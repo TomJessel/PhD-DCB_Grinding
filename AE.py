@@ -16,12 +16,13 @@ def rms(x):
 
 
 class AE:
-    def __init__(self, ae_files, pre_amp, fs):
+    def __init__(self, ae_files, pre_amp, fs, testinfo):
         self.files = ae_files
         self.kurt = []
         self.RMS = []
         self.pre_amp = pre_amp
         self.fs = fs
+        self._testinfo = testinfo
 
     @staticmethod
     def volt2db(v):
@@ -93,11 +94,12 @@ class AE:
         filename = filename[-8:]
         matplotlib.use('Qt5Agg')
         plt.figure()
-        plt.plot(f, self.volt2db(p))
-        plt.title(filename)
+        plt.plot(f / 1000, self.volt2db(p), linewidth=0.75)
+        plt.title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
         plt.autoscale(enable=True, axis='x', tight=True)
-        plt.xlabel('Frequency (Hz)')
+        plt.xlabel('Frequency (kHz)')
         plt.ylabel('Amplitude (dB)')
+        plt.grid()
         mplcursors.cursor(multiple=True)
         plt.show()
 

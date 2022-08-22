@@ -10,7 +10,7 @@ class Experiment:
         self.test_info = TestInfo.TestInfo(dataloc)
         self.date = date
         self.dataloc = dataloc
-        self.ae = AE.AE(ae_files, self.test_info.pre_amp, self.test_info.acquisition[0])
+        self.ae = AE.AE(ae_files, self.test_info.pre_amp, self.test_info.acquisition[0], self.test_info)
         self.nc4 = NC4.nc4(nc4_files, self.test_info, self.test_info.dcb, self.test_info.acquisition[1])
 
     def __repr__(self):
