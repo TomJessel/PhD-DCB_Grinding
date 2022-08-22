@@ -6,7 +6,6 @@ import mplcursors
 from scipy.stats import kurtosis
 import multiprocessing
 from functools import partial
-import math
 import time
 
 
@@ -27,7 +26,7 @@ class AE:
     @staticmethod
     def volt2db(v):
         v_ref = 1E-4
-        db = [20*(math.log10(vin/v_ref)) for vin in v]
+        db = [20*(np.log10(vin/v_ref)) for vin in v]
         return db
 
     def fftcalc(self, fno, freqres):
@@ -88,7 +87,7 @@ class AE:
 
     def plotfft(self, fno, freqres=1000):
         p = self.fftcalc(fno, freqres)
-        f = np.arange(0, self.fs/2, 1000, dtype=int)
+        f = np.arange(0, self.fs/2, freqres, dtype=int)
 
         filename = self.files[fno].partition('_202')[0]
         filename = filename[-8:]
@@ -102,6 +101,7 @@ class AE:
         plt.grid()
         mplcursors.cursor(multiple=True)
         plt.show()
+            # todo File 155 showing weird FFT
 
     def process(self):
         with multiprocessing.Pool() as pool:
@@ -118,10 +118,19 @@ class AE:
         print(f'Completed File {fno}...')
         return k, r
 
-    def fftsurf(self):
-        # f = np.fft.fftfreq(n=len(data), d=1/self.fs)
-        # todo finish off FFT plotting and calc
+    def fftsurf(self, res=1000):
 
-        res = 1000
+        # todo finish off FFT plotting and calc
         with multiprocessing.Pool() as pool:
             results = pool.map(partial(self.fftcalc, freqres=res), range(len(self.files)))
+
+        f = np.arange(0, self.fs/2, res, dtype=int)
+        n = np.arange(0, len(self.files))
+        p = self.volt2db(np.array(results))
+        p = np.array(p)
+
+        x, y = np.meshgrid(f, n)
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        surf = ax.plot_surface(x, y, p, cmap='jet')
+        fig.show()
