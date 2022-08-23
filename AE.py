@@ -33,7 +33,7 @@ class AE:
         length = int(self.fs / freqres)
         data = self.readAE(fno)
         if len(data) % length == 0:
-            temp = np.reshape(data, (length, -1))
+            temp = np.reshape(data, (length, -1), order='F')
         else:
             leftover = int(length - np.fmod(len(data), length))
             temp = np.pad(data, (0, leftover), 'constant', constant_values=0)
