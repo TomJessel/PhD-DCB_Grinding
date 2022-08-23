@@ -126,7 +126,6 @@ if __name__ == '__main__':
         getattr(exp.nc4, 'radius')
     except AttributeError:
         exp.nc4.process()
-    exp.ae.plotfft(155)
+
 
 # todo add methods to update objects and also print progress of tests
-# todo add FFT capabilities

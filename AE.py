@@ -3,10 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import mplcursors
-from scipy.stats import kurtosis
 import multiprocessing
 from functools import partial
-import time
+from scipy.stats import kurtosis
 
 
 def rms(x):
@@ -101,7 +100,6 @@ class AE:
         plt.grid()
         mplcursors.cursor(multiple=True)
         plt.show()
-            # todo File 155 showing weird FFT
 
     def process(self):
         with multiprocessing.Pool() as pool:
@@ -118,9 +116,13 @@ class AE:
         print(f'Completed File {fno}...')
         return k, r
 
-    def fftsurf(self, res=1000):
+    def fftsurf(self, res=1000, freqlim=None):
 
-        # todo finish off FFT plotting and calc
+        if freqlim is None:
+            freqlim = {'lowlim': int(0/res), 'uplim': int(self.fs/(2*res))}
+        else:
+            freqlim = {'lowlim': int(freqlim[0]/res), 'uplim': int(freqlim[1]/res)}
+
         with multiprocessing.Pool() as pool:
             results = pool.map(partial(self.fftcalc, freqres=res), range(len(self.files)))
 
@@ -128,9 +130,20 @@ class AE:
         n = np.arange(0, len(self.files))
         p = self.volt2db(np.array(results))
         p = np.array(p)
+        self._
+
+        f = f[freqlim['lowlim']:freqlim['uplim']]
+
+        p = p[:, freqlim['lowlim']:freqlim['uplim']]
 
         x, y = np.meshgrid(f, n)
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
-        surf = ax.plot_surface(x, y, p, cmap='jet')
+        ax.plot_surface(x, y, p, cmap='jet')
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel('Measurement Number')
+        ax.set_zlabel('Amplitude (dB)')
+        ax.set_title(f'Test No: {self._testinfo.testno} - FFT')
         fig.show()
+        # todo add inclusion to save figures as well as computed amp array
+
