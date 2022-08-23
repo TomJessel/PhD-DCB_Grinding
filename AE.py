@@ -17,7 +17,7 @@ class AE:
     def __init__(self, ae_files, pre_amp, fs, testinfo):
         self._files = ae_files
         self.kurt = []
-        self.RMS = []
+        self.rms = []
         self._pre_amp = pre_amp
         self._fs = fs
         self._testinfo = testinfo
@@ -86,14 +86,17 @@ class AE:
         plt.show()
 
     def plotfft(self, fno, freqres=1000):
-        p = self.fftcalc(fno, freqres)
+        if freqres in self.fft:
+            p = self.fft[freqres][fno]
+        else:
+            p = self.fftcalc(fno, freqres)
         f = np.arange(0, self._fs / 2, freqres, dtype=int)
 
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
         matplotlib.use('Qt5Agg')
         plt.figure()
-        plt.plot(f / 1000, self.volt2db(p), linewidth=0.75)
+        plt.plot(f / 1000, p, linewidth=0.75)
         plt.title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
         plt.autoscale(enable=True, axis='x', tight=True)
         plt.xlabel('Frequency (kHz)')
@@ -115,7 +118,7 @@ class AE:
         pool.close()
 
         self.kurt = results[:, 0]
-        self.RMS = results[:, 1]
+        self.rms = results[:, 1]
 
     def _calc(self, fno):
         data = self.readAE(fno)
@@ -152,5 +155,3 @@ class AE:
         ax.set_zlabel('Amplitude (dB)')
         ax.set_title(f'Test No: {self._testinfo.testno} - FFT')
         fig.show()
-        # todo add inclusion to save figures as well as computed amp array
-

@@ -121,11 +121,15 @@ def load():
 
 
 if __name__ == '__main__':
-    exp = createobj()
+    exp = load()
     try:
         getattr(exp.nc4, 'radius')
     except AttributeError:
         exp.nc4.process()
-    exp.ae.process()
+
+    try:
+        getattr(exp.ae, 'kurt')
+    except AttributeError:
+        exp.ae.process()
 
 # todo add methods to update objects and also print progress of tests
