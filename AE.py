@@ -15,12 +15,13 @@ def rms(x):
 
 class AE:
     def __init__(self, ae_files, pre_amp, fs, testinfo):
-        self.files = ae_files
+        self._files = ae_files
         self.kurt = []
         self.RMS = []
-        self.pre_amp = pre_amp
-        self.fs = fs
+        self._pre_amp = pre_amp
+        self._fs = fs
         self._testinfo = testinfo
+        self.fft = {}
 
     @staticmethod
     def volt2db(v):
@@ -29,7 +30,7 @@ class AE:
         return db
 
     def fftcalc(self, fno, freqres):
-        length = int(self.fs / freqres)
+        length = int(self._fs / freqres)
         data = self.readAE(fno)
         if len(data) % length == 0:
             temp = np.reshape(data, (length, -1), order='F')
@@ -52,7 +53,7 @@ class AE:
         return fft_mean
 
     def readAE(self, fno):
-        test = TdmsFile.read(self.files[fno])
+        test = TdmsFile.read(self._files[fno])
         prop = test.properties
         data = []
         for group in test.groups():
@@ -60,19 +61,19 @@ class AE:
                 data = channel[:]
         if not data.dtype == float:
             data = (data.astype(np.float) * prop.get('Gain')) + prop.get('Offset')
-        if not self.pre_amp.gain == 40:
-            if self.pre_amp.gain == 20:
+        if not self._pre_amp.gain == 40:
+            if self._pre_amp.gain == 20:
                 data = data * 10
-            elif self.pre_amp == 60:
+            elif self._pre_amp == 60:
                 data = data / 10
         return data
 
     def plotAE(self, fno):
         signal = self.readAE(fno)
-        ts = 1 / self.fs
+        ts = 1 / self._fs
         n = signal.size
         t = np.arange(0, n) * ts
-        filename = self.files[fno].partition('_202')[0]
+        filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
         matplotlib.use("Qt5Agg")
         plt.figure()
@@ -86,9 +87,9 @@ class AE:
 
     def plotfft(self, fno, freqres=1000):
         p = self.fftcalc(fno, freqres)
-        f = np.arange(0, self.fs/2, freqres, dtype=int)
+        f = np.arange(0, self._fs / 2, freqres, dtype=int)
 
-        filename = self.files[fno].partition('_202')[0]
+        filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
         matplotlib.use('Qt5Agg')
         plt.figure()
@@ -103,7 +104,14 @@ class AE:
 
     def process(self):
         with multiprocessing.Pool() as pool:
-            results = np.array(pool.map(self._calc, range(len(self.files))))
+            print('Calculating results...')
+            results = np.array(pool.map(self._calc, range(len(self._files))))
+            if 1000 not in self.fft:
+                print('Calculating FFT with 1kHz bins...')
+                fft = pool.map(partial(self.fftcalc, freqres=1000), range(len(self._files)))
+                p = self.volt2db(np.array(fft))
+                self.fft[1000] = p
+
         pool.close()
 
         self.kurt = results[:, 0]
@@ -113,27 +121,26 @@ class AE:
         data = self.readAE(fno)
         r = rms(data)
         k = kurtosis(data, fisher=False)
-        print(f'Completed File {fno}...')
+        # print(f'Completed File {fno}...')
         return k, r
 
     def fftsurf(self, res=1000, freqlim=None):
+        if res in self.fft:
+            p = self.fft[res]
+        else:
+            with multiprocessing.Pool() as pool:
+                results = pool.map(partial(self.fftcalc, freqres=res), range(len(self._files)))
+            p = self.volt2db(np.array(results))
+            self.fft[res] = p
 
         if freqlim is None:
-            freqlim = {'lowlim': int(0/res), 'uplim': int(self.fs/(2*res))}
+            freqlim = {'lowlim': int(0/res), 'uplim': int(self._fs / (2 * res))}
         else:
             freqlim = {'lowlim': int(freqlim[0]/res), 'uplim': int(freqlim[1]/res)}
-
-        with multiprocessing.Pool() as pool:
-            results = pool.map(partial(self.fftcalc, freqres=res), range(len(self.files)))
-
-        f = np.arange(0, self.fs/2, res, dtype=int)
-        n = np.arange(0, len(self.files))
-        p = self.volt2db(np.array(results))
+        f = np.arange(0, self._fs / 2, res, dtype=int)
+        n = np.arange(0, len(self._files))
         p = np.array(p)
-        self._
-
         f = f[freqlim['lowlim']:freqlim['uplim']]
-
         p = p[:, freqlim['lowlim']:freqlim['uplim']]
 
         x, y = np.meshgrid(f, n)
