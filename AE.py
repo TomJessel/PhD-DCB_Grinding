@@ -102,7 +102,7 @@ class AE:
         plt.xlabel('Frequency (kHz)')
         plt.ylabel('Amplitude (dB)')
         plt.grid()
-        mplcursors.cursor(multiple=True)
+        mplcursors.cursor(hover=True)
         plt.show()
 
     def process(self):
@@ -127,20 +127,20 @@ class AE:
         # print(f'Completed File {fno}...')
         return k, r
 
-    def fftsurf(self, res=1000, freqlim=None):
-        if res in self.fft:
-            p = self.fft[res]
+    def fftsurf(self, freqres=1000, freqlim=None):
+        if freqres in self.fft:
+            p = self.fft[freqres]
         else:
             with multiprocessing.Pool() as pool:
-                results = pool.map(partial(self.fftcalc, freqres=res), range(len(self._files)))
+                results = pool.map(partial(self.fftcalc, freqres=freqres), range(len(self._files)))
             p = self.volt2db(np.array(results))
-            self.fft[res] = p
+            self.fft[freqres] = p
 
         if freqlim is None:
-            freqlim = {'lowlim': int(0/res), 'uplim': int(self._fs / (2 * res))}
+            freqlim = {'lowlim': int(0 / freqres), 'uplim': int(self._fs / (2 * freqres))}
         else:
-            freqlim = {'lowlim': int(freqlim[0]/res), 'uplim': int(freqlim[1]/res)}
-        f = np.arange(0, self._fs / 2, res, dtype=int)
+            freqlim = {'lowlim': int(freqlim[0] / freqres), 'uplim': int(freqlim[1] / freqres)}
+        f = np.arange(0, self._fs / 2, freqres, dtype=int)
         n = np.arange(0, len(self._files))
         p = np.array(p)
         f = f[freqlim['lowlim']:freqlim['uplim']]
