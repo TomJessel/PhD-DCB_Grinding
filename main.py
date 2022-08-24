@@ -15,6 +15,8 @@ import Experiment
 import pickle
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import sys
+
 mpl.use("Qt5Agg")
 # from importlib import reload
 # import AE
@@ -73,7 +75,7 @@ def createobj():
             raise NotADirectoryError
     except NotADirectoryError:
         print('No Folder selected!')
-        quit()
+        sys.exit()
 
     folder_path = os.path.normpath(folder_path)
     
@@ -121,7 +123,7 @@ def load():
 
 
 if __name__ == '__main__':
-    exp = load()
+    exp = createobj()
     try:
         getattr(exp.nc4, 'radius')
     except AttributeError:
@@ -131,5 +133,6 @@ if __name__ == '__main__':
         getattr(exp.ae, 'kurt')
     except AttributeError:
         exp.ae.process()
+    exp.save()
 
 # todo add methods to update objects and also print progress of tests

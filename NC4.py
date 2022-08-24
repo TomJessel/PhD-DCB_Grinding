@@ -248,7 +248,7 @@ class nc4:
         return prad, nrad
 
     @staticmethod
-    def _alignposneg(prad, nrad):  # todo change when finished
+    def _alignposneg(prad, nrad):
         pradzero = np.subtract(np.transpose(prad), np.mean(prad, axis=1))
         nradzero = np.subtract(np.transpose(nrad), np.mean(nrad, axis=1))
         # print('Working out Lags')
