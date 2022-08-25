@@ -123,15 +123,13 @@ def load():
 
 
 if __name__ == '__main__':
-    exp = createobj()
+    exp = load()
     try:
         getattr(exp.nc4, 'radius')
     except AttributeError:
         exp.nc4.process()
 
-    try:
-        getattr(exp.ae, 'kurt')
-    except AttributeError:
+    if not exp.ae.kurt:
         exp.ae.process()
     exp.save()
 
