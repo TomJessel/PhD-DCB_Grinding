@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
+
 import mplcursors
 
 import NC4
@@ -16,9 +17,12 @@ import pickle
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import sys
+from scipy import signal
 import pandas as pd
 
 mpl.use("Qt5Agg")
+
+
 # from importlib import reload
 # import AE
 
@@ -79,7 +83,7 @@ def createobj():
         sys.exit()
 
     folder_path = os.path.normpath(folder_path)
-    
+
     # create two folder paths for AE and NC4
     ae_path = os.path.join(folder_path, 'AE', 'TDMS')
 
@@ -123,6 +127,22 @@ def load():
     return data
 
 
+def norm_corr(exp):
+    # freqind = int(freq/1000)
+    # f = np.array([file[freqind] for file in exp.ae.fft[1000]])
+    r = exp.nc4.mean_radius
+    f = np.array(exp.ae.fft[1000])
+    f = f.transpose()
+
+    c = [np.corrcoef(x, r[-np.shape(f)[1]:])[0, 1] for x in f]
+    # c = signal.correlate(f, r, mode='full')
+    fig, ax = plt.subplots()
+    ax.plot(c)
+    fig.show()
+    return c
+
+
+
 if __name__ == '__main__':
     exp = load()
     try:
@@ -135,3 +155,4 @@ if __name__ == '__main__':
     exp.save()
 
 # todo add methods to update objects and also print progress of tests
+# todo possibly move functionality of creating and loading objects into Experiment.py file
