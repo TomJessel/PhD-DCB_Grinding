@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
-
+import mplcursors
 
 import NC4
 import datetime
@@ -16,6 +16,7 @@ import pickle
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import sys
+import pandas as pd
 
 mpl.use("Qt5Agg")
 # from importlib import reload
@@ -129,7 +130,7 @@ if __name__ == '__main__':
     except AttributeError:
         exp.nc4.process()
 
-    if not exp.ae.kurt:
+    if not exp.ae.kurt:  # todo broken if filled in
         exp.ae.process()
     exp.save()
 

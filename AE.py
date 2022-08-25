@@ -1,11 +1,12 @@
 from nptdms import TdmsFile
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
+import matplotlib as mpl
 import mplcursors
 import multiprocessing
 from functools import partial
 from scipy.stats import kurtosis
+import pandas as pd
 
 
 def rms(x):
@@ -50,6 +51,7 @@ class AE:
         p[1:] = p[1:] * 2
         p = np.array(p * sc)
         fft_mean = np.mean(p, axis=1)
+        print(f'Calc FFT - File {fno}... ')
         return fft_mean
 
     def readAE(self, fno):
@@ -75,7 +77,7 @@ class AE:
         t = np.arange(0, n) * ts
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        matplotlib.use("Qt5Agg")
+        mpl.use("Qt5Agg")
         plt.figure()
         plt.plot(t, signal, linewidth=1)
         plt.title(filename)
@@ -94,7 +96,7 @@ class AE:
 
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        matplotlib.use('Qt5Agg')
+        mpl.use('Qt5Agg')
         plt.figure()
         plt.plot(f / 1000, p, linewidth=0.75)
         plt.title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
@@ -124,7 +126,7 @@ class AE:
         data = self.readAE(fno)
         r = rms(data)
         k = kurtosis(data, fisher=False)
-        # print(f'Completed File {fno}...')
+        print(f'Completed File {fno}...')
         return k, r
 
     def fftsurf(self, freqres=1000, freqlim=None):
@@ -154,4 +156,22 @@ class AE:
         ax.set_ylabel('Measurement Number')
         ax.set_zlabel('Amplitude (dB)')
         ax.set_title(f'Test No: {self._testinfo.testno} - FFT')
+        fig.show()
+
+    def rolling_rms(self, fno):
+        data = self.readAE(fno)
+        data = pd.DataFrame(data)
+        v = data.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
+        v = v.to_numpy()
+        ts = 1 / self._fs
+        n = data.size
+        t = np.arange(0, n) * ts
+        mpl.use('Qt5Agg')
+        fig, ax = plt.subplots()
+        ax.plot(t, v, linewidth=0.75)
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('RMS (s)')
+        ax.set_title(f'File {fno} - Rolling RMS')
+        ax.autoscale(enable=True, axis='x', tight=True)
+        mplcursors.cursor(multiple=True)
         fig.show()
