@@ -137,7 +137,6 @@ if __name__ == '__main__':
     if not exp.ae.kurt.all():
         exp.ae.process()
     exp.save()
-    exp.correlation()
 
 # todo add methods to update objects and also print progress of tests
 # todo possibly move functionality of creating and loading objects into Experiment.py file
