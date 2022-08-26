@@ -3,6 +3,10 @@ import TestInfo
 import AE
 import pickle
 import NC4
+import numpy as np
+import mplcursors
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 
 
 class Experiment:
@@ -21,3 +25,44 @@ class Experiment:
         with open(f'{self.dataloc}/Test {self.test_info.testno}.pickle', 'wb') as f:
             pickle.dump(self, f)
 
+    def correlation(self):
+        """
+        Corerlation between each freq bin and NC4 measurements
+
+        Produces correlation coeffs for each freq bin compared to mean radius
+
+        :param self: obj that is being used
+        :return: correlation coeffs
+        """
+        def plot(fre, c):
+            fig, axs = plt.subplots(2, 1, sharex='all')
+            axs[0].plot(fre, c[:, 0], 'C0', label='Mean Radius', linewidth=1)
+            axs[0].plot(fre, c[:, 1], 'C1', label='Peak Radius', linewidth=1)
+            axs[1].plot(fre, c[:, 2], 'C2', label='Runout', linewidth=1)
+            axs[1].plot(fre, c[:, 3], 'C3', label='Form Error', linewidth=1)
+            axs[0].set_xlim(0, 1000)
+            axs[1].set_xlim(0, 1000)
+            axs[0].xaxis.set_major_locator(mpl.ticker.MultipleLocator(100))
+            axs[1].xaxis.set_major_locator(mpl.ticker.MultipleLocator(100))
+            axs[0].set_ylim(-1, 1)
+            axs[1].set_ylim(-1, 1)
+            axs[0].set_xlabel('Freq Bin (kHz)')
+            axs[1].set_xlabel('Freq Bin (kHz)')
+            axs[0].set_ylabel('Pearson Correlation Coeff')
+            axs[1].set_ylabel('Pearson Correlation Coeff')
+            mplcursors.cursor(multiple=True)
+            axs[0].legend(['Mean Radius', 'Peak Radius'])
+            axs[1].legend(['Runout', 'Form Error'])
+            axs[0].grid()
+            axs[1].grid()
+            axs[0].set_title('Correlation of AE FFT bins and NC4 measurements')
+            return fig
+
+        r = np.stack([self.nc4.mean_radius, self.nc4.peak_radius, self.nc4.runout, self.nc4.form_error])
+        f = np.array(self.ae.fft[1000])
+        f = f.transpose()
+        coeff = np.corrcoef(f, r[-np.shape(f)[1]:])[:-4, -4:]
+        freq = np.arange(0, self.test_info.acquisition[0] / 2, 1000, dtype=int) / 1000
+        fig = plot(freq, coeff)
+        fig.show()
+        return coeff

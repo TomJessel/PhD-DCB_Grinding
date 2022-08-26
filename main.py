@@ -127,47 +127,6 @@ def load():
     return data
 
 
-def norm_corr(exp):
-    """
-    Calc Pearson correlation coefficients for each freq bin
-
-    Produces correlation coeffs for each freq bin compared to mean radius
-
-    :param exp: obj that is being used
-    :return: correlation coeffs
-    """
-    r = np.stack([exp.nc4.mean_radius, exp.nc4.peak_radius, exp.nc4.runout, exp.nc4.form_error])
-    f = np.array(exp.ae.fft[1000])
-    f = f.transpose()
-    c = np.corrcoef(f, r[-np.shape(f)[1]:])[:-4, -4:]
-    fre = np.arange(0, exp.ae._fs / 2, 1000, dtype=int) / 1000
-
-    fig, axs = plt.subplots(2, 1, sharex='all')
-    axs[0].plot(fre, c[:, 0], 'C0', label='Mean Radius', linewidth=1)
-    axs[0].plot(fre, c[:, 1], 'C1', label='Peak Radius', linewidth=1)
-    axs[1].plot(fre, c[:, 2], 'C2', label='Runout', linewidth=1)
-    axs[1].plot(fre, c[:, 3], 'C3', label='Form Error', linewidth=1)
-    axs[0].set_xlim(0, 1000)
-    axs[1].set_xlim(0, 1000)
-    axs[0].xaxis.set_major_locator(mpl.ticker.MultipleLocator(100))
-    axs[1].xaxis.set_major_locator(mpl.ticker.MultipleLocator(100))
-    axs[0].set_ylim(-1, 1)
-    axs[1].set_ylim(-1, 1)
-    axs[0].set_xlabel('Freq Bin (kHz)')
-    axs[1].set_xlabel('Freq Bin (kHz)')
-    axs[0].set_ylabel('Pearson Correlation Coeff')
-    axs[1].set_ylabel('Pearson Correlation Coeff')
-    mplcursors.cursor(multiple=True)
-    axs[0].legend(['Mean Radius', 'Peak Radius'])
-    axs[1].legend(['Runout', 'Form Error'])
-    axs[0].grid()
-    axs[1].grid()
-    axs[0].set_title('Correlation of AE FFT bins and NC4 measurements')
-    fig.show()
-    return c
-
-
-
 if __name__ == '__main__':
     exp = load()
     try:
@@ -178,7 +137,7 @@ if __name__ == '__main__':
     if not exp.ae.kurt.all():
         exp.ae.process()
     exp.save()
-    norm_corr(exp)
+    exp.correlation()
 
 # todo add methods to update objects and also print progress of tests
 # todo possibly move functionality of creating and loading objects into Experiment.py file
