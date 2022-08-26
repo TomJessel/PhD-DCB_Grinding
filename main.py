@@ -150,7 +150,7 @@ if __name__ == '__main__':
     except AttributeError:
         exp.nc4.process()
 
-    if not exp.ae.kurt:  # todo broken if filled in
+    if not exp.ae.kurt.all():
         exp.ae.process()
     exp.save()
 
