@@ -1,3 +1,5 @@
+import time
+
 from nptdms import TdmsFile
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,7 +9,8 @@ import multiprocessing
 from functools import partial
 from scipy.stats import kurtosis
 import pandas as pd
-
+import matplotlib.animation as animation
+from matplotlib.animation import PillowWriter
 
 def rms(x):
     r = np.sqrt(np.mean(x ** 2))
@@ -27,7 +30,7 @@ class AE:
     @staticmethod
     def volt2db(v):
         v_ref = 1E-4
-        db = [20*(np.log10(vin/v_ref)) for vin in v]
+        db = [20 * (np.log10(vin / v_ref)) for vin in v]
         return db
 
     def fftcalc(self, fno, freqres):
@@ -159,19 +162,68 @@ class AE:
         fig.show()
 
     def rolling_rms(self, fno):
-        data = self.readAE(fno)
-        data = pd.DataFrame(data)
-        v = data.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
-        v = v.to_numpy()
+        def calc_rms(no):
+            data = self.readAE(no)
+            data = pd.DataFrame(data)
+            v = data.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
+            v = v[1_000_000:41_000_000].to_numpy()
+            return v
+
         ts = 1 / self._fs
-        n = data.size
-        t = np.arange(0, n) * ts
-        mpl.use('Qt5Agg')
-        fig, ax = plt.subplots()
-        ax.plot(t, v, linewidth=0.75)
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('RMS (s)')
-        ax.set_title(f'File {fno} - Rolling RMS')
-        ax.autoscale(enable=True, axis='x', tight=True)
-        mplcursors.cursor(multiple=True)
-        fig.show()
+        if type(fno) is int:
+            v_rms = calc_rms(fno)
+            n = v_rms.size
+            t = np.arange(0, n) * ts
+            mpl.use('Qt5Agg')
+            fig, ax = plt.subplots()
+            ax.plot(t, v_rms, linewidth=0.75)
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('RMS (s)')
+            ax.set_title(f'File {fno} - Rolling RMS')
+            ax.autoscale(enable=True, axis='x', tight=True)
+            mplcursors.cursor(multiple=True)
+            fig.show()
+        elif type(fno) is tuple:
+            # v_rms = [calc_rms(no) for no in range(fno[0], fno[1])]
+            # # v_rms = np.array(v_rms)
+            #
+            # fig, ax = plt.subplots()
+            # n = 40_000_000
+            # t = np.arange(0, n) * ts
+            # line = ax.plot(t, v_rms[0])[0]
+            # ax.set_title('RMS - File 0')
+            # ax.set_ylim(0, 4)
+            # ax.set_xlim(0, 40000000)
+            # ax.set_xlabel('Time (s)')
+            # ax.set_ylabel('RMS (V)')
+            #
+            # def animate(i):
+            #     line.set_ydata(v_rms[i])
+            #     line.set_xdata(t)
+            #     ax.set_title(f'RMS - File {i + fno[0]}')
+            #     return line, ax
+            #
+            # anim = animation.FuncAnimation(fig, animate, frames=fno[1], interval=1000, blit=True)
+            # anim.save('AnimationTest.mp4')
+            # plt.show()
+            fig, ax = plt.subplots()
+            l, = ax.plot([], [])
+            ax.set_xlim(0, 20)
+            ax.set_ylim(0, 4)
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('RMS (V)')
+            writer = PillowWriter(fps=1)
+
+            x = []
+            y = []
+            n = 40_000_000
+            with writer.saving(fig, 'AnimationTest.gif', 100):
+                v_rms = [calc_rms(no) for no in range(fno[0], fno[1])]
+                for no in range(fno[0], fno[1]):
+                    x = np.arange(0, n) * ts
+                    y = calc_rms(no)
+                    l.set_data(x, y)
+                    ax.set_title(f'File - {no:03d}')
+                    writer.grab_frame()
+
+        # return v_rms

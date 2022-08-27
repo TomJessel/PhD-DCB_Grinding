@@ -33,6 +33,7 @@ class Experiment:
         Produces correlation coeffs for each freq bin compared to mean radius
 
         :param self: obj that is being used
+        :param plotfig: boolean for plotting the figure
         :return: correlation coeffs
         """
         def plot(fre, c):

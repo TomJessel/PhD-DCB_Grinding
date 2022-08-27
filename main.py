@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 
-import mplcursors
-
-import NC4
 import datetime
 import fnmatch
 import glob
@@ -16,15 +13,11 @@ import Experiment
 import pickle
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+
 import sys
-from scipy import signal
-import pandas as pd
+
 
 mpl.use("Qt5Agg")
-
-
-# from importlib import reload
-# import AE
 
 
 # function that moves _files from src folder to dst folder with optional ext selector
@@ -73,7 +66,6 @@ def getdate(AE_f, NC4_f):
 
 def createobj():
     # import file names and directories of AE and NC4
-    folder_path = None
     try:
         folder_path = askdirectory(title='Select test folder:')
         if not folder_path:
@@ -136,7 +128,10 @@ if __name__ == '__main__':
 
     if not exp.ae.kurt.all():
         exp.ae.process()
-    exp.save()
+    # exp.save()
+    # exp.ae.rolling_rms((0, 21))
 
+# todo .all() doesn't work when creating new obj
 # todo add methods to update objects and also print progress of tests
 # todo possibly move functionality of creating and loading objects into Experiment.py file
+# todo change file location saving to relative paths not absolute paths
