@@ -119,7 +119,6 @@ class AE:
                 fft = pool.map(partial(self.fftcalc, freqres=1000), range(len(self._files)))
                 p = self.volt2db(np.array(fft))
                 self.fft[1000] = p
-
         pool.close()
 
         self.kurt = results[:, 0]
