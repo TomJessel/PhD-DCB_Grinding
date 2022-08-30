@@ -1,4 +1,15 @@
-# Class for test objects with methods
+#!/usr/bin/env python3
+# -*- coding:utf-8 -*-
+"""
+@File    :   Experiment.py
+@Author  :   Tom Jessel
+@Contact :   jesselt@cardiff.ac.uk
+
+@Modify Time      @Author    @Version    @Desciption
+------------      -------    --------    -----------
+22/08/2022 13:46   tomhj      1.0         File containing code to produce and operate experiment objects
+"""
+
 import datetime
 import fnmatch
 import glob
@@ -20,7 +31,7 @@ def load(process=False):
     """
     Load in a saved exp pickle file, option to process data
 
-    :param process: bool default(False) option to process data when loading
+    :param process: bool (default:False) option to process data when loading
     :rtype: object
     """
     try:
@@ -43,7 +54,13 @@ def load(process=False):
     return data
 
 
-def create_obj():
+def create_obj(process=False):
+    """
+    Creates object for individual test
+
+    :param process: bool (default:False) decides if results should be processed
+    :return: experiment obj
+    """
     def folder_exist(path):
         # if folder doesn't exist create it
         if not os.path.isdir(path) or not os.path.exists(path):
@@ -112,7 +129,9 @@ def create_obj():
     nc4_files = tuple(glob.glob(os.path.join(nc4_path, "*.tdms")))
     date = getdate(ae_files, nc4_files)
     obj = Experiment(folder_path, date, ae_files, nc4_files)
-
+    if process:
+        obj.nc4.process()
+        obj.ae.process()
     return obj
 
 

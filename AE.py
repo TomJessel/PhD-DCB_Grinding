@@ -1,3 +1,15 @@
+#!/usr/bin/env python3
+# -*- coding:utf-8 -*-
+"""
+@File    :   AE.py
+@Author  :   Tom Jessel
+@Contact :   jesselt@cardiff.ac.uk
+
+@Modify Time      @Author    @Version    @Description
+------------      -------    --------    -----------
+22/08/2022 13:46   tomhj      1.0         File which handles AE operations within experiment object
+"""
+
 import multiprocessing
 from functools import partial
 import matplotlib as mpl

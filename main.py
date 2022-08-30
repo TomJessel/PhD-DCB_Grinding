@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
+"""
+@File    :   main.py
+@Author  :   Tom Jessel
+@Contact :   jesselt@cardiff.ac.uk
+
+@Modify Time      @Author    @Version    @Description
+------------      -------    --------    -----------
+22/08/2022 13:46   tomhj      1.0         Main file
+"""
+
 
 import Experiment
 
 if __name__ == '__main__':
-    # exp = Experiment.load()
-    # exp.save()
-    exp = Experiment.create_obj()
+    exp = Experiment.create_obj(process=True)
 
-# todo .all() doesn't work when creating new obj  possibly inbuild this part into the load and createobj funcs)
+
 # todo add methods to update objects and also print progress of tests
-# todo possibly move functionality of creating and loading objects into Experiment.py file
-# todo change file location saving to relative paths not absolute paths
