@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import sys
 
 
-mpl.use("Qt5Agg")
+# mpl.use("Qt5Agg")
 
 
 # function that moves _files from src folder to dst folder with optional ext selector
@@ -106,28 +106,17 @@ def createobj():
     return obj
 
 
-def load():
-    try:
-        file_path = tkfiledialog.askopenfilename(defaultextension='pickle')
-        if not file_path:
-            raise NotADirectoryError
-        with open(file_path, 'rb') as f:
-            data = pickle.load(f)
-    except NotADirectoryError:
-        print('No file selected.')
-        quit()
-    return data
-
 
 if __name__ == '__main__':
-    exp = load()
-    try:
-        getattr(exp.nc4, 'radius')
-    except AttributeError:
-        exp.nc4.process()
-
-    if not exp.ae.kurt.all():
-        exp.ae.process()
+    exp = Experiment.load()
+    # exp = load()
+    # try:
+    #     getattr(exp.nc4, 'radius')
+    # except AttributeError:
+    #     exp.nc4.process()
+    #
+    # if not exp.ae.kurt.all():
+    #     exp.ae.process()
     # exp.save()
     # exp.ae.rolling_rms((0, 21))
 

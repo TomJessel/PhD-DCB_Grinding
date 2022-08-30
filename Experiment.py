@@ -1,6 +1,7 @@
 # Class for test objects with methods
 import os
 import TestInfo
+import tkinter.filedialog as tkfiledialog
 import AE
 import pickle
 import NC4
@@ -8,6 +9,33 @@ import numpy as np
 import mplcursors
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+
+
+def load(process=False):
+    """
+    Load in a saved exp pickle file, option to process data
+
+    :param process: bool default(False) option to process data when loading
+    :rtype: object
+    """
+    try:
+        file_path = tkfiledialog.askopenfilename(defaultextension='pickle')
+        if not file_path:
+            raise NotADirectoryError
+        with open(file_path, 'rb') as f:
+            data = pickle.load(f)
+    except NotADirectoryError:
+        print('No file selected.')
+        quit()
+    if process:
+        try:
+            getattr(data.nc4, 'radius')
+        except AttributeError:
+            data.nc4.process()
+
+        if not data.ae.kurt.all():
+            data.ae.process()
+    return data
 
 
 class Experiment:
