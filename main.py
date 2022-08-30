@@ -14,4 +14,4 @@
 from Experiment import *
 
 if __name__ == '__main__':
-    exp = create_obj()
+    exp = load()
