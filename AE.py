@@ -1,17 +1,15 @@
-import time
-
-from nptdms import TdmsFile
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import mplcursors
 import multiprocessing
 from functools import partial
-from scipy.stats import kurtosis
-import pandas as pd
-import matplotlib.animation as animation
-from matplotlib.animation import PillowWriter
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import moviepy.editor as mp
+import mplcursors
+import numpy as np
+import pandas as pd
+from matplotlib.animation import PillowWriter
+from nptdms import TdmsFile
+from scipy.stats import kurtosis
+
 
 def rms(x):
     r = np.sqrt(np.mean(x ** 2))
@@ -168,8 +166,8 @@ class AE:
         :param fno: either int or tuple: int - single graph with return, tuple - range of animation plot
         :return: for single plot: V_rms
         """
-        def calc_rms(no):
-            data = self.readAE(no)
+        def calc_rms(i):
+            data = self.readAE(i)
             data = pd.DataFrame(data)
             v = data.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
             v = v[1_000_000:41_000_000].to_numpy()
