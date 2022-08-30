@@ -11,6 +11,7 @@ from scipy.stats import kurtosis
 import pandas as pd
 import matplotlib.animation as animation
 from matplotlib.animation import PillowWriter
+import moviepy.editor as mp
 
 def rms(x):
     r = np.sqrt(np.mean(x ** 2))
@@ -161,12 +162,23 @@ class AE:
         fig.show()
 
     def rolling_rms(self, fno):
+        """
+        Plot either rolling RMS of single AE file or creates animation of all the files in certain range
+
+        :param fno: either int or tuple: int - single graph with return, tuple - range of animation plot
+        :return: for single plot: V_rms
+        """
         def calc_rms(no):
             data = self.readAE(no)
             data = pd.DataFrame(data)
             v = data.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
             v = v[1_000_000:41_000_000].to_numpy()
             return v
+
+        def mp4_conv(gifname):
+            clip = mp.VideoFileClip(gifname)
+            mp4name = gifname[:-3] + '.mp4'
+            clip.write_videofile(mp4name)
 
         ts = 1 / self._fs
         if type(fno) is int:
@@ -182,47 +194,23 @@ class AE:
             ax.autoscale(enable=True, axis='x', tight=True)
             mplcursors.cursor(multiple=True)
             fig.show()
+            return v_rms
         elif type(fno) is tuple:
-            # v_rms = [calc_rms(no) for no in range(fno[0], fno[1])]
-            # # v_rms = np.array(v_rms)
-            #
-            # fig, ax = plt.subplots()
-            # n = 40_000_000
-            # t = np.arange(0, n) * ts
-            # line = ax.plot(t, v_rms[0])[0]
-            # ax.set_title('RMS - File 0')
-            # ax.set_ylim(0, 4)
-            # ax.set_xlim(0, 40000000)
-            # ax.set_xlabel('Time (s)')
-            # ax.set_ylabel('RMS (V)')
-            #
-            # def animate(i):
-            #     line.set_ydata(v_rms[i])
-            #     line.set_xdata(t)
-            #     ax.set_title(f'RMS - File {i + fno[0]}')
-            #     return line, ax
-            #
-            # anim = animation.FuncAnimation(fig, animate, frames=fno[1], interval=1000, blit=True)
-            # anim.save('AnimationTest.mp4')
-            # plt.show()
+            # Code to create a gif of the RMS plots
             fig, ax = plt.subplots()
             l, = ax.plot([], [])
             ax.set_xlim(0, 20)
-            ax.set_ylim(0, 4)
+            ax.set_ylim(0, 5)
             ax.set_xlabel('Time (s)')
             ax.set_ylabel('RMS (V)')
-            writer = PillowWriter(fps=1)
-
-            x = []
-            y = []
-            n = 40_000_000
-            with writer.saving(fig, 'AnimationTest.gif', 100):
-                v_rms = [calc_rms(no) for no in range(fno[0], fno[1])]
+            writer = PillowWriter(fps=1.1)
+            n = 40_000_000  # number of points to plot
+            name = f'Test {self._testinfo.testno} - Rolling RMS.gif'
+            with writer.saving(fig, name, 100):
                 for no in range(fno[0], fno[1]):
                     x = np.arange(0, n) * ts
                     y = calc_rms(no)
                     l.set_data(x, y)
                     ax.set_title(f'File - {no:03d}')
                     writer.grab_frame()
-
-        # return v_rms
+            mp4_conv(name)
