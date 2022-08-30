@@ -203,7 +203,7 @@ class AE:
             ax.set_ylim(0, 5)
             ax.set_xlabel('Time (s)')
             ax.set_ylabel('RMS (V)')
-            writer = PillowWriter(fps=1.1)
+            writer = PillowWriter(fps=1)
             n = 40_000_000  # number of points to plot
             name = f'Test {self._testinfo.testno} - Rolling RMS.gif'
             with writer.saving(fig, name, 100):
