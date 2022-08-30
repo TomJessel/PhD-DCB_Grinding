@@ -1,7 +1,12 @@
 # Class for test objects with methods
+import datetime
+import fnmatch
+import glob
 import os
+import sys
 import TestInfo
 import tkinter.filedialog as tkfiledialog
+from tkinter.filedialog import askdirectory
 import AE
 import pickle
 import NC4
@@ -37,6 +42,78 @@ def load(process=False):
             data.ae.process()
     return data
 
+
+def create_obj():
+    def folder_exist(path):
+        # if folder doesn't exist create it
+        if not os.path.isdir(path) or not os.path.exists(path):
+            os.makedirs(path)
+
+    def move_files(src: str, dst: str, ext: str = '*'):
+        for f in fnmatch.filter(os.listdir(src), ext):
+            os.rename(os.path.join(src, f), os.path.join(dst, f))
+
+    def substring_after(s, delim):
+        return s.partition(delim)[2]
+
+    def sort_rename(files, path):
+        t = []
+        for name in files:
+            temp = datetime.datetime.fromtimestamp(os.path.getmtime(name))
+            t.append(temp)
+        sort_ind = np.argsort(np.argsort(t))
+
+        zipfiles = zip(sort_ind, files, t)
+        sdfiles = sorted(zipfiles)
+
+        for fno in sdfiles:
+            number = str('%03.f' % fno[0])
+            newfilename = 'File_' + number + '_202' + substring_after(fno[1], '202')
+            if not newfilename == fno[1]:
+                os.rename(fno[1], os.path.join(path, newfilename))
+
+    def getdate(AE_f, NC4_f):
+        if AE_f:
+            d = datetime.date.fromtimestamp(os.path.getmtime(AE_f[0]))
+        else:
+            d = datetime.date.fromtimestamp(os.path.getmtime(NC4_f[0]))
+        return d
+
+    # import file names and directories of AE and NC4
+    try:
+        folder_path = askdirectory(title='Select test folder:')
+        if not folder_path:
+            raise NotADirectoryError
+    except NotADirectoryError:
+        print('No Folder selected!')
+        sys.exit()
+
+    # setup file paths and create folder if needed
+    folder_path = os.path.normpath(folder_path)
+    folder_path = os.path.relpath(folder_path)
+    ae_path = os.path.join(folder_path, 'AE', 'TDMS')
+    nc4_path = os.path.join(folder_path, 'NC4', 'TDMS')
+    folder_exist(ae_path)
+    folder_exist(nc4_path)
+
+    if glob.glob(os.path.join(folder_path, "*MHz.tdms")):
+        print("Moving AE _files...")
+        move_files(folder_path, ae_path, '*MHz.tdms')
+        ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
+        sort_rename(ae_files, ae_path)
+
+    if glob.glob(os.path.join(folder_path, "*kHz.tdms")):
+        print("Moving NC4 _files...")
+        move_files(folder_path, nc4_path, '*kHz.tdms')
+        nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
+        sort_rename(nc4_files, nc4_path)
+    # collect data for exp obj
+    ae_files = tuple(glob.glob(os.path.join(ae_path, "*.tdms")))
+    nc4_files = tuple(glob.glob(os.path.join(nc4_path, "*.tdms")))
+    date = getdate(ae_files, nc4_files)
+    obj = Experiment(folder_path, date, ae_files, nc4_files)
+
+    return obj
 
 class Experiment:
     def __init__(self, dataloc, date, ae_files, nc4_files):
