@@ -4,16 +4,16 @@ import fnmatch
 import glob
 import os
 import sys
-import TestInfo
 import tkinter.filedialog as tkfiledialog
 from tkinter.filedialog import askdirectory
-import AE
 import pickle
-import NC4
 import numpy as np
 import mplcursors
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import TestInfo
+import AE
+import NC4
 
 
 def load(process=False):
@@ -114,6 +114,7 @@ def create_obj():
     obj = Experiment(folder_path, date, ae_files, nc4_files)
 
     return obj
+
 
 class Experiment:
     def __init__(self, dataloc, date, ae_files, nc4_files):
