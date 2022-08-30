@@ -307,3 +307,7 @@ class nc4:
         self.peak_radius = np.array([np.max(rad) for rad in radius])
         self.form_error = np.array([(np.max(rad) - np.min(rad)) for rad in radius])
         return circle
+
+    def update(self, files):
+        self._files = files
+        # todo add functionality to only process updated files

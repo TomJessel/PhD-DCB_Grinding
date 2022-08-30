@@ -27,6 +27,31 @@ import AE
 import NC4
 
 
+def _move_files(src: str, dst: str, ext: str = '*'):
+    for f in fnmatch.filter(os.listdir(src), ext):
+        os.rename(os.path.join(src, f), os.path.join(dst, f))
+
+
+def _sort_rename(files, path):
+    def substring_after(s, delim):
+        return s.partition(delim)[2]
+
+    t = []
+    for name in files:
+        temp = datetime.datetime.fromtimestamp(os.path.getmtime(name))
+        t.append(temp)
+    sort_ind = np.argsort(np.argsort(t))
+
+    zipfiles = zip(sort_ind, files, t)
+    sdfiles = sorted(zipfiles)
+
+    for fno in sdfiles:
+        number = str('%03.f' % fno[0])
+        newfilename = 'File_' + number + '_202' + substring_after(fno[1], '202')
+        if not newfilename == fno[1]:
+            os.rename(fno[1], os.path.join(path, newfilename))
+
+
 def load(process=False):
     """
     Load in a saved exp pickle file, option to process data
@@ -66,29 +91,6 @@ def create_obj(process=False):
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
 
-    def move_files(src: str, dst: str, ext: str = '*'):
-        for f in fnmatch.filter(os.listdir(src), ext):
-            os.rename(os.path.join(src, f), os.path.join(dst, f))
-
-    def substring_after(s, delim):
-        return s.partition(delim)[2]
-
-    def sort_rename(files, path):
-        t = []
-        for name in files:
-            temp = datetime.datetime.fromtimestamp(os.path.getmtime(name))
-            t.append(temp)
-        sort_ind = np.argsort(np.argsort(t))
-
-        zipfiles = zip(sort_ind, files, t)
-        sdfiles = sorted(zipfiles)
-
-        for fno in sdfiles:
-            number = str('%03.f' % fno[0])
-            newfilename = 'File_' + number + '_202' + substring_after(fno[1], '202')
-            if not newfilename == fno[1]:
-                os.rename(fno[1], os.path.join(path, newfilename))
-
     def getdate(AE_f, NC4_f):
         if AE_f:
             d = datetime.date.fromtimestamp(os.path.getmtime(AE_f[0]))
@@ -114,16 +116,16 @@ def create_obj(process=False):
     folder_exist(nc4_path)
 
     if glob.glob(os.path.join(folder_path, "*MHz.tdms")):
-        print("Moving AE _files...")
-        move_files(folder_path, ae_path, '*MHz.tdms')
-        ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
-        sort_rename(ae_files, ae_path)
+        print("Moving AE files...")
+        _move_files(folder_path, ae_path, '*MHz.tdms')
+    ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
+    _sort_rename(ae_files, ae_path)
 
     if glob.glob(os.path.join(folder_path, "*kHz.tdms")):
-        print("Moving NC4 _files...")
-        move_files(folder_path, nc4_path, '*kHz.tdms')
-        nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
-        sort_rename(nc4_files, nc4_path)
+        print("Moving NC4 files...")
+        _move_files(folder_path, nc4_path, '*kHz.tdms')
+    nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
+    _sort_rename(nc4_files, nc4_path)
     # collect data for exp obj
     ae_files = tuple(glob.glob(os.path.join(ae_path, "*.tdms")))
     nc4_files = tuple(glob.glob(os.path.join(nc4_path, "*.tdms")))
@@ -148,8 +150,35 @@ class Experiment:
         return rep
 
     def save(self):
+        """
+        Save obj to the data location folder as a '.pickle' file
+        """
         with open(f'{self.dataloc}/Test {self.test_info.testno}.pickle', 'wb') as f:
             pickle.dump(self, f)
+
+    def update(self):
+        dataloc: str = self.test_info.dataloc
+        print(f'Updating experiemnt obj - {datetime.datetime.now()}')
+        ae_path = os.path.join(dataloc, 'AE', 'TDMS')
+        nc4_path = os.path.join(dataloc, 'NC4', 'TDMS')
+        if glob.glob(os.path.join(dataloc, "*MHz.tdms")):
+            _move_files(dataloc, ae_path, '*MHz.tdms')
+            print('Moving new AE files...')
+            ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
+            _sort_rename(ae_files, ae_path)
+            self.ae.update(tuple(ae_files))
+        else:
+            print('No new AE files')
+
+        if glob.glob(os.path.join(dataloc, "*kHz.tdms")):
+            print("Moving new NC4 files...")
+            _move_files(dataloc, nc4_path, '*kHz.tdms')
+            nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
+            _sort_rename(nc4_files, nc4_path)
+            self.nc4.update(tuple(nc4_files))
+        else:
+            print('No new NC4 files.')
+# todo finish update func and print test update
 
     def correlation(self, plotfig=True):
         """
@@ -213,3 +242,4 @@ class Experiment:
             mplcursors.cursor(multiple=True)
             fig.show()
         return coeff
+    # todo same thing but for AE features other than FFT

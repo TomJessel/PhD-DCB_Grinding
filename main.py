@@ -11,10 +11,7 @@
 """
 
 
-import Experiment
+from Experiment import *
 
 if __name__ == '__main__':
-    exp = Experiment.create_obj(process=True)
-
-
-# todo add methods to update objects and also print progress of tests
+    exp = create_obj()

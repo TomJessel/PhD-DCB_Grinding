@@ -216,7 +216,7 @@ class AE:
             writer = PillowWriter(fps=1)
             n = 40_000_000  # number of points to plot
             name = f'{self._testinfo.dataloc}\\Test {self._testinfo.testno} - Rolling RMS.gif'
-            with writer.saving(fig, name, 100):
+            with writer.saving(fig, name, 200):
                 for no in range(fno[0], fno[1]):
                     x = np.arange(0, n) * ts
                     y = calc_rms(no)
@@ -224,3 +224,6 @@ class AE:
                     ax.set_title(f'File - {no:03d}')
                     writer.grab_frame()
             mp4_conv(name)
+
+    def update(self, files):
+        self._files = files
