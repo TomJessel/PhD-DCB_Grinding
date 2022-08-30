@@ -187,7 +187,7 @@ class AE:
 
         def mp4_conv(gifname):
             clip = mp.VideoFileClip(gifname)
-            mp4name = gifname[:-3] + '.mp4'
+            mp4name = gifname[:-4] + '.mp4'
             clip.write_videofile(mp4name)
 
         ts = 1 / self._fs
@@ -215,7 +215,7 @@ class AE:
             ax.set_ylabel('RMS (V)')
             writer = PillowWriter(fps=1)
             n = 40_000_000  # number of points to plot
-            name = f'Test {self._testinfo.testno} - Rolling RMS.gif'
+            name = f'{self._testinfo.dataloc}\\Test {self._testinfo.testno} - Rolling RMS.gif'
             with writer.saving(fig, name, 100):
                 for no in range(fno[0], fno[1]):
                     x = np.arange(0, n) * ts
