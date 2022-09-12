@@ -52,22 +52,39 @@ def _sort_rename(files, path):
             os.rename(fno[1], os.path.join(path, newfilename))
 
 
-def load(process=False):
+def load(file: str = None, process=False):
     """
     Load in a saved exp pickle file, option to process data
 
+    :param file: str (default: None) choose file to load
     :param process: bool (default:False) option to process data when loading
     :rtype: object
     """
-    try:
-        file_path = tkfiledialog.askopenfilename(defaultextension='pickle')
-        if not file_path:
-            raise NotADirectoryError
+
+    f_locs = {
+        'test5': r'F:\OneDrive - Cardiff University\Documents\PHD\AE\Testing\22_08_03_grit1000\Test 5.pickle',
+        'test2': r"F:\OneDrive - Cardiff University\Documents\PHD\AE\Testing\TEST2Combined\Test 2.pickle",
+        'test1': r"F:\OneDrive - Cardiff University\Documents\PHD\AE\Testing\28_2_22_grit1000\Test 1.pickle"
+        }
+
+    if file is None:
+        try:
+            file_path = tkfiledialog.askopenfilename(defaultextension='pickle')
+            if not file_path:
+                raise NotADirectoryError
+            with open(file_path, 'rb') as f:
+                data = pickle.load(f)
+        except NotADirectoryError:
+            print('No file selected.')
+            quit()
+    else:
+        try:
+            file_path = f_locs[file.lower().replace(' ', '')]
+        except KeyError:
+            print(f'File location of {file} not saved')
+            quit()
         with open(file_path, 'rb') as f:
             data = pickle.load(f)
-    except NotADirectoryError:
-        print('No file selected.')
-        quit()
     if process:
         try:
             getattr(data.nc4, 'radius')
@@ -86,6 +103,7 @@ def create_obj(process=False):
     :param process: bool (default:False) decides if results should be processed
     :return: experiment obj
     """
+
     def folder_exist(path):
         # if folder doesn't exist create it
         if not os.path.isdir(path) or not os.path.exists(path):
@@ -178,7 +196,8 @@ class Experiment:
             self.nc4.update(tuple(nc4_files))
         else:
             print('No new NC4 files.')
-# todo finish update func and print test update
+
+    # todo finish update func and print test update
 
     def correlation(self, plotfig=True):
         """
@@ -190,6 +209,7 @@ class Experiment:
         :param plotfig: boolean for plotting the figure
         :return: correlation coeffs
         """
+
         def plot(fre, c):
             figure, axs = plt.subplots(2, 1, sharex='all')
             axs[0].plot(fre, c[:, 0], 'C0', label='Mean Radius', linewidth=1)
