@@ -10,54 +10,49 @@
 22/08/2022 13:46   tomhj      1.0         Main file
 """
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
+import seaborn as sns
 
 from Experiment import load
 
+
+def corr_test():
+    rms = exp.ae.rms[:-1]
+    kurt = exp.ae.kurt[:-1]
+    amp = exp.ae.amplitude[:-1]
+
+    f = np.array(exp.ae.fft[1000])
+    f = f.T
+    f_35 = f[35][:-1]
+    f_10 = f[10][:-1]
+    f_134 = f[134][:-1]
+
+    mean_rad = exp.nc4.mean_radius[1:]
+    run_out = exp.nc4.runout[1:]
+    form_err = exp.nc4.form_error[1:]
+
+    cols = ["RMS", 'Kurtosis', 'Amplitude', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
+            'Mean radius', 'Runout', 'Form error']
+
+    m = np.stack((rms, kurt, amp, f_10, f_35, f_134, mean_rad, run_out, form_err), axis=0)
+    df = pd.DataFrame(m.T, columns=cols)
+    fig, ax = plt.subplots(figsize=(8, 6), dpi=100)
+    sns.heatmap(df.corr(),
+                ax=ax,
+                annot=True,
+                xticklabels=cols,
+                yticklabels=cols,
+                vmin=-1,
+                vmax=1) \
+        .set(title='Correlation Matrix')
+    plt.tight_layout()
+
+    sns.pairplot(df, height=1)
+    fig.show()
+    return df.corr()
+
+
 if __name__ == '__main__':
-    exp = load(file='Test 2')
-
-    # f = np.array(exp.ae.fft[1000])
-    # f = f.T
-    # mean_rad = exp.nc4.mean_radius[1:]
-    #
-    # fig, ax = plt.subplots(2, 1)
-    # ax[0].scatter(f[4][:-1], mean_rad)
-    # ax[1].scatter(f[973][:-1], mean_rad)
-    # c = np.corrcoef(f[:, :-1], mean_rad)
-    #
-
-    # rms = exp.ae.rms[:-1]
-    # kurt = exp.ae.kurt[:-1]
-    # mean_rad = exp.nc4.mean_radius[1:]
-    # runout = exp.nc4.runout[1:]
-    # m = np.stack((rms, kurt, mean_rad, runout), axis=0)
-    # c = np.corrcoef(m)
-    #
-    # num_vectors = len(m)
-    # fig, ax = plt.subplots(num_vectors, num_vectors)
-    # labels = ['rms', 'kurtosis', 'mean radius', 'runout']
-    #
-    # for i in range(num_vectors):
-    #     for j in range(num_vectors):
-    #
-    #         # Scatter column_j on the x-axis vs. column_i on the y-axis
-    #         if i != j:
-    #             ax[i][j].scatter(m[j], m[i])
-    #
-    #         # unless i == j, in which case show the series name
-    #         else:
-    #             ax[i][j].annotate(labels[i], (0.5, 0.5),
-    #                               xycoords='axes fraction',
-    #                               ha="center", va="center")
-    #
-    #         # Then hide axis labels except left and bottom charts
-    #         if i < num_vectors - 1: ax[i][j].xaxis.set_visible(False)
-    #         if j > 0: ax[i][j].yaxis.set_visible(False)
-    #
-    # # Fix the bottom-right and top-left axis labels, which are wrong because
-    # # their charts only have text in them
-    # ax[-1][-1].set_xlim(ax[0][-1].get_xlim())
-    # ax[0][0].set_ylim(ax[0][1].get_ylim())
-    #
-    # plt.show()
+    exp = load(file='Test 5')
+    table = corr_test()

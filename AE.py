@@ -21,6 +21,8 @@ import pandas as pd
 from matplotlib.animation import PillowWriter
 from nptdms import TdmsFile
 from scipy.stats import kurtosis
+from tqdm import tqdm
+import time
 
 
 def rms(x):
@@ -33,6 +35,7 @@ class AE:
         self._files = ae_files
         self.kurt = []
         self.rms = []
+        self.amplitude = []
         self._pre_amp = pre_amp
         self._fs = fs
         self._testinfo = testinfo
@@ -124,23 +127,28 @@ class AE:
     def process(self):
         with multiprocessing.Pool() as pool:
             print('Calculating results...')
-            results = np.array(pool.map(self._calc, range(len(self._files))))
+            results = list(tqdm(pool.imap(self._calc, range(len(self._files))), total=len(self._files),
+                                desc='Calc AE features'))
+            results = np.array(results)
             if 1000 not in self.fft:
                 print('Calculating FFT with 1kHz bins...')
-                fft = pool.map(partial(self.fftcalc, freqres=1000), range(len(self._files)))
+                fft = list(tqdm(pool.imap(partial(self.fftcalc, freqres=1000), range(len(self._files))),
+                                desc='Calc FFT 1kHz'))
                 p = self.volt2db(np.array(fft))
                 self.fft[1000] = p
         pool.close()
 
         self.kurt = results[:, 0]
         self.rms = results[:, 1]
+        self.amplitude = results[:, 2]
 
     def _calc(self, fno):
         data = self.readAE(fno)
         r = rms(data)
         k = kurtosis(data, fisher=False)
-        print(f'Completed File {fno}...')
-        return k, r
+        a = data.max()
+        # print(f'Completed File {fno}...')
+        return k, r, a
 
     def fftsurf(self, freqres=1000, freqlim=None):
         if freqres in self.fft:
