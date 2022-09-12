@@ -80,11 +80,11 @@ def load(file: str = None, process=False):
     else:
         try:
             file_path = f_locs[file.lower().replace(' ', '')]
+            with open(file_path, 'rb') as f:
+                data = pickle.load(f)
         except KeyError:
             print(f'File location of {file} not saved')
             quit()
-        with open(file_path, 'rb') as f:
-            data = pickle.load(f)
     if process:
         try:
             getattr(data.nc4, 'radius')
