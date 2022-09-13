@@ -22,6 +22,8 @@ import numpy as np
 import mplcursors
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import pandas as pd
+
 import TestInfo
 import AE
 import NC4
@@ -65,7 +67,7 @@ def load(file: str = None, process=False):
         'test5': r'F:\OneDrive - Cardiff University\Documents\PHD\AE\Testing\22_08_03_grit1000\Test 5.pickle',
         'test2': r"F:\OneDrive - Cardiff University\Documents\PHD\AE\Testing\TEST2Combined\Test 2.pickle",
         'test1': r"F:\OneDrive - Cardiff University\Documents\PHD\AE\Testing\28_2_22_grit1000\Test 1.pickle"
-        }
+    }
 
     if file is None:
         try:
@@ -162,6 +164,7 @@ class Experiment:
         self.dataloc = dataloc
         self.ae = AE.AE(ae_files, self.test_info.pre_amp, self.test_info.acquisition[0], self.test_info)
         self.nc4 = NC4.nc4(nc4_files, self.test_info, self.test_info.dcb, self.test_info.acquisition[1])
+        self.features = pd.DataFrame
 
     def __repr__(self):
         rep = f'Test No: {self.test_info.testno} \nDate: {self.date} \nData: {self.dataloc}'
@@ -262,4 +265,35 @@ class Experiment:
             mplcursors.cursor(multiple=True)
             fig.show()
         return coeff
+
     # todo same thing but for AE features other than FFT
+    def create_feat_df(self: object):
+        """
+        Creates dataframe of useful calc features from obj.
+
+        :param self: object: experiment obj containing data for dataframe
+        :return: df: DataFrame: features of experiment
+        """
+        cols = ["RMS", 'Kurtosis', 'Amplitude', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
+                'Mean radius', 'Runout', 'Form error']
+
+        rms: np.array = self.ae.rms[:-1]
+        kurt: np.array  = self.ae.kurt[:-1]
+        amp: np.array  = self.ae.amplitude[:-1]
+
+        f = np.array(self.ae.fft[1000])
+        f = f.T
+        f_35: np.array  = f[35][:-1]
+        f_10: np.array  = f[10][:-1]
+        f_134: np.array  = f[134][:-1]
+
+        mean_rad: np.array  = self.nc4.mean_radius[1:]
+        run_out: np.array  = self.nc4.runout[1:]
+        form_err: np.array  = self.nc4.form_error[1:]
+
+        m: np.array  = np.stack((rms, kurt, amp, f_10, f_35, f_134, mean_rad, run_out, form_err), axis=0)
+        df: pd.DataFrame = pd.DataFrame(m.T, columns=cols)
+        print(f'Feature DF of Test {self.test_info.testno}:')
+        print(df.head())
+        self.features = df
+        return df
