@@ -22,12 +22,51 @@ from matplotlib.animation import PillowWriter
 from nptdms import TdmsFile
 from scipy.stats import kurtosis
 from tqdm import tqdm
+from scipy.signal import hilbert, butter, filtfilt
 import time
 
 
 def rms(x):
     r = np.sqrt(np.mean(x ** 2))
     return r
+
+
+def low_pass(data, cutoff, fs, order):
+    data = np.pad(data, pad_width=10_000)
+    norm_cutoff = cutoff / (0.5 * fs)
+    b, a = butter(N=order, Wn=norm_cutoff, btype='lowpass', analog=False)
+    y = filtfilt(b, a, data)
+    return y[10_000:-10_000]
+
+
+def envelope_hilbert(s):
+    z = hilbert(s)
+    inst_amp = np.abs(z)
+    return inst_amp
+
+
+def trigger_st(d):
+    chunk_size = 100_000
+    diff_change = 1.75E-6
+
+    n_chunks = len(d) / chunk_size
+    t = []
+
+    chunks = np.array_split(d, n_chunks)
+    grad = [(chunki[-1] - chunki[0]) / chunk_size for chunki in chunks]
+    if np.max(grad) < diff_change:
+        t = None
+        t_y = None
+    else:
+        ind = [(i * chunk_size) + (chunk_size / 2) for i in range(len(grad))]
+        zipped = tuple(zip(ind, np.abs(grad)))
+        trig = sorted([z for z in zipped if z[1] >= diff_change], key=lambda x: x[0], reverse=False)
+
+        t = (trig[0][0])
+        t_y = d[int(t)]
+        # t[1] = int(t[0]) + np.argmax(d[int(t[0]):] < t_y)
+        # assert t[1] - t[0] > 35_000_000, 'Trigger point selection incorrect'
+    return t, t_y
 
 
 class AE:
@@ -40,6 +79,7 @@ class AE:
         self._fs = fs
         self._testinfo = testinfo
         self.fft = {}
+        self.trig_points = pd.DataFrame()
 
     @staticmethod
     def volt2db(v):
@@ -124,15 +164,25 @@ class AE:
         mplcursors.cursor(hover=True)
         plt.show()
 
-    def process(self):
+    def process(self, trigger=False):
         with multiprocessing.Pool() as pool:
-            print('Calculating results...')
-            results = list(tqdm(pool.imap(self._calc, range(len(self._files))), total=len(self._files),
-                                desc='Calc AE features'))
+            if self.trig_points.empty or trigger:
+                trigs = list(tqdm(pool.imap(self.triggers, range(len(self._files))),
+                                  total=len(self._files),
+                                  desc='Triggers'))
+                self.trig_points = pd.DataFrame(trigs,
+                                                columns=['trig st', 'trig end', 'trig y-val'],
+                                                )
+            # print('Calculating results...')
+            results = list(tqdm(pool.imap(self._calc, range(len(self._files))),
+                                total=len(self._files),
+                                desc='AE features'))
+
             results = np.array(results)
             if 1000 not in self.fft:
                 print('Calculating FFT with 1kHz bins...')
                 fft = list(tqdm(pool.imap(partial(self.fftcalc, freqres=1000), range(len(self._files))),
+                                total=len(self._files),
                                 desc='Calc FFT 1kHz'))
                 p = self.volt2db(np.array(fft))
                 self.fft[1000] = p
@@ -149,6 +199,28 @@ class AE:
         a = data.max()
         # print(f'Completed File {fno}...')
         return k, r, a
+
+    def triggers(self, i):
+        sig = self.readAE(i)
+        e_sig = envelope_hilbert(sig[:6_000_000])
+        f_sig = low_pass(e_sig, 10, self._fs, 3)
+        trig, trig_y_val = trigger_st(f_sig[100_000:])
+        if trig is None:
+            trig_st = None
+            trig_end = None
+            trig_y_val = None
+        else:
+            trig_st = trig + 100_000
+            en_trig2 = envelope_hilbert(sig[-6_000_000:])
+            fil_trig2 = low_pass(en_trig2, 10, self._fs, 3)
+            trig_end = (5_900_000 - np.argmax(fil_trig2[100_000:] < trig_y_val))
+            if trig_end == 5_900_000:
+                en_trig2 = envelope_hilbert(sig[6_000_000:-6_000_000])
+                fil_trig2 = low_pass(en_trig2, 10, self._fs, 3)
+                trig_end = 6_100_000 + (np.argmax(fil_trig2[100_000:] < trig_y_val))
+            else:
+                trig_end = len(sig) - trig_end
+        return trig_st, trig_end, trig_y_val
 
     def fftsurf(self, freqres=1000, freqlim=None):
         if freqres in self.fft:
