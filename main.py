@@ -10,21 +10,14 @@
 22/08/2022 13:46   tomhj      1.0         Main file
 """
 import os
-from collections import defaultdict
+
+import matplotlib.pyplot as plt
 import mplcursors
 import numpy as np
 import pandas as pd
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import scipy
 import seaborn as sns
-import mplcursors
-from scipy.signal import hilbert
-from scipy.signal import butter, filtfilt
-import tqdm
 
 from Experiment import load
-import AE
 
 
 def corr_matrix(df: pd.DataFrame, save_fig: bool = True):
@@ -62,7 +55,7 @@ def corr_pairplot(df: pd.DataFrame, save_fig: bool = True):
 def ae_hits(exp: object, s: np.array):
     """
     Convert AE signal into hit data
-    :param ex: object: experiement object
+    :param exp: object: experiement object
     :param s: ndarray: AE signal
     """
 
@@ -118,11 +111,10 @@ def plot_triggers(ex_obj, fno):
     plt.ylabel('Voltage (V)')
     plt.show()
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     exp = load(file='Test 5')
     plot_triggers(exp, 150)
-
 
     # envelope_hilbert(sig)
 
