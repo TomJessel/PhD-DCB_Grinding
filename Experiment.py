@@ -219,6 +219,10 @@ class Experiment:
             axs[0].plot(fre, c[:, 1], 'C1', label='Peak Radius', linewidth=1)
             axs[1].plot(fre, c[:, 2], 'C2', label='Runout', linewidth=1)
             axs[1].plot(fre, c[:, 3], 'C3', label='Form Error', linewidth=1)
+            axs[0].axhline(0.65, color='r', linewidth=0.5)
+            axs[0].axhline(-0.65, color='r', linewidth=0.5)
+            axs[1].axhline(0.65, color='r', linewidth=0.5)
+            axs[1].axhline(-0.65, color='r', linewidth=0.5)
             axs[0].set_xlim(0, 1000)
             axs[1].set_xlim(0, 1000)
             axs[0].xaxis.set_major_locator(mpl.ticker.MultipleLocator(100))
@@ -236,6 +240,8 @@ class Experiment:
             axs[0].set_title('Correlation of AE FFT bins and NC4 measurements')
             return figure
 
+        freq = 1000
+
         mpl.use('Qt5Agg')
         path = f'{self.test_info.dataloc}/Figures'
         png_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.png'
@@ -243,27 +249,23 @@ class Experiment:
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
         r = np.stack([self.nc4.mean_radius, self.nc4.peak_radius, self.nc4.runout, self.nc4.form_error])
-        f = np.array(self.ae.fft[1000])
+        f = np.array(self.ae.fft[freq])
         f = f.transpose()
         coeff = np.corrcoef(f, r[-np.shape(f)[1]:])[:-4, -4:]
         if plotfig:
-            try:
-                with open(pic_name, 'rb') as f:
-                    fig = pickle.load(f)
-            except IOError:
-                freq = np.arange(0, self.test_info.acquisition[0] / 2, 1000, dtype=int) / 1000
-                fig = plot(freq, coeff)
-                try:
-                    open(png_name)
-                except IOError:
-                    fig.savefig(png_name, dpi=300)
-                try:
-                    open(pic_name)
-                except IOError:
-                    with open(pic_name, 'wb') as f:
-                        pickle.dump(fig, f)
+            freq = np.arange(0, self.test_info.acquisition[0] / 2, freq, dtype=int) / 1000
+            fig = plot(freq, coeff)
             mplcursors.cursor(multiple=True)
             fig.show()
+            try:
+                open(png_name)
+            except IOError:
+                fig.savefig(png_name, dpi=300)
+            try:
+                open(pic_name)
+            except IOError:
+                with open(pic_name, 'wb') as f:
+                    pickle.dump(fig, f)
         return coeff
 
     # todo same thing but for AE features other than FFT
@@ -278,20 +280,20 @@ class Experiment:
                 'Mean radius', 'Runout', 'Form error']
 
         rms: np.array = self.ae.rms[:-1]
-        kurt: np.array  = self.ae.kurt[:-1]
-        amp: np.array  = self.ae.amplitude[:-1]
+        kurt: np.array = self.ae.kurt[:-1]
+        amp: np.array = self.ae.amplitude[:-1]
 
         f = np.array(self.ae.fft[1000])
         f = f.T
-        f_35: np.array  = f[35][:-1]
-        f_10: np.array  = f[10][:-1]
-        f_134: np.array  = f[134][:-1]
+        f_35: np.array = f[35][:-1]
+        f_10: np.array = f[10][:-1]
+        f_134: np.array = f[134][:-1]
 
-        mean_rad: np.array  = self.nc4.mean_radius[1:]
-        run_out: np.array  = self.nc4.runout[1:]
-        form_err: np.array  = self.nc4.form_error[1:]
+        mean_rad: np.array = self.nc4.mean_radius[1:]
+        run_out: np.array = self.nc4.runout[1:]
+        form_err: np.array = self.nc4.form_error[1:]
 
-        m: np.array  = np.stack((rms, kurt, amp, f_10, f_35, f_134, mean_rad, run_out, form_err), axis=0)
+        m: np.array = np.stack((rms, kurt, amp, f_10, f_35, f_134, mean_rad, run_out, form_err), axis=0)
         df: pd.DataFrame = pd.DataFrame(m.T, columns=cols)
         print(f'Feature DF of Test {self.test_info.testno}:')
         print(df.head())

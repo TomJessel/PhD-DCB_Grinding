@@ -185,7 +185,7 @@ class AE:
                 # print('Calculating FFT with 1kHz bins...')
                 fft = list(tqdm(pool.imap(partial(self.fftcalc, freqres=1000), range(len(self._files))),
                                 total=len(self._files),
-                                desc='Calc FFT 1kHz'))
+                                desc='Calc FFT 1 kHz'))
                 p = self.volt2db(np.array(fft))
                 self.fft[1000] = p
         pool.close()
@@ -231,8 +231,10 @@ class AE:
             p = self.fft[freqres]
         else:
             with multiprocessing.Pool() as pool:
-                results = pool.map(partial(self.fftcalc, freqres=freqres), range(len(self._files)))
-            p = self.volt2db(np.array(results))
+                fft = list(tqdm(pool.imap(partial(self.fftcalc, freqres=freqres), range(len(self._files))),
+                                total=len(self._files),
+                                desc=f'Calc FFT  {freqres / 1000} kHz'))
+                p = self.volt2db(np.array(fft))
             self.fft[freqres] = p
 
         if freqlim is None:
