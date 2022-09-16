@@ -90,6 +90,8 @@ class AE:
     def fftcalc(self, fno, freqres):
         length = int(self._fs / freqres)
         data = self.readAE(fno)
+        trig = self.trig_points.loc[fno]
+        data = data[int(trig['trig st']):int(trig['trig end'])]
         if len(data) % length == 0:
             temp = np.reshape(data, (length, -1), order='F')
         else:
@@ -108,7 +110,7 @@ class AE:
         p[1:] = p[1:] * 2
         p = np.array(p * sc)
         fft_mean = np.mean(p, axis=1)
-        print(f'Calc FFT - File {fno}... ')
+        # print(f'Calc FFT - File {fno}... ')
         return fft_mean
 
     def readAE(self, fno):
@@ -164,7 +166,7 @@ class AE:
         mplcursors.cursor(hover=True)
         plt.show()
 
-    def process(self, trigger=False):
+    def process(self, trigger=False, FFT=False):
         with multiprocessing.Pool() as pool:
             if self.trig_points.empty or trigger:
                 trigs = list(tqdm(pool.imap(self.triggers, range(len(self._files))),
@@ -179,8 +181,8 @@ class AE:
                                 desc='AE features'))
 
             results = np.array(results)
-            if 1000 not in self.fft:
-                print('Calculating FFT with 1kHz bins...')
+            if 1000 not in self.fft or FFT:
+                # print('Calculating FFT with 1kHz bins...')
                 fft = list(tqdm(pool.imap(partial(self.fftcalc, freqres=1000), range(len(self._files))),
                                 total=len(self._files),
                                 desc='Calc FFT 1kHz'))
@@ -194,6 +196,8 @@ class AE:
 
     def _calc(self, fno):
         data = self.readAE(fno)
+        trig = self.trig_points.loc[fno]
+        data = data[int(trig['trig st']):int(trig['trig end'])]
         r = rms(data)
         k = kurtosis(data, fisher=False)
         a = data.max()
@@ -206,9 +210,9 @@ class AE:
         f_sig = low_pass(e_sig, 10, self._fs, 3)
         trig, trig_y_val = trigger_st(f_sig[100_000:])
         if trig is None:
-            trig_st = None
-            trig_end = None
-            trig_y_val = None
+            trig_st = 0
+            trig_end = len(sig)
+            trig_y_val = 0
         else:
             trig_st = trig + 100_000
             en_trig2 = envelope_hilbert(sig[-6_000_000:])

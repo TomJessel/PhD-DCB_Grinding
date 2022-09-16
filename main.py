@@ -114,7 +114,7 @@ def plot_triggers(ex_obj, fno):
 
 if __name__ == '__main__':
     exp = load(file='Test 5')
-    plot_triggers(exp, 150)
+    # plot_triggers(exp, 150)
 
     # envelope_hilbert(sig)
 
