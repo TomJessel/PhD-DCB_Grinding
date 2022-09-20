@@ -276,12 +276,13 @@ class Experiment:
         :param self: object: experiment obj containing data for dataframe
         :return: df: DataFrame: features of experiment
         """
-        cols = ["RMS", 'Kurtosis', 'Amplitude', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
+        cols = ["RMS", 'Kurtosis', 'Amplitude', 'Skewness', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
                 'Mean radius', 'Runout', 'Form error']
 
         rms: np.array = self.ae.rms[:-1]
         kurt: np.array = self.ae.kurt[:-1]
         amp: np.array = self.ae.amplitude[:-1]
+        skew: np.array = self.ae.skewness[:-1]
 
         f = np.array(self.ae.fft[1000])
         f = f.T
@@ -293,7 +294,7 @@ class Experiment:
         run_out: np.array = self.nc4.runout[1:]
         form_err: np.array = self.nc4.form_error[1:]
 
-        m: np.array = np.stack((rms, kurt, amp, f_10, f_35, f_134, mean_rad, run_out, form_err), axis=0)
+        m: np.array = np.stack((rms, kurt, amp, skew, f_10, f_35, f_134, mean_rad, run_out, form_err), axis=0)
         df: pd.DataFrame = pd.DataFrame(m.T, columns=cols)
         print(f'Feature DF of Test {self.test_info.testno}:')
         print(df.head())
