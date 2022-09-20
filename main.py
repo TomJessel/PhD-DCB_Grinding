@@ -18,6 +18,7 @@ import pandas as pd
 import seaborn as sns
 
 from Experiment import load
+import AE
 
 
 def corr_matrix(df: pd.DataFrame, save_fig: bool = True):
@@ -102,9 +103,10 @@ def plot_triggers(ex_obj, fno):
     plt.close()
     plt.figure()
     plt.plot(t, sig, linewidth=1)
-    plt.axvline(trigs['trig st'] * ts, color='r')
-    plt.axvline(trigs['trig end'] * ts, color='r')
-    # plt.axhline(trigs['trig y-val'], color='r')
+    # plt.plot(t, fil_sig)
+    # plt.axhline(trigs['trig y-val'], color='r', linewidth=1)
+    plt.axvline(trigs['trig st'] * ts, color='r', linewidth=1)
+    plt.axvline(trigs['trig end'] * ts, color='r', linewidth=1)
     plt.title(filename)
     plt.autoscale(enable=True, axis='x', tight=True)
     plt.xlabel('Time (s)')

@@ -21,6 +21,7 @@ import pandas as pd
 from matplotlib.animation import PillowWriter
 from nptdms import TdmsFile
 from scipy.stats import kurtosis
+from scipy.stats import skew
 from tqdm import tqdm
 from scipy.signal import hilbert, butter, filtfilt
 import time
@@ -75,6 +76,7 @@ class AE:
         self.kurt = []
         self.rms = []
         self.amplitude = []
+        self.skewness = []
         self._pre_amp = pre_amp
         self._fs = fs
         self._testinfo = testinfo
@@ -92,6 +94,7 @@ class AE:
         data = self.readAE(fno)
         trig = self.trig_points.loc[fno]
         data = data[int(trig['trig st']):int(trig['trig end'])]
+        # data = envelope_hilbert(data)
         if len(data) % length == 0:
             temp = np.reshape(data, (length, -1), order='F')
         else:
@@ -193,6 +196,7 @@ class AE:
         self.kurt = results[:, 0]
         self.rms = results[:, 1]
         self.amplitude = results[:, 2]
+        self.skewness = results[:,3]
 
     def _calc(self, fno):
         data = self.readAE(fno)
@@ -201,8 +205,9 @@ class AE:
         r = rms(data)
         k = kurtosis(data, fisher=False)
         a = data.max()
+        sk = skew(data)
         # print(f'Completed File {fno}...')
-        return k, r, a
+        return k, r, a, sk
 
     def triggers(self, i):
         sig = self.readAE(i)
