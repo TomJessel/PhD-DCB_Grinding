@@ -64,9 +64,9 @@ def load(file: str = None, process=False):
     """
 
     f_locs = {
-        'test5': r'F:\OneDrive - Cardiff University\Documents\PHD\AE\Testing\22_08_03_grit1000\Test 5.pickle',
-        'test2': r"F:\OneDrive - Cardiff University\Documents\PHD\AE\Testing\TEST2Combined\Test 2.pickle",
-        'test1': r"F:\OneDrive - Cardiff University\Documents\PHD\AE\Testing\28_2_22_grit1000\Test 1.pickle"
+        'test5': r'..\..\Testing\22_08_03_grit1000\Test 5.pickle',
+        'test2': r"..\..\Testing\TEST2Combined\Test 2.pickle",
+        'test1': r"..\..m\Testing\28_2_22_grit1000\Test 1.pickle"
     }
 
     if file is None:
