@@ -9,7 +9,6 @@
 ------------      -------    --------    -----------
 21/09/2022 09:23   tomhj      1.0         None
 """
-import warnings
 import os
 
 import pandas as pd
@@ -17,8 +16,6 @@ from scikeras.wrappers import KerasRegressor
 from sklearn.model_selection import KFold
 from sklearn.model_selection import cross_validate
 from sklearn.preprocessing import StandardScaler
-import tensorflow as tf
-from tensorflow import get_logger
 from tensorflow import keras
 from tqdm import tqdm
 
@@ -63,12 +60,10 @@ kfold = KFold(n_splits=5, shuffle=True, random_state=0)
 ind = []
 history = []
 
-for train, test in tqdm(kfold.split(X=X, y=y), total= kfold.get_n_splits(), desc='K-Fold'):
+for train, test in tqdm(kfold.split(X=X, y=y), total=kfold.get_n_splits(), desc='K-Fold'):
     reg.fit(X[train], y[train], validation_data=(X[test], y[test]))
     hist = reg.history_
-    history.append(pd.DataFrame(hist).
-    drop(columns=['loss', 'val_loss']).
-    rename({
+    history.append(pd.DataFrame(hist).drop(columns=['loss', 'val_loss']).rename({
         'mean_abolsute_error': 'MAE-train',
         'mean_squared_error': 'MSE-train',
         'mean_absolute_percentage_error': 'MAPE-train',
@@ -103,7 +98,7 @@ scores = cross_validate(reg, X, y, cv=kfold, scoring=scoring, return_train_score
 # param_grid = dict(model__hidden_layer_sizes=model__hidden_layer_sizes, model__dropout=model__dropout)
 
 # Neuron initiation mode
-# init_mode = ['uniform', 'lecun_uniform', 'normal', 'zero', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform']
+# init_mode = ['uniform', 'lecun_uniform', 'normal', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform']
 # param_grid = dict(model__init_mode=init_mode)
 
 # Learining rate and Momentum
