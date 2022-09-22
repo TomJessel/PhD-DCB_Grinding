@@ -9,27 +9,22 @@
 ------------      -------    --------    -----------
 21/09/2022 09:23   tomhj      1.0         None
 """
+import warnings
+import os
 
 import pandas as pd
-import scikeras
-import warnings
-import tensorflow as tf
-from matplotlib import pyplot as plt
-from sklearn.metrics import mean_absolute_error, r2_score
-from sklearn.model_selection import train_test_split, cross_validate
-from sklearn.preprocessing import StandardScaler
-from tensorflow import get_logger
-import numpy as np
 from scikeras.wrappers import KerasRegressor
-from tensorflow import keras
-from sklearn.datasets import make_regression
-from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold
+from sklearn.model_selection import cross_validate
+from sklearn.preprocessing import StandardScaler
+import tensorflow as tf
+from tensorflow import get_logger
+from tensorflow import keras
+from tqdm import tqdm
 
 from Experiment import load
 
-get_logger().setLevel('ERROR')
-warnings.filterwarnings("ignore", message="Setting the random state for TF")
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 def get_regression(meta, hidden_layer_sizes, dropout, init_mode='glorot_uniform'):
@@ -61,32 +56,30 @@ reg = KerasRegressor(
     batch_size=8,
     dropout=0.2,
     epochs=300,
-    verbose=2,
+    verbose=0,
 )
 
-kfold = KFold(n_splits=3, shuffle=True, random_state=0)
-cols = ['MSE', 'MAE', 'r^2']
+kfold = KFold(n_splits=5, shuffle=True, random_state=0)
 ind = []
 history = []
 
-for train, test in kfold.split(X=X, y=y):
+for train, test in tqdm(kfold.split(X=X, y=y), total= kfold.get_n_splits(), desc='K-Fold'):
     reg.fit(X[train], y[train], validation_data=(X[test], y[test]))
-    r_2 = reg.score(X[test], y[test])
     hist = reg.history_
     history.append(pd.DataFrame(hist).
-                   drop(columns=['loss', 'val_loss']).
-                   rename({
-                            'mean_abolsute_error': 'MAE-train',
-                            'mean_squared_error': 'MSE-train',
-                            'mean_absolute_percentage_error': 'MAPE-train',
-                            'val_mean_abolsute_error': 'MAE-test',
-                            'val_mean_squared_error': 'MSE-test',
-                            'val_mean_absolute_percentage_error': 'MAPE-test',
-                            }))
+    drop(columns=['loss', 'val_loss']).
+    rename({
+        'mean_abolsute_error': 'MAE-train',
+        'mean_squared_error': 'MSE-train',
+        'mean_absolute_percentage_error': 'MAPE-train',
+        'val_mean_abolsute_error': 'MAE-test',
+        'val_mean_squared_error': 'MSE-test',
+        'val_mean_absolute_percentage_error': 'MAPE-test',
+    }))
     index = {
         'train_i': train,
         'test_i': test,
-        }
+    }
     ind.append(index)
 
 scoring = {
@@ -96,7 +89,7 @@ scoring = {
     'r2': 'r2',
 }
 
-scores = cross_validate(reg, X, y, cv=kfold, scoring=scoring, return_train_score=True)
+scores = cross_validate(reg, X, y, cv=kfold, scoring=scoring, return_train_score=True, verbose=0, n_jobs=-1)
 # print(scores.mean())
 
 # Batch Size and Epoch
