@@ -103,7 +103,20 @@ scoring = {
     'MSE': 'neg_mean_squared_error',
     'r2': 'r2',
 }
-scores = cross_validate(reg, X, y, cv=kfold, scoring=scoring, return_train_score=True, verbose=0, n_jobs=-1)
+
+scores = cross_validate(
+    estimator=reg,
+    X=X,
+    y=y,
+    cv=kfold,
+    scoring=scoring,
+    return_train_score=True,
+    verbose=0,
+    n_jobs=-1,
+    return_estimator=True
+)
+ind = np.argmax(scores['test_r2'])
+reg = scores['estimator'][ind]
 
 #%% Printing model summary and scores
 reg.model_.summary()
@@ -118,6 +131,8 @@ print(f'R^2 = {np.mean(scores["test_r2"]):.3f}')
 print('-' * 65)
 
 #%%
+# todo use gridsearch to optimise hyperparameters
+# todo use adaptive learning rates
 # Batch Size and Epoch
 # batch_size = [5, 8, 10, 12, 15, 20]
 # epochs = [1000, 1500, 2000]
