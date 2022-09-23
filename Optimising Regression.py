@@ -9,8 +9,10 @@
 ------------      -------    --------    -----------
 21/09/2022 09:23   tomhj      1.0         None
 """
+#%%
 import os
 
+import matplotlib.pyplot as plt
 import pandas as pd
 from scikeras.wrappers import KerasRegressor
 from sklearn.model_selection import KFold
@@ -34,7 +36,7 @@ def get_regression(meta, hidden_layer_sizes, dropout, init_mode='glorot_uniform'
     model.add(keras.layers.Dense(1))
     return model
 
-
+#%%
 exp = load(file='Test 5')
 dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz', 'Freq 134 kHz'])
 dataset = dataframe.values
@@ -55,19 +57,21 @@ reg = KerasRegressor(
     epochs=300,
     verbose=0,
 )
-
+#%%
 kfold = KFold(n_splits=5, shuffle=True, random_state=0)
+
+#%%
 ind = []
 history = []
 
 for train, test in tqdm(kfold.split(X=X, y=y), total=kfold.get_n_splits(), desc='K-Fold'):
     reg.fit(X[train], y[train], validation_data=(X[test], y[test]))
     hist = reg.history_
-    history.append(pd.DataFrame(hist).drop(columns=['loss', 'val_loss']).rename({
-        'mean_abolsute_error': 'MAE-train',
+    history.append(pd.DataFrame(hist).drop(columns=['loss', 'val_loss']).rename(columns={
+        'mean_absolute_error': 'MAE-train',
         'mean_squared_error': 'MSE-train',
         'mean_absolute_percentage_error': 'MAPE-train',
-        'val_mean_abolsute_error': 'MAE-test',
+        'val_mean_absolute_error': 'MAE-test',
         'val_mean_squared_error': 'MSE-test',
         'val_mean_absolute_percentage_error': 'MAPE-test',
     }))
@@ -76,7 +80,23 @@ for train, test in tqdm(kfold.split(X=X, y=y), total=kfold.get_n_splits(), desc=
         'test_i': test,
     }
     ind.append(index)
+history = pd.concat(history)
 
+#%% Graph History Results
+mean_hist = history.groupby(level=0).mean()
+
+fig = mean_hist.plot(
+        subplots=[('MAE-train', 'MAE-test'), ('MSE-train', 'MSE-test'), ('MAPE-train', 'MAPE-test')],
+        xlabel='Epoch',
+        xlim=(-1, len(mean_hist)),
+        title='Regression Model Learning History'
+        )
+fig[0].set_ylabel('Mean\nAbsolute Error')
+fig[1].set_ylabel('Mean\nSquared Error')
+fig[2].set_ylabel('Mean Absolute\nPercentage Error')
+# [f.autoscale(axis='y', tight=True) for f in fig]
+
+#%%
 scoring = {
     'MAE': 'neg_mean_absolute_error',
     'MSE': 'neg_mean_squared_error',
@@ -85,8 +105,8 @@ scoring = {
 }
 
 scores = cross_validate(reg, X, y, cv=kfold, scoring=scoring, return_train_score=True, verbose=0, n_jobs=-1)
-# print(scores.mean())
 
+#%%
 # Batch Size and Epoch
 # batch_size = [5, 8, 10, 12, 15, 20]
 # epochs = [1000, 1500, 2000]
