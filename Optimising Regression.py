@@ -13,6 +13,7 @@
 import os
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from scikeras.wrappers import KerasRegressor
 from sklearn.model_selection import KFold
@@ -96,15 +97,25 @@ fig[1].set_ylabel('Mean\nSquared Error')
 fig[2].set_ylabel('Mean Absolute\nPercentage Error')
 # [f.autoscale(axis='y', tight=True) for f in fig]
 
-#%%
+#%% Scoring with Cross Validation
 scoring = {
     'MAE': 'neg_mean_absolute_error',
     'MSE': 'neg_mean_squared_error',
-    'MAPE': 'neg_mean_absolute_percentage_error',
     'r2': 'r2',
 }
-
 scores = cross_validate(reg, X, y, cv=kfold, scoring=scoring, return_train_score=True, verbose=0, n_jobs=-1)
+
+#%% Printing model summary and scores
+reg.model_.summary()
+print('-' * 65)
+print(f'Model Scores:')
+print('-' * 65)
+print(f'Train time = {np.mean(scores["fit_time"]):.2f} s')
+print(f'Predict time = {np.mean(scores["score_time"]):.2f} s')
+print(f'MAE = {np.abs(np.mean(scores["test_MAE"])) * 1000:.3f} um')
+print(f'MSE = {np.abs(np.mean(scores["test_MSE"])) * 1_000_000:.3f} um^2')
+print(f'R^2 = {np.mean(scores["test_r2"]):.3f}')
+print('-' * 65)
 
 #%%
 # Batch Size and Epoch
