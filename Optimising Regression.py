@@ -11,6 +11,7 @@
 """
 # %%
 import os
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,6 +21,7 @@ from sklearn.model_selection import KFold, train_test_split, RepeatedKFold
 from sklearn.model_selection import cross_validate
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.model_selection import GridSearchCV
 from tensorflow import keras
 from tqdm import tqdm
 
@@ -64,6 +66,65 @@ reg = KerasRegressor(
     epochs=300,
     verbose=0,
 )
+#%% GridsearchCV
+
+
+def Model_gridsearch(
+        model: KerasRegressor,
+        Xdata: np.ndarray,
+        ydata: np.ndarray,
+        param_grid: Dict,
+        cv: int = 5
+) -> object:
+
+    kfold = KFold(n_splits=cv, shuffle=True, random_state=0)
+
+    grid = GridSearchCV(
+        estimator=model,
+        param_grid=param_grid,
+        n_jobs=-1,
+        cv=kfold,
+        scoring='r2',
+        verbose=True
+    )
+    gd_result = grid.fit(Xdata, ydata)
+
+    print("Best: %f using %s" % (gd_result.best_score_, gd_result.best_params_))
+    print('-'*82)
+    means = gd_result.cv_results_['mean_test_score']
+    stds = gd_result.cv_results_['std_test_score']
+    params = gd_result.cv_results_['params']
+    for mean, stdev, param in zip(means, stds, params):
+        print("%f (%f) with: %r" % (mean, stdev, param))
+    return gd_result
+
+
+# Batch Size and Epoch
+batch_size = [5, 8, 10, 12, 15, 20]
+epochs = [100, 200, 300, 400, 500]
+
+# Number of neurons
+model__hidden_layer_sizes = [(10,), (20,), (30,), (10, 10), (20, 20), (30, 30)]
+model__dropout = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
+# Neuron initiation mode
+init_mode = ['uniform', 'lecun_uniform', 'normal', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform']
+
+# Learining rate and Momentum
+learn_rate = [0.001, 0.01, 0.1, 0.2, 0.3]
+
+param_grid = dict(
+    # model__init_mode=init_mode,
+    model__hidden_layer_sizes=model__hidden_layer_sizes,
+    model__dropout=model__dropout,
+    batch_size=batch_size,
+    epochs=epochs,
+    optimizer__learning_rate=learn_rate,
+)
+
+grid_result = Model_gridsearch(model=reg, Xdata=X_train, ydata=y_train, param_grid=param_grid)
+reg = grid_result.best_estimator_
+
 # %% Train model and show validation history
 
 
@@ -174,45 +235,7 @@ ax.set_ylabel('Mean Radius (mm)')
 ax.set_xlabel('Data Points')
 ax.legend()
 fig.show()
+
 # %%
 # todo use gridsearch to optimise hyperparameters
 # todo use adaptive learning rates
-# Batch Size and Epoch
-# batch_size = [5, 8, 10, 12, 15, 20]
-# epochs = [1000, 1500, 2000]
-# param_grid = dict(batch_size=batch_size, epochs=epochs)
-
-# Number of neurons
-# model__hidden_layer_sizes = [(10, 10, 10), (20, 20), (30, 30)]
-# model__dropout = [0.2, 0.3, 0.4]
-# param_grid = dict(model__hidden_layer_sizes=model__hidden_layer_sizes, model__dropout=model__dropout)
-
-# Neuron initiation mode
-# init_mode = ['uniform', 'lecun_uniform', 'normal', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform']
-# param_grid = dict(model__init_mode=init_mode)
-
-# Learining rate and Momentum
-# learn_rate = [0.3, 0.4, 0.6, 0.8, 1]
-# epochs = [1000, 1250, 1500, 2000]
-# param_grid = dict(optimizer__learning_rate=learn_rate, epochs=epochs)
-
-# grid = GridSearchCV(
-#     estimator=reg,
-#     param_grid=param_grid,
-#     n_jobs=-1,
-#     cv=3,
-#     scoring='r2',
-#     verbose=True
-# )
-# grid_result = grid.fit(X, y)
-#
-# print("Best: %f using %s" % (grid_result.best_score_, grid_result.best_params_))
-# print('-'*82)
-# means = grid_result.cv_results_['mean_test_score']
-# stds = grid_result.cv_results_['std_test_score']
-# params = grid_result.cv_results_['params']
-# for mean, stdev, param in zip(means, stds, params):
-#     print("%f (%f) with: %r" % (mean, stdev, param))
-#
-# model = grid_result.best_estimator_
-# scores = cross_val_score(model, X, y, cv=10, scoring='r2')
