@@ -19,6 +19,7 @@ from scikeras.wrappers import KerasRegressor
 from sklearn.model_selection import KFold, train_test_split, RepeatedKFold
 from sklearn.model_selection import cross_validate
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from tensorflow import keras
 from tqdm import tqdm
 
@@ -38,7 +39,7 @@ def get_regression(meta, hidden_layer_sizes, dropout, init_mode='glorot_uniform'
     return model
 
 
-# %%
+# %% Load and pre-process dataset
 exp = load(file='Test 5')
 dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz', 'Freq 134 kHz'])
 dataset = dataframe.values
@@ -49,6 +50,8 @@ sc = StandardScaler()
 X = sc.fit_transform(X)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+
+#%% Setup regression model
 
 reg = KerasRegressor(
     model=get_regression,
@@ -133,7 +136,7 @@ def scoring_model(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, c
 
     best_model.model_.summary()
     print('-' * 65)
-    print(f'Model Scores:')
+    print(f'Model Training Scores:')
     print('-' * 65)
     print(f'Train time = {np.mean(scores_["fit_time"]):.2f} s')
     print(f'Predict time = {np.mean(scores_["score_time"]):.2f} s')
@@ -144,19 +147,32 @@ def scoring_model(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, c
     return best_model, scores_
 
 
-reg, scores = scoring_model(model=reg, Xdata=X_train, ydata=y_train)
+reg, train_scores = scoring_model(model=reg, Xdata=X_train, ydata=y_train)
 
-# %% plot predictions
-
+# %% Evaluate model again test set
 
 reg.fit(X_train, y_train)
 y_pred = reg.predict(X_test, verbose=0)
+test_score = {
+    'MAE': mean_absolute_error(y_test, y_pred),
+    'MSE': mean_squared_error(y_test, y_pred),
+    'r2': r2_score(y_test, y_pred),
+}
+print('-' * 65)
+print(f'Model Test Scores:')
+print('-' * 65)
+print(f'MAE = {np.abs(test_score["MAE"]) * 1000:.3f} um')
+print(f'MSE = {np.abs(test_score["MSE"]) * 1_000_000:.3f} um^2')
+print(f'R^2 = {np.mean(test_score["r2"]):.3f}')
+print('-' * 65)
 
-plt.plot(y_test, color='red', label='Real data')
-plt.plot(y_pred, color='blue', label='Predicted data')
-plt.title('Prediction')
-plt.legend()
-plt.show()
+fig, ax = plt.subplots()
+ax.plot(y_test, color='red', label='Real data')
+ax.plot(y_pred, color='blue', label='Predicted data')
+ax.set_title('Prediction')
+ax.set_ylabel('Mean Radius (mm)')
+fig.legend()
+fig.show()
 # %%
 # todo use gridsearch to optimise hyperparameters
 # todo use adaptive learning rates
