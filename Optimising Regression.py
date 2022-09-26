@@ -168,10 +168,11 @@ print('-' * 65)
 
 fig, ax = plt.subplots()
 ax.plot(y_test, color='red', label='Real data')
-ax.plot(y_pred, color='blue', label='Predicted data')
-ax.set_title('Prediction')
+ax.plot(y_pred, color='blue', ls='--', label='Predicted data')
+ax.set_title('Model Predictions - Test Set')
 ax.set_ylabel('Mean Radius (mm)')
-fig.legend()
+ax.set_xlabel('Data Points')
+ax.legend()
 fig.show()
 # %%
 # todo use gridsearch to optimise hyperparameters
@@ -215,14 +216,3 @@ fig.show()
 #
 # model = grid_result.best_estimator_
 # scores = cross_val_score(model, X, y, cv=10, scoring='r2')
-
-# reg.fit(x_train, y_train)
-# print(reg.model_.summary())
-#
-# y_pred = reg.predict(x_test)
-#
-# plt.plot(y_test, color='red', label='Real data')
-# plt.plot(y_pred, color='blue', label='Predicted data')
-# plt.title('Prediction')
-# plt.legend()
-# plt.show()
