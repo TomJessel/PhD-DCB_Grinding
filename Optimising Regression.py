@@ -9,14 +9,14 @@
 ------------      -------    --------    -----------
 21/09/2022 09:23   tomhj      1.0         None
 """
-#%%
+# %%
 import os
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scikeras.wrappers import KerasRegressor
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, train_test_split, RepeatedKFold
 from sklearn.model_selection import cross_validate
 from sklearn.preprocessing import StandardScaler
 from tensorflow import keras
@@ -37,7 +37,8 @@ def get_regression(meta, hidden_layer_sizes, dropout, init_mode='glorot_uniform'
     model.add(keras.layers.Dense(1))
     return model
 
-#%%
+
+# %%
 exp = load(file='Test 5')
 dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz', 'Freq 134 kHz'])
 dataset = dataframe.values
@@ -46,6 +47,8 @@ y = dataset[:, -1]
 
 sc = StandardScaler()
 X = sc.fit_transform(X)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
 reg = KerasRegressor(
     model=get_regression,
@@ -58,59 +61,66 @@ reg = KerasRegressor(
     epochs=300,
     verbose=0,
 )
-#%%
-kfold = KFold(n_splits=10, shuffle=True, random_state=0)
+# %% Train model and show validation history
 
-#%%
-ind = []
-history = []
 
-for train, test in tqdm(kfold.split(X=X, y=y), total=kfold.get_n_splits(), desc='K-Fold'):
-    reg.fit(X[train], y[train], validation_data=(X[test], y[test]))
-    hist = reg.history_
-    history.append(pd.DataFrame(hist).drop(columns=['loss', 'val_loss']).rename(columns={
-        'mean_absolute_error': 'MAE-train',
-        'mean_squared_error': 'MSE-train',
-        'mean_absolute_percentage_error': 'MAPE-train',
-        'val_mean_absolute_error': 'MAE-test',
-        'val_mean_squared_error': 'MSE-test',
-        'val_mean_absolute_percentage_error': 'MAPE-test',
-    }))
-    index = {
-        'train_i': train,
-        'test_i': test,
-    }
-    ind.append(index)
-history = pd.concat(history)
+def model_history(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, cv: int = 5) -> KerasRegressor:
+    kfold = KFold(n_splits=cv, shuffle=True, random_state=0)
+    ind = []
+    history = []
 
-#%% Graph History Results
-mean_hist = history.groupby(level=0).mean()
+    for train, val in tqdm(kfold.split(X=Xdata, y=ydata), total=kfold.get_n_splits(), desc='Model History'):
+        model.fit(Xdata[train], ydata[train], validation_data=(Xdata[val], ydata[val]))
+        hist = model.history_
+        history.append(pd.DataFrame(hist).drop(columns=['loss', 'val_loss']).rename(columns={
+            'mean_absolute_error': 'MAE-train',
+            'mean_squared_error': 'MSE-train',
+            'mean_absolute_percentage_error': 'MAPE-train',
+            'val_mean_absolute_error': 'MAE-val',
+            'val_mean_squared_error': 'MSE-val',
+            'val_mean_absolute_percentage_error': 'MAPE-val',
+        }))
+        index = {
+            'train_i': train,
+            'test_i': val,
+        }
+        ind.append(index)
+    history = pd.concat(history)
 
-fig = mean_hist.plot(
-        subplots=[('MAE-train', 'MAE-test'), ('MSE-train', 'MSE-test'), ('MAPE-train', 'MAPE-test')],
+    # Graph History Results
+    mean_hist = history.groupby(level=0).mean()
+
+    fig = mean_hist.plot(
+        subplots=[('MAE-train', 'MAE-val'), ('MSE-train', 'MSE-val'), ('MAPE-train', 'MAPE-val')],
         xlabel='Epoch',
         xlim=(-1, len(mean_hist)),
         title='Regression Model Learning History'
-        )
-fig[0].set_ylabel('Mean\nAbsolute Error')
-fig[1].set_ylabel('Mean\nSquared Error')
-fig[2].set_ylabel('Mean Absolute\nPercentage Error')
-# [f.autoscale(axis='y', tight=True) for f in fig]
-
-#%% Scoring with Cross Validation
+    )
+    fig[0].set_ylabel('Mean\nAbsolute Error')
+    fig[1].set_ylabel('Mean\nSquared Error')
+    fig[2].set_ylabel('Mean Absolute\nPercentage Error')
+    return model
 
 
-def scoring_model(model):
+reg = model_history(model=reg, Xdata=X_train, ydata=y_train, cv=5)
+
+# %% Scoring with Cross Validation
+
+
+def scoring_model(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, cv: int = 10):
+    # kfold = KFold(n_splits=cv, shuffle=True, random_state=0)
+    kfold = RepeatedKFold(n_splits=cv, n_repeats=5, random_state=0)
     scoring = {
         'MAE': 'neg_mean_absolute_error',
         'MSE': 'neg_mean_squared_error',
         'r2': 'r2',
     }
+    print('Scoring Model...\n')
 
-    scores = cross_validate(
+    scores_ = cross_validate(
         estimator=model,
-        X=X,
-        y=y,
+        X=Xdata,
+        y=ydata,
         cv=kfold,
         scoring=scoring,
         return_train_score=True,
@@ -118,25 +128,36 @@ def scoring_model(model):
         n_jobs=-1,
         return_estimator=True
     )
-    ind = np.argmax(scores['test_r2'])
-    best_model = scores['estimator'][ind]
+    ind = np.argmax(scores_['test_r2'])
+    best_model = scores_['estimator'][ind]
 
     best_model.model_.summary()
     print('-' * 65)
     print(f'Model Scores:')
     print('-' * 65)
-    print(f'Train time = {np.mean(scores["fit_time"]):.2f} s')
-    print(f'Predict time = {np.mean(scores["score_time"]):.2f} s')
-    print(f'MAE = {np.abs(np.mean(scores["test_MAE"])) * 1000:.3f} um')
-    print(f'MSE = {np.abs(np.mean(scores["test_MSE"])) * 1_000_000:.3f} um^2')
-    print(f'R^2 = {np.mean(scores["test_r2"]):.3f}')
+    print(f'Train time = {np.mean(scores_["fit_time"]):.2f} s')
+    print(f'Predict time = {np.mean(scores_["score_time"]):.2f} s')
+    print(f'MAE = {np.abs(np.mean(scores_["test_MAE"])) * 1000:.3f} um')
+    print(f'MSE = {np.abs(np.mean(scores_["test_MSE"])) * 1_000_000:.3f} um^2')
+    print(f'R^2 = {np.mean(scores_["test_r2"]):.3f}')
     print('-' * 65)
-    return best_model, scores
+    return best_model, scores_
 
 
-reg, scores = scoring_model(reg)
+reg, scores = scoring_model(model=reg, Xdata=X_train, ydata=y_train)
 
-#%%
+# %% plot predictions
+
+
+reg.fit(X_train, y_train)
+y_pred = reg.predict(X_test, verbose=0)
+
+plt.plot(y_test, color='red', label='Real data')
+plt.plot(y_pred, color='blue', label='Predicted data')
+plt.title('Prediction')
+plt.legend()
+plt.show()
+# %%
 # todo use gridsearch to optimise hyperparameters
 # todo use adaptive learning rates
 # Batch Size and Epoch
