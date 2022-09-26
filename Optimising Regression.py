@@ -12,6 +12,7 @@
 # %%
 import os
 from typing import Dict
+import logging
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,6 +29,20 @@ from tqdm import tqdm
 from Experiment import load
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+formatter = logging.Formatter('%(asctime)s:%(name)s:%(levelname)s:%(message)s')
+console_formatter = logging.Formatter('%(name)s:%(levelname)s:%(message)s')
+
+file_handler = logging.FileHandler('ML.log')
+file_handler.setFormatter(formatter)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(console_formatter)
+
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
 
 
 def get_regression(meta, hidden_layer_sizes, dropout, init_mode='glorot_uniform'):
@@ -43,6 +58,7 @@ def get_regression(meta, hidden_layer_sizes, dropout, init_mode='glorot_uniform'
 
 # %% Load and pre-process dataset
 exp = load(file='Test 5')
+logger.info('Loaded Dateset')
 dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz', 'Freq 134 kHz'])
 dataset = dataframe.values
 X = dataset[:, :-1]
@@ -50,8 +66,10 @@ y = dataset[:, -1]
 
 sc = StandardScaler()
 X = sc.fit_transform(X)
+logger.info('Scaling Dataset')
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+logger.info('Split Dataset into Train and Test')
 
 #%% Setup regression model
 
@@ -66,6 +84,7 @@ reg = KerasRegressor(
     epochs=300,
     verbose=0,
 )
+
 #%% GridsearchCV
 
 
@@ -87,15 +106,17 @@ def Model_gridsearch(
         scoring='r2',
         verbose=True
     )
+    logger.info(f'GridSearchCV')
     gd_result = grid.fit(Xdata, ydata)
 
-    print("Best: %f using %s" % (gd_result.best_score_, gd_result.best_params_))
-    print('-'*82)
+    logger.info("Best: %f using %s" % (gd_result.best_score_, gd_result.best_params_))
+    # print("Best: %f using %s" % (gd_result.best_score_, gd_result.best_params_))
+    # print('-'*82)
     means = gd_result.cv_results_['mean_test_score']
     stds = gd_result.cv_results_['std_test_score']
     params = gd_result.cv_results_['params']
     for mean, stdev, param in zip(means, stds, params):
-        print("%f (%f) with: %r" % (mean, stdev, param))
+        logging.info("%f (%f) with: %r" % (mean, stdev, param))
     return gd_result
 
 
@@ -122,8 +143,11 @@ param_grid = dict(
     optimizer__learning_rate=learn_rate,
 )
 
-grid_result = Model_gridsearch(model=reg, Xdata=X_train, ydata=y_train, param_grid=param_grid)
-reg = grid_result.best_estimator_
+
+# grid_result = Model_gridsearch(model=reg, Xdata=X_train, ydata=y_train, param_grid=param_grid)
+# reg = grid_result.best_estimator_
+# logger.info('Best Estimator:')
+# logger.info(reg.model_.summary(print_fn=logger.info))
 
 # %% Train model and show validation history
 
@@ -132,6 +156,7 @@ def model_history(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, c
     kfold = KFold(n_splits=cv, shuffle=True, random_state=0)
     ind = []
     history = []
+    logger.info('Model learning/validation history')
 
     for train, val in tqdm(kfold.split(X=Xdata, y=ydata), total=kfold.get_n_splits(), desc='Model History'):
         model.fit(Xdata[train], ydata[train], validation_data=(Xdata[val], ydata[val]))
@@ -154,15 +179,19 @@ def model_history(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, c
     # Graph History Results
     mean_hist = history.groupby(level=0).mean()
 
-    fig = mean_hist.plot(
+    ax = mean_hist.plot(
         subplots=[('MAE-train', 'MAE-val'), ('MSE-train', 'MSE-val'), ('MAPE-train', 'MAPE-val')],
         xlabel='Epoch',
         xlim=(-1, len(mean_hist)),
         title='Regression Model Learning History'
     )
-    fig[0].set_ylabel('Mean\nAbsolute Error')
-    fig[1].set_ylabel('Mean\nSquared Error')
-    fig[2].set_ylabel('Mean Absolute\nPercentage Error')
+    ax[0].set_ylabel('Mean\nAbsolute Error')
+    ax[1].set_ylabel('Mean\nSquared Error')
+    ax[2].set_ylabel('Mean Absolute\nPercentage Error')
+    fig_ = ax[2].get_figure()
+    png_name_ = f'ML learning history'
+    fig_.savefig(png_name_, dpi=300)
+    logger.info(f'Figure saved - {png_name_}')
     return model
 
 
@@ -179,7 +208,8 @@ def scoring_model(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, c
         'MSE': 'neg_mean_squared_error',
         'r2': 'r2',
     }
-    print('Scoring Model...\n')
+    # print('Scoring Model...\n')
+    logger.info(f'Cross Validating Model - Repeated KFold')
 
     scores_ = cross_validate(
         estimator=model,
@@ -195,16 +225,16 @@ def scoring_model(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, c
     ind = np.argmax(scores_['test_r2'])
     best_model = scores_['estimator'][ind]
 
-    best_model.model_.summary()
-    print('-' * 65)
-    print(f'Model Training Scores:')
-    print('-' * 65)
-    print(f'Train time = {np.mean(scores_["fit_time"]):.2f} s')
-    print(f'Predict time = {np.mean(scores_["score_time"]):.2f} s')
-    print(f'MAE = {np.abs(np.mean(scores_["test_MAE"])) * 1000:.3f} um')
-    print(f'MSE = {np.abs(np.mean(scores_["test_MSE"])) * 1_000_000:.3f} um^2')
-    print(f'R^2 = {np.mean(scores_["test_r2"]):.3f}')
-    print('-' * 65)
+    logger.info(best_model.model_.summary(print_fn=logger.info))
+    logger.info('-' * 65)
+    logger.info(f'Model Training Scores:')
+    logger.info('-' * 65)
+    logger.info(f'Train time = {np.mean(scores_["fit_time"]):.2f} s')
+    logger.info(f'Predict time = {np.mean(scores_["score_time"]):.2f} s')
+    logger.info(f'MAE = {np.abs(np.mean(scores_["test_MAE"])) * 1000:.3f} um')
+    logger.info(f'MSE = {np.abs(np.mean(scores_["test_MSE"])) * 1_000_000:.3f} um^2')
+    logger.info(f'R^2 = {np.mean(scores_["test_r2"]):.3f}')
+    logger.info('-' * 65)
     return best_model, scores_
 
 
@@ -212,6 +242,7 @@ reg, train_scores = scoring_model(model=reg, Xdata=X_train, ydata=y_train)
 
 # %% Evaluate model again test set
 
+logger.info('Evaluating model with TEST set')
 reg.fit(X_train, y_train)
 y_pred = reg.predict(X_test, verbose=0)
 test_score = {
@@ -219,13 +250,13 @@ test_score = {
     'MSE': mean_squared_error(y_test, y_pred),
     'r2': r2_score(y_test, y_pred),
 }
-print('-' * 65)
-print(f'Model Test Scores:')
-print('-' * 65)
-print(f'MAE = {np.abs(test_score["MAE"]) * 1000:.3f} um')
-print(f'MSE = {np.abs(test_score["MSE"]) * 1_000_000:.3f} um^2')
-print(f'R^2 = {np.mean(test_score["r2"]):.3f}')
-print('-' * 65)
+logger.info('-' * 65)
+logger.info(f'Model Test Scores:')
+logger.info('-' * 65)
+logger.info(f'MAE = {np.abs(test_score["MAE"]) * 1000:.3f} um')
+logger.info(f'MSE = {np.abs(test_score["MSE"]) * 1_000_000:.3f} um^2')
+logger.info(f'R^2 = {np.mean(test_score["r2"]):.3f}')
+logger.info('-' * 65)
 
 fig, ax = plt.subplots()
 ax.plot(y_test, color='red', label='Real data')
@@ -234,6 +265,9 @@ ax.set_title('Model Predictions - Test Set')
 ax.set_ylabel('Mean Radius (mm)')
 ax.set_xlabel('Data Points')
 ax.legend()
+png_name = f'ML Predictions Test Set'
+fig.savefig(png_name, dpi=300)
+logger.info(f'Figure saved - {png_name}')
 fig.show()
 
 # %%
