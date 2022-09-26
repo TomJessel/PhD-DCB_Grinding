@@ -59,7 +59,7 @@ reg = KerasRegressor(
     verbose=0,
 )
 #%%
-kfold = KFold(n_splits=5, shuffle=True, random_state=0)
+kfold = KFold(n_splits=10, shuffle=True, random_state=0)
 
 #%%
 ind = []
@@ -98,37 +98,43 @@ fig[2].set_ylabel('Mean Absolute\nPercentage Error')
 # [f.autoscale(axis='y', tight=True) for f in fig]
 
 #%% Scoring with Cross Validation
-scoring = {
-    'MAE': 'neg_mean_absolute_error',
-    'MSE': 'neg_mean_squared_error',
-    'r2': 'r2',
-}
 
-scores = cross_validate(
-    estimator=reg,
-    X=X,
-    y=y,
-    cv=kfold,
-    scoring=scoring,
-    return_train_score=True,
-    verbose=0,
-    n_jobs=-1,
-    return_estimator=True
-)
-ind = np.argmax(scores['test_r2'])
-reg = scores['estimator'][ind]
 
-#%% Printing model summary and scores
-reg.model_.summary()
-print('-' * 65)
-print(f'Model Scores:')
-print('-' * 65)
-print(f'Train time = {np.mean(scores["fit_time"]):.2f} s')
-print(f'Predict time = {np.mean(scores["score_time"]):.2f} s')
-print(f'MAE = {np.abs(np.mean(scores["test_MAE"])) * 1000:.3f} um')
-print(f'MSE = {np.abs(np.mean(scores["test_MSE"])) * 1_000_000:.3f} um^2')
-print(f'R^2 = {np.mean(scores["test_r2"]):.3f}')
-print('-' * 65)
+def scoring_model(model):
+    scoring = {
+        'MAE': 'neg_mean_absolute_error',
+        'MSE': 'neg_mean_squared_error',
+        'r2': 'r2',
+    }
+
+    scores = cross_validate(
+        estimator=model,
+        X=X,
+        y=y,
+        cv=kfold,
+        scoring=scoring,
+        return_train_score=True,
+        verbose=0,
+        n_jobs=-1,
+        return_estimator=True
+    )
+    ind = np.argmax(scores['test_r2'])
+    best_model = scores['estimator'][ind]
+
+    best_model.model_.summary()
+    print('-' * 65)
+    print(f'Model Scores:')
+    print('-' * 65)
+    print(f'Train time = {np.mean(scores["fit_time"]):.2f} s')
+    print(f'Predict time = {np.mean(scores["score_time"]):.2f} s')
+    print(f'MAE = {np.abs(np.mean(scores["test_MAE"])) * 1000:.3f} um')
+    print(f'MSE = {np.abs(np.mean(scores["test_MSE"])) * 1_000_000:.3f} um^2')
+    print(f'R^2 = {np.mean(scores["test_r2"]):.3f}')
+    print('-' * 65)
+    return best_model, scores
+
+
+reg, scores = scoring_model(reg)
 
 #%%
 # todo use gridsearch to optimise hyperparameters
