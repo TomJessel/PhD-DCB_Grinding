@@ -77,12 +77,13 @@ logger.info('Split Dataset into Train and Test')
 reg = KerasRegressor(
     model=get_regression,
     optimizer='adam',
+    optimizer__learning_rate=0.001,
     loss='mae',
     metrics=['MAE', 'MSE', 'mean_absolute_percentage_error'],
     hidden_layer_sizes=(30, 30),
-    batch_size=8,
-    dropout=0.2,
-    epochs=300,
+    batch_size=10,
+    dropout=0.1,
+    epochs=500,
     verbose=0,
 )
 
@@ -124,32 +125,31 @@ def Model_gridsearch(
 
 # Batch Size and Epoch
 batch_size = [10]
-epochs = [300, 400, 500]
+epochs = [400, 450, 500]
 
 # Number of neurons
-model__hidden_layer_sizes = [(25,25), (30, 30)]
-model__dropout = [0.1]
+model__hidden_layer_sizes = [(30, 30)]
+model__dropout = [0, 0.1, 0.3, 0.5]
 
 # Neuron initiation mode
 init_mode = ['lecun_uniform', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform']
 
 # Learining rate and Momentum
-learn_rate = [0.001]
+learn_rate = [0.001, 0.01, 0.1, 0.3]
 
 param_grid = dict(
-    # model__init_mode=init_mode,
-    model__hidden_layer_sizes=model__hidden_layer_sizes,
-    model__dropout=model__dropout,
-    batch_size=batch_size,
+    model__init_mode=init_mode,
+    # model__hidden_layer_sizes=model__hidden_layer_sizes,
+    # model__dropout=model__dropout,
+    # batch_size=batch_size,
     epochs=epochs,
-    optimizer__learning_rate=learn_rate,
+    # optimizer__learning_rate=learn_rate,
 )
 
 
 grid_result = Model_gridsearch(model=reg, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
 reg = grid_result.best_estimator_
-# logger.info('Best Estimator:')
-# logger.info(reg.model_.summary(print_fn=logger.info))
+
 
 # %% Train model and show validation history
 
@@ -197,7 +197,7 @@ def model_history(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, c
     return model
 
 
-reg = model_history(model=reg, Xdata=X_train, ydata=y_train, cv=5)
+# reg = model_history(model=reg, Xdata=X_train, ydata=y_train, cv=5)
 
 # %% Scoring with Cross Validation
 
