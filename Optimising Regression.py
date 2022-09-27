@@ -32,8 +32,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-formatter = logging.Formatter('%(asctime)s:%(name)s:%(levelname)s:%(message)s')
-console_formatter = logging.Formatter('%(name)s:%(levelname)s:%(message)s')
+formatter = logging.Formatter('%(asctime)s: %(name)s: %(levelname)s: %(message)s')
+console_formatter = logging.Formatter('%(name)s: %(levelname)s: %(message)s')
 
 file_handler = logging.FileHandler('ML.log')
 file_handler.setFormatter(formatter)
@@ -57,6 +57,7 @@ def get_regression(meta, hidden_layer_sizes, dropout, init_mode='glorot_uniform'
 
 
 # %% Load and pre-process dataset
+logger.info('=' * 65)
 exp = load(file='Test 5')
 logger.info('Loaded Dateset')
 dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz', 'Freq 134 kHz'])
@@ -68,7 +69,7 @@ sc = StandardScaler()
 X = sc.fit_transform(X)
 logger.info('Scaling Dataset')
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 logger.info('Split Dataset into Train and Test')
 
 #%% Setup regression model
@@ -96,7 +97,7 @@ def Model_gridsearch(
         cv: int = 5
 ) -> object:
 
-    kfold = KFold(n_splits=cv, shuffle=True, random_state=0)
+    kfold = KFold(n_splits=cv, shuffle=True)
 
     grid = GridSearchCV(
         estimator=model,
@@ -106,33 +107,34 @@ def Model_gridsearch(
         scoring='r2',
         verbose=True
     )
-    logger.info(f'GridSearchCV')
+    logger.info(f'___GridSearchCV___')
     gd_result = grid.fit(Xdata, ydata)
 
-    logger.info("Best: %f using %s" % (gd_result.best_score_, gd_result.best_params_))
+    logger.info(f'Best Estimator: {gd_result.best_score_:.6f}')
+    logger.info(f'Using: {gd_result.best_params_}')
     # print("Best: %f using %s" % (gd_result.best_score_, gd_result.best_params_))
     # print('-'*82)
     means = gd_result.cv_results_['mean_test_score']
     stds = gd_result.cv_results_['std_test_score']
     params = gd_result.cv_results_['params']
-    for mean, stdev, param in zip(means, stds, params):
-        logging.info("%f (%f) with: %r" % (mean, stdev, param))
+    # for mean, stdev, param in zip(means, stds, params):
+    #     print("%f (%f) with: %r" % (mean, stdev, param))
     return gd_result
 
 
 # Batch Size and Epoch
-batch_size = [5, 8, 10, 12, 15, 20]
-epochs = [100, 200, 300, 400, 500]
+batch_size = [10]
+epochs = [300, 400, 500]
 
 # Number of neurons
-model__hidden_layer_sizes = [(10,), (20,), (30,), (10, 10), (20, 20), (30, 30)]
-model__dropout = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+model__hidden_layer_sizes = [(25,25), (30, 30)]
+model__dropout = [0.1]
 
 # Neuron initiation mode
-init_mode = ['uniform', 'lecun_uniform', 'normal', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform']
+init_mode = ['lecun_uniform', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform']
 
 # Learining rate and Momentum
-learn_rate = [0.001, 0.01, 0.1, 0.2, 0.3]
+learn_rate = [0.001]
 
 param_grid = dict(
     # model__init_mode=init_mode,
@@ -144,8 +146,8 @@ param_grid = dict(
 )
 
 
-# grid_result = Model_gridsearch(model=reg, Xdata=X_train, ydata=y_train, param_grid=param_grid)
-# reg = grid_result.best_estimator_
+grid_result = Model_gridsearch(model=reg, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
+reg = grid_result.best_estimator_
 # logger.info('Best Estimator:')
 # logger.info(reg.model_.summary(print_fn=logger.info))
 
@@ -153,10 +155,10 @@ param_grid = dict(
 
 
 def model_history(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, cv: int = 5) -> KerasRegressor:
-    kfold = KFold(n_splits=cv, shuffle=True, random_state=0)
+    kfold = KFold(n_splits=cv, shuffle=True)
     ind = []
     history = []
-    logger.info('Model learning/validation history')
+    logger.info('___Model learning/validation history___')
 
     for train, val in tqdm(kfold.split(X=Xdata, y=ydata), total=kfold.get_n_splits(), desc='Model History'):
         model.fit(Xdata[train], ydata[train], validation_data=(Xdata[val], ydata[val]))
@@ -202,14 +204,14 @@ reg = model_history(model=reg, Xdata=X_train, ydata=y_train, cv=5)
 
 def scoring_model(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, cv: int = 10):
     # kfold = KFold(n_splits=cv, shuffle=True, random_state=0)
-    kfold = RepeatedKFold(n_splits=cv, n_repeats=5, random_state=0)
+    kfold = RepeatedKFold(n_splits=cv, n_repeats=5)
     scoring = {
         'MAE': 'neg_mean_absolute_error',
         'MSE': 'neg_mean_squared_error',
         'r2': 'r2',
     }
     # print('Scoring Model...\n')
-    logger.info(f'Cross Validating Model - Repeated KFold')
+    logger.info(f'___Cross Validating Model - Repeated KFold___')
 
     scores_ = cross_validate(
         estimator=model,
@@ -269,7 +271,7 @@ png_name = f'ML Predictions Test Set'
 fig.savefig(png_name, dpi=300)
 logger.info(f'Figure saved - {png_name}')
 fig.show()
+logger.info('=' * 65)
 
 # %%
-# todo use gridsearch to optimise hyperparameters
 # todo use adaptive learning rates
