@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@File    :   Optimising Regression.py
+@File    :   Optimising_Regression.py
 @Author  :   Tom Jessel
 @Contact :   jesselt@cardiff.ac.uk
 
@@ -11,7 +11,7 @@
 """
 # %%
 import os
-from typing import Dict
+from typing import Dict, Any
 import logging
 
 import matplotlib.pyplot as plt
@@ -20,6 +20,7 @@ import pandas as pd
 from scikeras.wrappers import KerasRegressor
 from sklearn.model_selection import KFold, train_test_split, RepeatedKFold
 from sklearn.model_selection import cross_validate
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import GridSearchCV
@@ -44,6 +45,28 @@ stream_handler.setFormatter(console_formatter)
 logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
 
+# %% Load and pre-process dataset
+logger.info('=' * 65)
+exp = load(file='Test 5')
+logger.info('Loaded Dateset')
+dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz', 'Freq 134 kHz'])
+dataset = dataframe.values
+X = dataset[:, :-1]
+y = dataset[:, -1]
+
+#%% Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+logger.info('Split Dataset into Train and Test')
+
+#%% Scale data
+# sc = StandardScaler()
+# X_train = sc.fit_transform(X_train)
+# X_test = sc.transform(X_test)
+# logger.info('Scaling Dataset')
+
+
+#%% Setup regression model
+
 
 def get_regression(meta, hidden_layer_sizes, dropout, init_mode='glorot_uniform'):
     n_features_in_ = meta['n_features_in_']
@@ -56,26 +79,9 @@ def get_regression(meta, hidden_layer_sizes, dropout, init_mode='glorot_uniform'
     return model
 
 
-# %% Load and pre-process dataset
-logger.info('=' * 65)
-exp = load(file='Test 5')
-logger.info('Loaded Dateset')
-dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz', 'Freq 134 kHz'])
-dataset = dataframe.values
-X = dataset[:, :-1]
-y = dataset[:, -1]
-
-sc = StandardScaler()
-X = sc.fit_transform(X)
-logger.info('Scaling Dataset')
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-logger.info('Split Dataset into Train and Test')
-
-#%% Setup regression model
-
 reg = KerasRegressor(
     model=get_regression,
+    model__init_mode='glorot_normal',
     optimizer='adam',
     optimizer__learning_rate=0.001,
     loss='mae',
@@ -87,6 +93,11 @@ reg = KerasRegressor(
     verbose=0,
 )
 
+#%% Pipeline
+pipe = Pipeline([
+    ('scaler', StandardScaler()),
+    ('model', reg),
+])
 #%% GridsearchCV
 
 
@@ -115,40 +126,45 @@ def Model_gridsearch(
     logger.info(f'Using: {gd_result.best_params_}')
     # print("Best: %f using %s" % (gd_result.best_score_, gd_result.best_params_))
     # print('-'*82)
-    means = gd_result.cv_results_['mean_test_score']
-    stds = gd_result.cv_results_['std_test_score']
-    params = gd_result.cv_results_['params']
+    # means = gd_result.cv_results_['mean_test_score']
+    # stds = gd_result.cv_results_['std_test_score']
+    # params = gd_result.cv_results_['params']
     # for mean, stdev, param in zip(means, stds, params):
     #     print("%f (%f) with: %r" % (mean, stdev, param))
     return gd_result
 
 
-# Batch Size and Epoch
-batch_size = [10]
-epochs = [400, 450, 500]
-
+# Batch Size
+batch_size = [5, 8, 10, 15, 25, 32]
+# Epochs
+epochs = [450, 500, 600]
 # Number of neurons
-model__hidden_layer_sizes = [(30, 30)]
+model__hidden_layer_sizes = [(80, ), (30, 25), (30, 30)]
+# Dropout
 model__dropout = [0, 0.1, 0.3, 0.5]
-
 # Neuron initiation mode
 init_mode = ['lecun_uniform', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform']
-
+# Optimizer
+optimizer = ['adam', 'SGD', 'RMSprop', 'Adagrad', 'Adamax', 'Adadelta']
 # Learining rate and Momentum
-learn_rate = [0.001, 0.01, 0.1, 0.3]
+learn_rate = [0.0005, 0.0075, 0.001, 0.0025, 0.005, 0.01]
+# Loss function
+loss = ['mse', 'mae']
 
 param_grid = dict(
-    model__init_mode=init_mode,
+    # model__init_mode=init_mode,
     # model__hidden_layer_sizes=model__hidden_layer_sizes,
     # model__dropout=model__dropout,
+    # loss=loss,
     # batch_size=batch_size,
     epochs=epochs,
+    # optimizer=optimizer,
     # optimizer__learning_rate=learn_rate,
 )
 
 
-grid_result = Model_gridsearch(model=reg, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
-reg = grid_result.best_estimator_
+# grid_result = Model_gridsearch(model=reg, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
+# reg = grid_result.best_estimator_
 
 
 # %% Train model and show validation history
@@ -202,7 +218,7 @@ def model_history(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, c
 # %% Scoring with Cross Validation
 
 
-def scoring_model(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, cv: int = 10):
+def scoring_model(model: Any, Xdata: np.ndarray, ydata: np.ndarray, cv: int = 10):
     # kfold = KFold(n_splits=cv, shuffle=True, random_state=0)
     kfold = RepeatedKFold(n_splits=cv, n_repeats=5)
     scoring = {
@@ -227,7 +243,7 @@ def scoring_model(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, c
     ind = np.argmax(scores_['test_r2'])
     best_model = scores_['estimator'][ind]
 
-    logger.info(best_model.model_.summary(print_fn=logger.info))
+    # logger.info(best_model.model_.summary(print_fn=logger.info))
     logger.info('-' * 65)
     logger.info(f'Model Training Scores:')
     logger.info('-' * 65)
@@ -240,13 +256,16 @@ def scoring_model(model: KerasRegressor, Xdata: np.ndarray, ydata: np.ndarray, c
     return best_model, scores_
 
 
-reg, train_scores = scoring_model(model=reg, Xdata=X_train, ydata=y_train)
+reg, train_scores = scoring_model(model=pipe, Xdata=X_train, ydata=y_train)
 
 # %% Evaluate model again test set
 
 logger.info('Evaluating model with TEST set')
-reg.fit(X_train, y_train)
-y_pred = reg.predict(X_test, verbose=0)
+# reg.fit(X_train, y_train)
+# y_pred = reg.predict(X_test, verbose=0)
+pipe.fit(X_train, y_train)
+y_pred = pipe.predict(X_test, verbose=0)
+
 test_score = {
     'MAE': mean_absolute_error(y_test, y_pred),
     'MSE': mean_squared_error(y_test, y_pred),
@@ -273,5 +292,5 @@ logger.info(f'Figure saved - {png_name}')
 fig.show()
 logger.info('=' * 65)
 
-# %%
-# todo use adaptive learning rates
+# todo properly implement pipelines instead of scaling then model
+# todo change file into package that I can import to use in future
