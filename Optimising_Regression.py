@@ -293,24 +293,32 @@ def train_history(model: Union[KerasRegressor, Pipeline]):
     logger.info(f'Figure saved - {png_name_}')
 
 
+def split_dataset(df):
+    dataset = df.values
+    x = dataset[:, :-1]
+    y = dataset[:, -1]
+
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+    logger.info('Split Dataset into Train and Test')
+    return x_train, x_test, y_train, y_test
+
+
+def create_pipeline(**kwargs):
+    reg = KerasRegressor(**kwargs)
+    p = Pipeline([
+        ('scaler', StandardScaler()),
+        ('reg', reg),
+        ])
+    return p
+
+
 if __name__ == '__main__':
     logger.info('=' * 65)
     exp = load(file='Test 5')
     logger.info('Loaded Dateset')
-    dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz'])
-    dataset = dataframe.values
-    X = dataset[:, :-1]
-    y = dataset[:, -1]
+    dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz', 'Freq 134 kHz'])
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-    logger.info('Split Dataset into Train and Test')
-
-    # sc = StandardScaler()
-    # X_train = sc.fit_transform(X_train)
-    # X_test = sc.transform(X_test)
-    # logger.info('Scaling Dataset')
-
-    reg = KerasRegressor(
+    pipe = create_pipeline(
         model=get_regression,
         model__init_mode='glorot_normal',
         model__dropout=0.1,
@@ -322,12 +330,7 @@ if __name__ == '__main__':
         batch_size=10,
         epochs=500,
         verbose=0,
-    )
-
-    pipe = Pipeline([
-        ('scaler', StandardScaler()),
-        ('reg', reg),
-    ])
+        )
 
     param_grid = dict(
         # model__init_mode=['lecun_uniform', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'],
@@ -339,6 +342,8 @@ if __name__ == '__main__':
         # optimizer=['adam', 'SGD', 'RMSprop', 'Adagrad', 'Adamax', 'Adadelta'],
         # optimizer__learning_rate=[0.0005, 0.0075, 0.001, 0.0025, 0.005, 0.01],
     )
+
+    X_train, X_test, y_train, y_test = split_dataset(dataframe)
 
     # pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
 
