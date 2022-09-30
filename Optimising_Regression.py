@@ -76,18 +76,18 @@ def get_regression(meta: Dict[str, Any],
     return model
 
 
-def Model_gridsearch(
+def model_gridsearch(
         model: Union[KerasRegressor, Pipeline],
         Xdata: np.ndarray,
         ydata: np.ndarray,
         param_grid: Dict[str, iter],
         cv: int = 5
-        ) -> object:
+        ) -> [Union[KerasRegressor, Pipeline], object]:
     """
-    Gridsearch for given hyperparameters
+    Gridsearch for given hyper-parameters
 
     :param model: [KerasRegressor, Pipeline]:
-        model/pipeline to examine hyperparameters over
+        model/pipeline to examine hyper-parameters over
     :param Xdata: np.ndarray:
         features training data to carry out gridsearch with
     :param ydata: np.ndarray:
@@ -96,7 +96,9 @@ def Model_gridsearch(
         parameters to evaluate with gridsearch, key: parameter, item: iterable
     :param cv: int: default= 5:
         number of splits carried out by KFold for cross validation
-    :return: gd_result: object:
+    :return best_estimator: [KerasRegressor, Pipeline]:
+        the best model that performed the best on given hyper-parameters
+    :return gd_result: object:
         grid search cv results and estimators used
     """
 
@@ -107,11 +109,14 @@ def Model_gridsearch(
         param_grid=param_grid,
         n_jobs=-1,
         cv=kfold,
-        scoring='r2',
-        verbose=True
+        scoring={'r2': 'r2', 'MAE': 'mae', 'MSE': 'mse'},
+        refit='r2',
+        verbose=True,
+        return_train_score=True,
     )
     logger.info(f'___GridSearchCV___')
     gd_result = grid.fit(Xdata, ydata)
+    best_estimator = gd_result.best_estimator_
 
     logger.info(f'Best Estimator: {gd_result.best_score_:.6f}')
     logger.info(f'Using: {gd_result.best_params_}')
@@ -122,74 +127,7 @@ def Model_gridsearch(
     # params = gd_result.cv_results_['params']
     # for mean, stdev, param in zip(means, stds, params):
     #     print("%f (%f) with: %r" % (mean, stdev, param))
-    return gd_result
-
-
-def model_history(
-        model: Union[KerasRegressor, Pipeline],
-        Xdata: np.ndarray,
-        ydata: np.ndarray,
-        cv: int = 5
-        ) -> Union[KerasRegressor, Pipeline]:
-    """
-    Train & validate model with training data to visualise model learning rates.
-
-    :param model: [KerasRegressor, Pipeline]:
-        model to train and validate for
-    :param Xdata: np.ndarray:
-        training set features
-    :param ydata: np.ndarray:
-        training set results
-    :param cv: int: default=5:
-        number of splits carried out by KFold for cross validation
-    :return: model: [KerasRegressor, Pipeline]:
-        fitted model with history for final cv split
-    """
-
-    kfold = KFold(n_splits=cv, shuffle=True, random_state=40)
-    ind = []
-    history = []
-    logger.info('___Model learning/validation history___')
-    pipe_bool = False
-    if type(model) == Pipeline:
-        pipe_bool = True
-
-    for train, val in tqdm(kfold.split(X=Xdata, y=ydata), total=kfold.get_n_splits(), desc='Model History'):
-        if pipe_bool:
-            model.fit(Xdata[train], ydata[train], reg__validation_data=(Xdata[val], ydata[val]))
-            hist = model['reg'].history_
-        else:
-            model.fit(Xdata[train], ydata[train], validation_data=(Xdata[val], ydata[val]))
-            hist = model.history_
-        history.append(pd.DataFrame(hist).drop(columns=['loss', 'val_loss']).rename(columns={
-            'mean_absolute_error': 'MAE-train',
-            'mean_squared_error': 'MSE-train',
-            'val_mean_absolute_error': 'MAE-val',
-            'val_mean_squared_error': 'MSE-val',
-        }))
-        index = {
-            'train_i': train,
-            'test_i': val,
-        }
-        ind.append(index)
-    history = pd.concat(history)
-
-    # Graph History Results
-    mean_hist = history.groupby(level=0).mean()
-
-    ax = mean_hist.plot(
-        subplots=[('MAE-train', 'MAE-val'), ('MSE-train', 'MSE-val')],
-        xlabel='Epoch',
-        xlim=(-1, len(mean_hist)),
-        title='Regression Model Learning History'
-    )
-    ax[0].set_ylabel('Mean\nAbsolute Error')
-    ax[1].set_ylabel('Mean\nSquared Error')
-    fig_ = ax[1].get_figure()
-    png_name_ = f'ML learning history'
-    fig_.savefig(png_name_, dpi=300)
-    logger.info(f'Figure saved - {png_name_}')
-    return model
+    return best_estimator, gd_result
 
 
 def score_train(
@@ -303,6 +241,45 @@ def score_test(model: Union[KerasRegressor, Pipeline],
     return _test_score
 
 
+def train_history(model: Union[KerasRegressor, Pipeline]):
+    """
+    Plot training history of model, to show loss over epochs.
+
+    :param model: [KerasRegressor, Pipeline]:
+        fitted model to plot training history
+    """
+    logger.info('___Model learning/validation history___')
+    pipe_bool = False
+    if type(model) == Pipeline:
+        pipe_bool = True
+
+    if pipe_bool:
+        hist = model['reg'].history_
+    else:
+        hist = model.history_
+    history = pd.DataFrame(hist).drop(columns=['loss', 'val_loss']).rename(columns={
+        'mean_absolute_error': 'MAE-train',
+        'mean_squared_error': 'MSE-train',
+        'val_mean_absolute_error': 'MAE-val',
+        'val_mean_squared_error': 'MSE-val',
+    })
+
+    # Graph History Results
+
+    ax = history.plot(
+        subplots=[('MAE-train', 'MAE-val'), ('MSE-train', 'MSE-val')],
+        xlabel='Epoch',
+        xlim=(-1, len(history)),
+        title='Regression Model Learning History'
+    )
+    ax[0].set_ylabel('Mean\nAbsolute Error')
+    ax[1].set_ylabel('Mean\nSquared Error')
+    fig_ = ax[1].get_figure()
+    png_name_ = f'ML learning history'
+    fig_.savefig(png_name_, dpi=300)
+    logger.info(f'Figure saved - {png_name_}')
+
+
 if __name__ == '__main__':
     logger.info('=' * 65)
     exp = load(file='Test 5')
@@ -340,23 +317,21 @@ if __name__ == '__main__':
     ])
 
     param_grid = dict(
-        model__init_mode=['lecun_uniform', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'],
-        model__hidden_layer_sizes=[(80,), (30, 25), (30, 30)],
-        model__dropout=[0, 0.1, 0.3, 0.5],
-        loss=['mse', 'mae'],
-        batch_size=[5, 8, 10, 15, 25, 32],
+        # model__init_mode=['lecun_uniform', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'],
+        # model__hidden_layer_sizes=[(80,), (30, 25), (30, 30)],
+        # model__dropout=[0, 0.1, 0.3, 0.5],
+        # loss=['mse', 'mae'],
+        # batch_size=[5, 8, 10, 15, 25, 32],
         reg__epochs=[450, 500, 600],
-        optimizer=['adam', 'SGD', 'RMSprop', 'Adagrad', 'Adamax', 'Adadelta'],
-        optimizer__learning_rate=[0.0005, 0.0075, 0.001, 0.0025, 0.005, 0.01],
+        # optimizer=['adam', 'SGD', 'RMSprop', 'Adagrad', 'Adamax', 'Adadelta'],
+        # optimizer__learning_rate=[0.0005, 0.0075, 0.001, 0.0025, 0.005, 0.01],
     )
 
-    # grid_result = Model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
-    # pipe = grid_result.best_estimator_
-
-    # pipe = model_history(model=pipe, Xdata=X_train, ydata=y_train, cv=5)
+    pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
 
     pipe, train_scores = score_train(model=pipe, Xdata=X_train, ydata=y_train)
 
-    pipe.fit(X_train, y_train, reg__validation_split=0.2)  # todo change history function to use values from this fit
+    pipe.fit(X_train, y_train, reg__validation_split=0.2)
+    train_history(pipe)
 
     test_score = score_test(pipe, X_test, y_test)
