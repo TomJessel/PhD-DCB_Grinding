@@ -25,7 +25,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import GridSearchCV
 from tensorflow import keras
-from tqdm import tqdm
 
 from Experiment import load
 
@@ -102,31 +101,44 @@ def model_gridsearch(
         grid search cv results and estimators used
     """
 
-    kfold = KFold(n_splits=cv, shuffle=True, random_state=40)
+    kfold = KFold(n_splits=cv, shuffle=True)
 
     grid = GridSearchCV(
         estimator=model,
         param_grid=param_grid,
         n_jobs=-1,
         cv=kfold,
-        scoring={'r2': 'r2', 'MAE': 'mae', 'MSE': 'mse'},
+        scoring={'r2': 'r2', 'MAE': 'neg_mean_absolute_error', 'MSE': 'neg_mean_squared_error'},
         refit='r2',
         verbose=True,
         return_train_score=True,
     )
     logger.info(f'___GridSearchCV___')
+    logger.info('-' * 65)
+    logger.info(f'Parameter grid: ')
+    logger.info('-' * 65)
+    for key, value in param_grid.items():
+        logger.info(f'{key} - {value}')
+    logger.info('-'*65)
     gd_result = grid.fit(Xdata, ydata)
     best_estimator = gd_result.best_estimator_
 
-    logger.info(f'Best Estimator: {gd_result.best_score_:.6f}')
-    logger.info(f'Using: {gd_result.best_params_}')
-    # print("Best: %f using %s" % (gd_result.best_score_, gd_result.best_params_))
-    # print('-'*82)
-    # means = gd_result.cv_results_['mean_test_score']
-    # stds = gd_result.cv_results_['std_test_score']
-    # params = gd_result.cv_results_['params']
-    # for mean, stdev, param in zip(means, stds, params):
-    #     print("%f (%f) with: %r" % (mean, stdev, param))
+    logger.info(f'Best Estimator:')
+    logger.info('-' * 65)
+    logger.info(f'Score: {gd_result.best_score_:.6f}')
+    logger.info(f'Params:')
+    for key, value in gd_result.best_params_.items():
+        logger.info(f'{key}: {value}')
+    logger.info('-'*65)
+
+    logger.info('Results:')
+    logger.info('-' * 65)
+    means = gd_result.cv_results_['mean_test_r2']
+    stds = gd_result.cv_results_['std_test_r2']
+    params = gd_result.cv_results_['params']
+    for mean, stdev, param in zip(means, stds, params):
+        logger.info(f'{mean:.4f} ({stdev:.4f}) with: {param}')
+    logger.info('-' * 65)
     return best_estimator, gd_result
 
 
@@ -156,7 +168,7 @@ def score_train(
         dict of scores and times for each fitted model
     """
 
-    kfold = RepeatedKFold(n_splits=cv_splits, n_repeats=cv_repeats, random_state=40)
+    kfold = RepeatedKFold(n_splits=cv_splits, n_repeats=cv_repeats)
     scoring = {
         'MAE': 'neg_mean_absolute_error',
         'MSE': 'neg_mean_squared_error',
@@ -249,6 +261,7 @@ def train_history(model: Union[KerasRegressor, Pipeline]):
         fitted model to plot training history
     """
     logger.info('___Model learning/validation history___')
+    logger.info('-' * 65)
     pipe_bool = False
     if type(model) == Pipeline:
         pipe_bool = True
@@ -284,12 +297,12 @@ if __name__ == '__main__':
     logger.info('=' * 65)
     exp = load(file='Test 5')
     logger.info('Loaded Dateset')
-    dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz', 'Freq 134 kHz'])
+    dataframe = exp.features.drop(columns=['Runout', 'Form error', 'Freq 10 kHz'])
     dataset = dataframe.values
     X = dataset[:, :-1]
     y = dataset[:, -1]
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=40)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     logger.info('Split Dataset into Train and Test')
 
     # sc = StandardScaler()
@@ -322,12 +335,12 @@ if __name__ == '__main__':
         # model__dropout=[0, 0.1, 0.3, 0.5],
         # loss=['mse', 'mae'],
         # batch_size=[5, 8, 10, 15, 25, 32],
-        reg__epochs=[450, 500, 600],
+        # reg__epochs=[400, 500, 600]
         # optimizer=['adam', 'SGD', 'RMSprop', 'Adagrad', 'Adamax', 'Adadelta'],
         # optimizer__learning_rate=[0.0005, 0.0075, 0.001, 0.0025, 0.005, 0.01],
     )
 
-    pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
+    # pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
 
     pipe, train_scores = score_train(model=pipe, Xdata=X_train, ydata=y_train)
 
