@@ -66,7 +66,7 @@ def load(file: str = None, process=False):
     f_locs = {
         'test5': r'..\..\Testing\22_08_03_grit1000\Test 5.pickle',
         'test2': r"..\..\Testing\TEST2Combined\Test 2.pickle",
-        'test1': r"..\..m\Testing\28_2_22_grit1000\Test 1.pickle"
+        'test1': r"..\..\Testing\28_2_22_grit1000\Test 1.pickle"
     }
 
     if file is None:
@@ -279,10 +279,10 @@ class Experiment:
         cols = ["RMS", 'Kurtosis', 'Amplitude', 'Skewness', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
                 'Mean radius', 'Runout', 'Form error']
 
-        rms: np.array = self.ae.rms[:-1]
-        kurt: np.array = self.ae.kurt[:-1]
-        amp: np.array = self.ae.amplitude[:-1]
-        skew: np.array = self.ae.skewness[:-1]
+        rms = self.ae.rms[:-1]
+        kurt = self.ae.kurt[:-1]
+        amp = self.ae.amplitude[:-1]
+        skew = self.ae.skewness[:-1]
 
         f = np.array(self.ae.fft[1000])
         f = f.T
