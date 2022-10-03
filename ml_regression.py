@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@File    :   Optimising_Regression.py
+@File    :   ml_regression.py
 @Author  :   Tom Jessel
 @Contact :   jesselt@cardiff.ac.uk
 
@@ -239,7 +239,7 @@ def score_test(model: Union[KerasRegressor, Pipeline],
     logger.info('-' * 65)
 
     fig, ax = plt.subplots()
-    ax.plot(y_test, color='red', label='Real data')
+    ax.plot(ytest, color='red', label='Real data')
     ax.plot(y_pred, color='blue', ls='--', label='Predicted data')
     ax.set_title('Model Predictions - Test Set')
     ax.set_ylabel('Mean Radius (mm)')
@@ -290,6 +290,7 @@ def train_history(model: Union[KerasRegressor, Pipeline]):
     fig_ = ax[1].get_figure()
     png_name_ = f'ML learning history'
     fig_.savefig(png_name_, dpi=300)
+    fig_.show()
     logger.info(f'Figure saved - {png_name_}')
 
 

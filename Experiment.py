@@ -279,10 +279,10 @@ class Experiment:
         cols = ["RMS", 'Kurtosis', 'Amplitude', 'Skewness', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
                 'Mean radius', 'Runout', 'Form error']
 
-        rms: np.array = self.ae.rms[:-1]
-        kurt: np.array = self.ae.kurt[:-1]
-        amp: np.array = self.ae.amplitude[:-1]
-        skew: np.array = self.ae.skewness[:-1]
+        rms = self.ae.rms[:-1]
+        kurt = self.ae.kurt[:-1]
+        amp = self.ae.amplitude[:-1]
+        skew = self.ae.skewness[:-1]
 
         f = np.array(self.ae.fft[1000])
         f = f.T

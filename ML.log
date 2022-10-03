@@ -2359,3 +2359,392 @@
 2022-09-30 13:34:30,285: __main__: INFO: =================================================================
 2022-09-30 13:34:31,341: __main__: INFO: Loaded Dateset
 2022-09-30 13:34:31,343: __main__: INFO: Split Dataset into Train and Test
+2022-09-30 13:54:44,168: Optimising_Regression: INFO: Split Dataset into Train and Test
+2022-09-30 13:55:38,328: Optimising_Regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 13:56:37,694: Optimising_Regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 13:57:45,598: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 13:57:45,600: Optimising_Regression: INFO: Model Training Scores:
+2022-09-30 13:57:45,601: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 13:57:45,602: Optimising_Regression: INFO: Train time = 26.94 s
+2022-09-30 13:57:45,604: Optimising_Regression: INFO: Predict time = 0.36 s
+2022-09-30 13:57:45,605: Optimising_Regression: INFO: MAE = 1.637 um
+2022-09-30 13:57:45,606: Optimising_Regression: INFO: MSE = 9.011 um^2
+2022-09-30 13:57:45,607: Optimising_Regression: INFO: R^2 = 0.916
+2022-09-30 13:57:45,608: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 13:58:27,887: __main__: INFO: =================================================================
+2022-09-30 13:58:28,981: __main__: INFO: Loaded Dateset
+2022-09-30 14:01:25,238: Optimising_Regression: INFO: ___Model learning/validation history___
+2022-09-30 14:01:25,239: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:01:25,778: Optimising_Regression: INFO: Figure saved - ML learning history
+2022-09-30 14:02:30,262: Optimising_Regression: INFO: Evaluating model with TEST set
+2022-09-30 14:02:30,450: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:02:30,451: Optimising_Regression: INFO: Model Test Scores:
+2022-09-30 14:02:30,451: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:02:30,452: Optimising_Regression: INFO: MAE = 1.430 um
+2022-09-30 14:02:30,452: Optimising_Regression: INFO: MSE = 6.729 um^2
+2022-09-30 14:02:30,453: Optimising_Regression: INFO: R^2 = 0.945
+2022-09-30 14:02:30,453: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:03:00,496: Optimising_Regression: INFO: Evaluating model with TEST set
+2022-09-30 14:03:00,587: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:03:00,589: Optimising_Regression: INFO: Model Test Scores:
+2022-09-30 14:03:00,589: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:03:00,590: Optimising_Regression: INFO: MAE = 1.430 um
+2022-09-30 14:03:00,591: Optimising_Regression: INFO: MSE = 6.729 um^2
+2022-09-30 14:03:00,591: Optimising_Regression: INFO: R^2 = 0.945
+2022-09-30 14:03:00,592: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:04:01,487: Optimising_Regression: INFO: Evaluating model with TEST set
+2022-09-30 14:04:01,584: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:04:01,585: Optimising_Regression: INFO: Model Test Scores:
+2022-09-30 14:04:01,585: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:04:01,586: Optimising_Regression: INFO: MAE = 1.430 um
+2022-09-30 14:04:01,586: Optimising_Regression: INFO: MSE = 6.729 um^2
+2022-09-30 14:04:01,587: Optimising_Regression: INFO: R^2 = 0.945
+2022-09-30 14:04:01,588: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:04:22,950: Optimising_Regression: INFO: Evaluating model with TEST set
+2022-09-30 14:04:23,027: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:04:23,028: Optimising_Regression: INFO: Model Test Scores:
+2022-09-30 14:04:23,028: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:04:23,029: Optimising_Regression: INFO: MAE = 1.430 um
+2022-09-30 14:04:23,029: Optimising_Regression: INFO: MSE = 6.729 um^2
+2022-09-30 14:04:23,030: Optimising_Regression: INFO: R^2 = 0.945
+2022-09-30 14:04:23,030: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:04:47,492: Optimising_Regression: INFO: Evaluating model with TEST set
+2022-09-30 14:04:47,586: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:04:47,587: Optimising_Regression: INFO: Model Test Scores:
+2022-09-30 14:04:47,588: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:04:47,588: Optimising_Regression: INFO: MAE = 1.430 um
+2022-09-30 14:04:47,588: Optimising_Regression: INFO: MSE = 6.729 um^2
+2022-09-30 14:04:47,589: Optimising_Regression: INFO: R^2 = 0.945
+2022-09-30 14:04:47,590: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:07:02,918: Optimising_Regression: INFO: Split Dataset into Train and Test
+2022-09-30 14:07:02,919: Optimising_Regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 14:08:43,897: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:08:43,898: Optimising_Regression: INFO: Model Training Scores:
+2022-09-30 14:08:43,899: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:08:43,900: Optimising_Regression: INFO: Train time = 25.74 s
+2022-09-30 14:08:43,901: Optimising_Regression: INFO: Predict time = 0.41 s
+2022-09-30 14:08:43,902: Optimising_Regression: INFO: MAE = 1.499 um
+2022-09-30 14:08:43,903: Optimising_Regression: INFO: MSE = 6.881 um^2
+2022-09-30 14:08:43,904: Optimising_Regression: INFO: R^2 = 0.930
+2022-09-30 14:08:43,905: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:09:22,563: Optimising_Regression: INFO: ___Model learning/validation history___
+2022-09-30 14:09:22,564: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:09:23,262: Optimising_Regression: INFO: Figure saved - ML learning history
+2022-09-30 14:09:23,263: Optimising_Regression: INFO: Evaluating model with TEST set
+2022-09-30 14:09:23,445: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:09:23,446: Optimising_Regression: INFO: Model Test Scores:
+2022-09-30 14:09:23,446: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:09:23,446: Optimising_Regression: INFO: MAE = 1.511 um
+2022-09-30 14:09:23,447: Optimising_Regression: INFO: MSE = 6.036 um^2
+2022-09-30 14:09:23,447: Optimising_Regression: INFO: R^2 = 0.954
+2022-09-30 14:09:23,447: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:09:23,795: Optimising_Regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 14:09:23,796: Optimising_Regression: INFO: =================================================================
+2022-09-30 14:18:44,170: Optimising_Regression: INFO: Evaluating model with TEST set
+2022-09-30 14:18:44,268: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:18:44,268: Optimising_Regression: INFO: Model Test Scores:
+2022-09-30 14:18:44,269: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:18:44,269: Optimising_Regression: INFO: MAE = 1.511 um
+2022-09-30 14:18:44,269: Optimising_Regression: INFO: MSE = 6.036 um^2
+2022-09-30 14:18:44,270: Optimising_Regression: INFO: R^2 = 0.954
+2022-09-30 14:18:44,270: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:18:44,664: Optimising_Regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 14:18:44,665: Optimising_Regression: INFO: =================================================================
+2022-09-30 14:26:39,085: Optimising_Regression: INFO: Split Dataset into Train and Test
+2022-09-30 14:26:39,085: Optimising_Regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 14:29:01,591: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:29:01,592: Optimising_Regression: INFO: Model Training Scores:
+2022-09-30 14:29:01,593: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:29:01,594: Optimising_Regression: INFO: Train time = 50.24 s
+2022-09-30 14:29:01,595: Optimising_Regression: INFO: Predict time = 0.41 s
+2022-09-30 14:29:01,596: Optimising_Regression: INFO: MAE = 1.454 um
+2022-09-30 14:29:01,597: Optimising_Regression: INFO: MSE = 5.626 um^2
+2022-09-30 14:29:01,598: Optimising_Regression: INFO: R^2 = 0.952
+2022-09-30 14:29:01,598: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:30:16,047: Optimising_Regression: INFO: ___Model learning/validation history___
+2022-09-30 14:30:16,048: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:30:16,694: Optimising_Regression: INFO: Figure saved - ML learning history
+2022-09-30 14:30:16,694: Optimising_Regression: INFO: Evaluating model with TEST set
+2022-09-30 14:30:16,874: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:30:16,874: Optimising_Regression: INFO: Model Test Scores:
+2022-09-30 14:30:16,874: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:30:16,875: Optimising_Regression: INFO: MAE = 1.670 um
+2022-09-30 14:30:16,875: Optimising_Regression: INFO: MSE = 4.218 um^2
+2022-09-30 14:30:16,875: Optimising_Regression: INFO: R^2 = 0.961
+2022-09-30 14:30:16,875: Optimising_Regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:30:17,238: Optimising_Regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 14:30:17,240: Optimising_Regression: INFO: =================================================================
+2022-09-30 14:37:34,322: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 14:37:34,322: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 14:39:57,880: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:39:57,881: ml_regression: INFO: Model Training Scores:
+2022-09-30 14:39:57,882: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:39:57,883: ml_regression: INFO: Train time = 50.37 s
+2022-09-30 14:39:57,884: ml_regression: INFO: Predict time = 0.41 s
+2022-09-30 14:39:57,885: ml_regression: INFO: MAE = 1.326 um
+2022-09-30 14:39:57,886: ml_regression: INFO: MSE = 4.245 um^2
+2022-09-30 14:39:57,887: ml_regression: INFO: R^2 = 0.960
+2022-09-30 14:39:57,888: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:41:12,793: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 14:41:12,794: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:41:13,444: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 14:41:13,444: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 14:41:13,636: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:41:13,637: ml_regression: INFO: Model Test Scores:
+2022-09-30 14:41:13,637: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:41:13,638: ml_regression: INFO: MAE = 1.593 um
+2022-09-30 14:41:13,638: ml_regression: INFO: MSE = 4.610 um^2
+2022-09-30 14:41:13,638: ml_regression: INFO: R^2 = 0.967
+2022-09-30 14:41:13,639: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:41:14,003: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 14:41:14,005: ml_regression: INFO: =================================================================
+2022-09-30 14:46:17,158: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 14:46:17,159: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 14:48:40,735: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:48:40,736: ml_regression: INFO: Model Training Scores:
+2022-09-30 14:48:40,737: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:48:40,738: ml_regression: INFO: Train time = 51.16 s
+2022-09-30 14:48:40,739: ml_regression: INFO: Predict time = 0.42 s
+2022-09-30 14:48:40,740: ml_regression: INFO: MAE = 1.620 um
+2022-09-30 14:48:40,741: ml_regression: INFO: MSE = 9.876 um^2
+2022-09-30 14:48:40,742: ml_regression: INFO: R^2 = 0.891
+2022-09-30 14:48:40,743: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:49:53,956: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 14:49:53,956: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:49:54,631: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 14:49:54,632: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 14:49:54,817: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:49:54,817: ml_regression: INFO: Model Test Scores:
+2022-09-30 14:49:54,817: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:49:54,817: ml_regression: INFO: MAE = 1.043 um
+2022-09-30 14:49:54,818: ml_regression: INFO: MSE = 1.626 um^2
+2022-09-30 14:49:54,818: ml_regression: INFO: R^2 = 0.986
+2022-09-30 14:49:54,818: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:49:55,201: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 14:49:55,202: ml_regression: INFO: =================================================================
+2022-09-30 14:55:58,147: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 14:55:58,147: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 14:57:46,449: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:57:46,450: ml_regression: INFO: Model Training Scores:
+2022-09-30 14:57:46,451: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:57:46,452: ml_regression: INFO: Train time = 30.55 s
+2022-09-30 14:57:46,452: ml_regression: INFO: Predict time = 0.40 s
+2022-09-30 14:57:46,453: ml_regression: INFO: MAE = 1.215 um
+2022-09-30 14:57:46,453: ml_regression: INFO: MSE = 3.541 um^2
+2022-09-30 14:57:46,453: ml_regression: INFO: R^2 = 0.970
+2022-09-30 14:57:46,454: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:58:26,781: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 14:58:26,782: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:58:27,453: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 14:58:27,453: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 14:58:27,623: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:58:27,623: ml_regression: INFO: Model Test Scores:
+2022-09-30 14:58:27,624: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:58:27,624: ml_regression: INFO: MAE = 1.004 um
+2022-09-30 14:58:27,624: ml_regression: INFO: MSE = 1.483 um^2
+2022-09-30 14:58:27,625: ml_regression: INFO: R^2 = 0.982
+2022-09-30 14:58:27,625: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 14:58:27,996: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 14:58:27,998: ml_regression: INFO: =================================================================
+2022-09-30 15:26:36,557: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 15:26:36,558: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 15:28:24,965: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:28:24,966: ml_regression: INFO: Model Training Scores:
+2022-09-30 15:28:24,967: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:28:24,968: ml_regression: INFO: Train time = 30.34 s
+2022-09-30 15:28:24,969: ml_regression: INFO: Predict time = 0.41 s
+2022-09-30 15:28:24,970: ml_regression: INFO: MAE = 1.988 um
+2022-09-30 15:28:24,971: ml_regression: INFO: MSE = 16.382 um^2
+2022-09-30 15:28:24,971: ml_regression: INFO: R^2 = 0.850
+2022-09-30 15:28:24,972: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:29:08,285: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 15:29:08,285: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:29:08,968: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 15:29:08,969: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 15:29:09,148: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:29:09,148: ml_regression: INFO: Model Test Scores:
+2022-09-30 15:29:09,148: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:29:09,149: ml_regression: INFO: MAE = 3.094 um
+2022-09-30 15:29:09,149: ml_regression: INFO: MSE = 62.271 um^2
+2022-09-30 15:29:09,149: ml_regression: INFO: R^2 = 0.552
+2022-09-30 15:29:09,149: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:29:09,507: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 15:29:09,509: ml_regression: INFO: =================================================================
+2022-09-30 15:30:28,664: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 15:30:28,665: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 15:32:15,752: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:32:15,753: ml_regression: INFO: Model Training Scores:
+2022-09-30 15:32:15,754: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:32:15,755: ml_regression: INFO: Train time = 30.84 s
+2022-09-30 15:32:15,756: ml_regression: INFO: Predict time = 0.41 s
+2022-09-30 15:32:15,757: ml_regression: INFO: MAE = 2.154 um
+2022-09-30 15:32:15,758: ml_regression: INFO: MSE = 23.197 um^2
+2022-09-30 15:32:15,759: ml_regression: INFO: R^2 = 0.763
+2022-09-30 15:32:15,760: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:32:59,012: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 15:32:59,013: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:32:59,986: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 15:32:59,986: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 15:33:00,224: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:33:00,225: ml_regression: INFO: Model Test Scores:
+2022-09-30 15:33:00,226: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:33:00,227: ml_regression: INFO: MAE = 4.623 um
+2022-09-30 15:33:00,228: ml_regression: INFO: MSE = 106.681 um^2
+2022-09-30 15:33:00,229: ml_regression: INFO: R^2 = 0.284
+2022-09-30 15:33:00,229: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:33:00,593: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 15:33:00,595: ml_regression: INFO: =================================================================
+2022-09-30 15:33:57,768: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 15:33:57,849: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:33:57,850: ml_regression: INFO: Model Test Scores:
+2022-09-30 15:33:57,850: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:33:57,850: ml_regression: INFO: MAE = 4.623 um
+2022-09-30 15:33:57,851: ml_regression: INFO: MSE = 106.681 um^2
+2022-09-30 15:33:57,851: ml_regression: INFO: R^2 = 0.284
+2022-09-30 15:33:57,851: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:33:58,208: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 15:33:58,210: ml_regression: INFO: =================================================================
+2022-09-30 15:38:45,663: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 15:38:45,664: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 15:40:34,061: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:40:34,063: ml_regression: INFO: Model Training Scores:
+2022-09-30 15:40:34,063: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:40:34,064: ml_regression: INFO: Train time = 30.80 s
+2022-09-30 15:40:34,065: ml_regression: INFO: Predict time = 0.40 s
+2022-09-30 15:40:34,066: ml_regression: INFO: MAE = 1.420 um
+2022-09-30 15:40:34,067: ml_regression: INFO: MSE = 4.895 um^2
+2022-09-30 15:40:34,068: ml_regression: INFO: R^2 = 0.958
+2022-09-30 15:40:34,069: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:41:17,118: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 15:41:17,118: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:41:17,803: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 15:41:17,803: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 15:41:18,008: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:41:18,009: ml_regression: INFO: Model Test Scores:
+2022-09-30 15:41:18,009: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:41:18,009: ml_regression: INFO: MAE = 0.714 um
+2022-09-30 15:41:18,010: ml_regression: INFO: MSE = 0.906 um^2
+2022-09-30 15:41:18,010: ml_regression: INFO: R^2 = 0.991
+2022-09-30 15:41:18,010: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 15:41:18,390: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 15:41:18,392: ml_regression: INFO: =================================================================
+2022-09-30 16:03:45,298: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 16:03:45,298: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 16:06:12,480: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:06:12,481: ml_regression: INFO: Model Training Scores:
+2022-09-30 16:06:12,482: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:06:12,483: ml_regression: INFO: Train time = 52.32 s
+2022-09-30 16:06:12,484: ml_regression: INFO: Predict time = 0.41 s
+2022-09-30 16:06:12,485: ml_regression: INFO: MAE = 1.193 um
+2022-09-30 16:06:12,486: ml_regression: INFO: MSE = 6.318 um^2
+2022-09-30 16:06:12,486: ml_regression: INFO: R^2 = 0.945
+2022-09-30 16:06:12,487: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:07:25,376: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 16:07:25,377: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:07:26,056: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 16:07:26,056: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 16:07:26,254: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:07:26,255: ml_regression: INFO: Model Test Scores:
+2022-09-30 16:07:26,255: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:07:26,256: ml_regression: INFO: MAE = 1.038 um
+2022-09-30 16:07:26,256: ml_regression: INFO: MSE = 2.435 um^2
+2022-09-30 16:07:26,256: ml_regression: INFO: R^2 = 0.978
+2022-09-30 16:07:26,257: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:07:26,641: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 16:07:26,643: ml_regression: INFO: =================================================================
+2022-09-30 16:08:09,687: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 16:08:09,688: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 16:10:42,815: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:10:42,816: ml_regression: INFO: Model Training Scores:
+2022-09-30 16:10:42,816: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:10:42,816: ml_regression: INFO: Train time = 55.26 s
+2022-09-30 16:10:42,817: ml_regression: INFO: Predict time = 0.40 s
+2022-09-30 16:10:42,817: ml_regression: INFO: MAE = 1.102 um
+2022-09-30 16:10:42,817: ml_regression: INFO: MSE = 8.649 um^2
+2022-09-30 16:10:42,818: ml_regression: INFO: R^2 = 0.884
+2022-09-30 16:10:42,818: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:11:58,140: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 16:11:58,141: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:11:58,840: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 16:11:58,840: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 16:11:59,036: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:11:59,036: ml_regression: INFO: Model Test Scores:
+2022-09-30 16:11:59,037: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:11:59,037: ml_regression: INFO: MAE = 0.945 um
+2022-09-30 16:11:59,037: ml_regression: INFO: MSE = 1.480 um^2
+2022-09-30 16:11:59,038: ml_regression: INFO: R^2 = 0.989
+2022-09-30 16:11:59,038: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:11:59,384: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 16:11:59,385: ml_regression: INFO: =================================================================
+2022-09-30 16:19:59,810: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 16:19:59,810: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 16:22:18,739: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:22:18,740: ml_regression: INFO: Model Training Scores:
+2022-09-30 16:22:18,740: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:22:18,740: ml_regression: INFO: Train time = 47.99 s
+2022-09-30 16:22:18,741: ml_regression: INFO: Predict time = 0.42 s
+2022-09-30 16:22:18,741: ml_regression: INFO: MAE = 1.078 um
+2022-09-30 16:22:18,741: ml_regression: INFO: MSE = 2.765 um^2
+2022-09-30 16:22:18,742: ml_regression: INFO: R^2 = 0.972
+2022-09-30 16:22:18,742: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:23:30,666: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 16:23:30,666: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:23:31,320: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 16:23:31,320: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 16:23:31,511: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:23:31,511: ml_regression: INFO: Model Test Scores:
+2022-09-30 16:23:31,512: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:23:31,512: ml_regression: INFO: MAE = 1.747 um
+2022-09-30 16:23:31,512: ml_regression: INFO: MSE = 4.310 um^2
+2022-09-30 16:23:31,513: ml_regression: INFO: R^2 = 0.962
+2022-09-30 16:23:31,513: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:23:31,891: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 16:23:31,892: ml_regression: INFO: =================================================================
+2022-09-30 16:24:21,600: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 16:24:21,600: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 16:26:36,284: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:26:36,285: ml_regression: INFO: Model Training Scores:
+2022-09-30 16:26:36,286: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:26:36,287: ml_regression: INFO: Train time = 46.41 s
+2022-09-30 16:26:36,288: ml_regression: INFO: Predict time = 0.43 s
+2022-09-30 16:26:36,288: ml_regression: INFO: MAE = 0.919 um
+2022-09-30 16:26:36,288: ml_regression: INFO: MSE = 1.605 um^2
+2022-09-30 16:26:36,289: ml_regression: INFO: R^2 = 0.985
+2022-09-30 16:26:36,289: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:27:47,270: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 16:27:47,271: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:27:47,938: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 16:27:47,938: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 16:27:48,131: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:27:48,132: ml_regression: INFO: Model Test Scores:
+2022-09-30 16:27:48,132: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:27:48,132: ml_regression: INFO: MAE = 1.891 um
+2022-09-30 16:27:48,133: ml_regression: INFO: MSE = 4.908 um^2
+2022-09-30 16:27:48,133: ml_regression: INFO: R^2 = 0.963
+2022-09-30 16:27:48,133: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:27:48,511: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 16:27:48,512: ml_regression: INFO: =================================================================
+2022-09-30 16:39:42,958: ml_regression: INFO: Split Dataset into Train and Test
+2022-09-30 16:39:42,958: ml_regression: INFO: ___Cross Validating Model - Repeated KFold___
+2022-09-30 16:41:58,377: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:41:58,378: ml_regression: INFO: Model Training Scores:
+2022-09-30 16:41:58,379: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:41:58,380: ml_regression: INFO: Train time = 46.58 s
+2022-09-30 16:41:58,381: ml_regression: INFO: Predict time = 0.35 s
+2022-09-30 16:41:58,382: ml_regression: INFO: MAE = 1.087 um
+2022-09-30 16:41:58,383: ml_regression: INFO: MSE = 2.156 um^2
+2022-09-30 16:41:58,384: ml_regression: INFO: R^2 = 0.980
+2022-09-30 16:41:58,385: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:43:08,882: ml_regression: INFO: ___Model learning/validation history___
+2022-09-30 16:43:08,882: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:43:09,576: ml_regression: INFO: Figure saved - ML learning history
+2022-09-30 16:43:09,576: ml_regression: INFO: Evaluating model with TEST set
+2022-09-30 16:43:09,791: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:43:09,792: ml_regression: INFO: Model Test Scores:
+2022-09-30 16:43:09,792: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:43:09,792: ml_regression: INFO: MAE = 1.003 um
+2022-09-30 16:43:09,792: ml_regression: INFO: MSE = 5.882 um^2
+2022-09-30 16:43:09,793: ml_regression: INFO: R^2 = 0.949
+2022-09-30 16:43:09,793: ml_regression: INFO: -----------------------------------------------------------------
+2022-09-30 16:43:10,156: ml_regression: INFO: Figure saved - ML Predictions Test Set
+2022-09-30 16:43:10,158: ml_regression: INFO: =================================================================
