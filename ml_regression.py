@@ -32,17 +32,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-formatter = logging.Formatter('%(asctime)s: %(name)s: %(levelname)s: %(message)s')
-console_formatter = logging.Formatter('%(name)s: %(levelname)s: %(message)s')
+if not logger.handlers:
+    formatter = logging.Formatter('%(asctime)s: %(name)s: %(levelname)s: %(message)s')
+    console_formatter = logging.Formatter('%(name)s: %(levelname)s: %(message)s')
 
-file_handler = logging.FileHandler('ML.log')
-file_handler.setFormatter(formatter)
+    file_handler = logging.FileHandler('ML.log')
+    file_handler.setFormatter(formatter)
 
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(console_formatter)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(console_formatter)
 
-logger.addHandler(file_handler)
-logger.addHandler(stream_handler)
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
 
 
 def get_regression(meta: Dict[str, Any],
@@ -313,6 +314,43 @@ def create_pipeline(**kwargs):
     return p
 
 
+def plot_grid_results(gd_results: GridSearchCV, comp_variable:str):
+    params = list(gd_results.param_grid.keys())
+    param = [p for p in params if comp_variable in p]
+    title = f'GridSearchCV results comparing {comp_variable}'
+    param = 'param_' + param[0]
+
+    # Get the regular numpy array from the MaskedArray
+    x_axis = np.array(gd_results.cv_results_[param].data, dtype=float)
+    for scorer, color in zip(sorted(gd_results.scoring), ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8']):
+        plt.figure()
+        plt.title(f'GridSearchCV results comparing {comp_variable}', fontsize=16)
+        plt.xlabel(comp_variable.capitalize())
+        plt.ylabel("Score")
+        ax = plt.gca()
+        for sample, style in (("train", "--"), ("test", "-")):
+            sample_score_mean = gd_results.cv_results_["mean_%s_%s" % (sample, scorer)]
+            sample_score_std = gd_results.cv_results_["std_%s_%s" % (sample, scorer)]
+            ax.fill_between(
+                x_axis,
+                sample_score_mean - sample_score_std,
+                sample_score_mean + sample_score_std,
+                alpha=0.1 if sample == "test" else 0,
+                color=color,
+            )
+            ax.plot(
+                x_axis,
+                sample_score_mean,
+                style,
+                color=color,
+                alpha=1 if sample == "test" else 0.7,
+                label="%s (%s)" % (scorer, sample),
+            )
+        plt.legend(loc="best")
+    plt.grid(False)
+    plt.show()
+
+
 if __name__ == '__main__':
     logger.info('=' * 65)
     exp = load(file='Test 5')
@@ -339,18 +377,19 @@ if __name__ == '__main__':
         # model__dropout=[0, 0.1, 0.3, 0.5],
         # loss=['mse', 'mae'],
         # batch_size=[5, 8, 10, 15, 25, 32],
-        # reg__epochs=[400, 500, 600]
+        reg__epochs=np.arange(200, 1025, 25)
         # optimizer=['adam', 'SGD', 'RMSprop', 'Adagrad', 'Adamax', 'Adadelta'],
         # optimizer__learning_rate=[0.0005, 0.0075, 0.001, 0.0025, 0.005, 0.01],
     )
 
     X_train, X_test, y_train, y_test = split_dataset(dataframe)
 
-    # pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
+    pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
+    plot_grid_results(grid_result, 'epochs')
 
-    pipe, train_scores = score_train(model=pipe, Xdata=X_train, ydata=y_train)
-
-    pipe.fit(X_train, y_train, reg__validation_split=0.2)
-    train_history(pipe)
-
-    test_score = score_test(pipe, X_test, y_test)
+    # pipe, train_scores = score_train(model=pipe, Xdata=X_train, ydata=y_train)
+    #
+    # pipe.fit(X_train, y_train, reg__validation_split=0.2)
+    # train_history(pipe)
+    #
+    # test_score = score_test(pipe, X_test, y_test)
