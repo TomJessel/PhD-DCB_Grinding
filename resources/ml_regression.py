@@ -7,7 +7,7 @@
 
 @Modify Time      @Author    @Version    @Desciption
 ------------      -------    --------    -----------
-21/09/2022 09:23   tomhj      1.0         None
+21/09/2022 09:23   tomhj      1.0         Functions to create and evaluate NN regression models
 """
 import os
 from typing import Dict, Any, Union
