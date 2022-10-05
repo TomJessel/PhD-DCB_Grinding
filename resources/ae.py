@@ -12,6 +12,8 @@
 
 import multiprocessing
 from functools import partial
+from typing import Tuple
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import moviepy.editor as mp
@@ -25,32 +27,70 @@ from scipy.stats import skew
 from tqdm import tqdm
 from scipy.signal import hilbert, butter, filtfilt
 
-
-def rms(x):
-    r = np.sqrt(np.mean(x ** 2))
-    return r
+import resources.experiment
 
 
-def low_pass(data, cutoff, fs, order):
+def butter_filter(
+        data: np.ndarray,
+        ftype: str = 'low',
+        cutoff: float = 10,
+        fs: float = 2_000_000,
+        order: int = 3,
+        ) -> np.ndarray:
+    """
+    Apply butterworth filter to input data.
+
+    :param data: Input signal for filtering
+    :param ftype: Type of filter, (low, high, band)
+    :param cutoff: Filter cut off point, as a fraction of the nyquist freq
+    :param fs: Sample freq for the input signal
+    :param order: Filter order
+    :return: y: Filtered signal
+    """
     data = np.pad(data, pad_width=10_000)
-    norm_cutoff = cutoff / (0.5 * fs)
-    b, a = butter(N=order, Wn=norm_cutoff, btype='low', analog=False, output='ba')
+    norm_cutoff = cutoff * (0.5 * fs)
+    b, a = butter(N=order, Wn=norm_cutoff, btype=ftype, analog=False, output='ba')
     y = filtfilt(b, a, data)
     return y[10_000:-10_000]
 
 
-def envelope_hilbert(s):
+def rms(x: np.ndarray) -> np.ndarray:
+    """
+    Calculate root-mean squared of a np.array.
+
+    :param x: Input array to calculate for
+    :return: r: RMS of inputted array
+    """
+    r = np.sqrt(np.mean(x ** 2))
+    return r
+
+
+def envelope_hilbert(s: np.ndarray) -> np.ndarray:
+    """
+    Envelope a signal with the hilbert transform and return the instantaneous amplitude.
+
+    :param s: Input signal to be enveloped
+    :return: inst_amp: Instaneous amplitude of the hilbert enveloped input signal
+    """
     z = hilbert(s)
     inst_amp = np.abs(z)
     return inst_amp
 
 
-def trigger_st(d):
-    chunk_size = 100_000
-    diff_change = 1.75E-6
+def trigger_st(
+        d: np.ndarray,
+        chunk_size: int = 100_000,
+        diff_change: float = 1.75E-6,
+        ) -> [int, float]:
+    """
+    Find the index of the first trigger point based on change in gradient over a chunk size.
 
+    :param d: Data to find trigger of
+    :param chunk_size: Size of chunks to calculate gradient over
+    :param diff_change: Threshold for change in gradient to find trigger
+    :returns: [t, t_y]: Trigger index, Data value at trigger point
+    """
     n_chunks = len(d) / chunk_size
-    t = []
 
     chunks = np.array_split(d, n_chunks)
     grad = [(chunki[-1] - chunki[0]) / chunk_size for chunki in chunks]
@@ -70,7 +110,22 @@ def trigger_st(d):
 
 
 class AE:
-    def __init__(self, ae_files, pre_amp, fs, testinfo):
+    def __init__(
+            self,
+            ae_files: Tuple,
+            pre_amp: resources.experiment.PreAmp,
+            testinfo: resources.experiment.TestInfo,
+            fs: float,
+            ):
+        """
+        AE class constructor.
+
+        Args:
+            ae_files: File locations for each AE file.
+            pre_amp: Pre-Amp object, containing pre-amp info for the experiment.
+            testinfo: Test Info object, containing testing info for the experiment.
+            fs: Sample rate for the experiment.
+        """
         self._files = ae_files
         self.kurt = []
         self.rms = []
@@ -83,7 +138,17 @@ class AE:
         self.trig_points = pd.DataFrame()
 
     @staticmethod
-    def volt2db(v):
+    def volt2db(v: np.ndarray) -> list:
+        """Converts array from volts to dB.
+
+        Calculates the equivalent amplitude dB for a given input array, based on typical AE values of; V_ref = 1E-4.
+
+        Args:
+            v: Voltage array for converting.
+
+        Returns:
+            The equivalent array converted to decibels.
+        """
         v_ref = 1E-4
         db = [20 * (np.log10(vin / v_ref)) for vin in v]
         return db
@@ -211,7 +276,7 @@ class AE:
     def _triggers(self, i):
         sig = self.readAE(i)
         e_sig = envelope_hilbert(sig[:6_000_000])
-        f_sig = low_pass(e_sig, 10, self._fs, 3)
+        f_sig = butter_filter(data=e_sig, cutoff=0.1, fs=self._fs, order=3, ftype='low')
         trig, trig_y_val = trigger_st(f_sig[100_000:])
         if trig is None:
             trig_st = 0
@@ -220,11 +285,11 @@ class AE:
         else:
             trig_st = trig + 100_000
             en_trig2 = envelope_hilbert(sig[-6_000_000:])
-            fil_trig2 = low_pass(en_trig2, 10, self._fs, 3)
+            fil_trig2 = butter_filter(data=en_trig2, cutoff=0.1, fs=self._fs, order=3, ftype='low')
             trig_end = (5_900_000 - np.argmax(fil_trig2[100_000:] < trig_y_val))
             if trig_end == 5_900_000:
                 en_trig2 = envelope_hilbert(sig[6_000_000:-6_000_000])
-                fil_trig2 = low_pass(en_trig2, 10, self._fs, 3)
+                fil_trig2 = butter_filter(data=en_trig2, cutoff=0.1, fs=self._fs, order=3, ftype='low')
                 trig_end = 6_100_000 + (np.argmax(fil_trig2[100_000:] < trig_y_val))
             else:
                 trig_end = len(sig) - trig_end
@@ -333,13 +398,13 @@ class AE:
             return
 
         sig = self.readAE(fno)
-        ts = 1 / self._testinfo.acquisition[0]
+        ts = 1 / self._fs
         n = sig.size
         t = np.arange(0, n) * ts
         filename = f'Test {fno:03d} - Triggers of enveloped & filtered AE signal'
 
         en_sig = envelope_hilbert(sig)
-        sig = low_pass(en_sig, 10, 2000000, 3)
+        sig = butter_filter(data=en_sig, cutoff=0.1, fs=self._fs, order=3, ftype='low')
 
         plt.figure()
         plt.plot(t, sig, linewidth=1)

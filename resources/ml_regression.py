@@ -46,11 +46,12 @@ if not logger.handlers:
     logger.addHandler(stream_handler)
 
 
-def get_regression(meta: Dict[str, Any],
-                   hidden_layer_sizes: iter,
-                   dropout: float,
-                   init_mode: str
-                   ) -> Sequential:
+def get_regression(
+        meta: Dict[str, Any],
+        hidden_layer_sizes: iter,
+        dropout: float,
+        init_mode: str
+        ) -> Sequential:
     """
     Generate keras sequential regression model for SciKeras module
 
@@ -82,7 +83,7 @@ def model_gridsearch(
         ydata: np.ndarray,
         para_grid: Dict[str, iter],
         cv: int = 5
-) -> [Union[KerasRegressor, Pipeline], object]:
+        ) -> [Union[KerasRegressor, Pipeline], object]:
     """
     Gridsearch for given hyper-parameters
 
@@ -96,9 +97,9 @@ def model_gridsearch(
         parameters to evaluate with gridsearch, key: parameter, item: iterable
     :param cv: int: default= 5:
         number of splits carried out by KFold for cross validation
-    :return best_estimator: [KerasRegressor, Pipeline]:
+    :return: best_estimator: [KerasRegressor, Pipeline]:
         the best model that performed the best on given hyper-parameters
-    :return gd_result: object:
+    :return: gd_result: object:
         grid search cv results and estimators used
     """
 
@@ -149,7 +150,7 @@ def score_train(
         ydata: np.ndarray,
         cv_splits: int = 10,
         cv_repeats: int = 5
-) -> [Union[KerasRegressor, Pipeline], Dict]:
+        ) -> [Union[KerasRegressor, Pipeline], Dict]:
     """
     Score a model/pipeline on it's training set, using RepeatedKFold cross validation.
 
@@ -205,10 +206,11 @@ def score_train(
     return best_model, scores_
 
 
-def score_test(model: Union[KerasRegressor, Pipeline],
-               Xtest: np.ndarray,
-               ytest: np.ndarray
-               ) -> Dict[str, float]:
+def score_test(
+        model: Union[KerasRegressor, Pipeline],
+        Xtest: np.ndarray,
+        ytest: np.ndarray
+        ) -> Dict[str, float]:
     """
     Score a fitted model/pipeline on it's test set.
 
@@ -295,7 +297,10 @@ def train_history(model: Union[KerasRegressor, Pipeline]):
     logger.info(f'Figure saved - {png_name_}')
 
 
-def split_dataset(df: pd.DataFrame, split_frac: float = 0.2) -> [np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def split_dataset(
+        df: pd.DataFrame,
+        split_frac: float = 0.2
+        ) -> [np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Separate dataset into features and results. Final column is results.
     Then split into training and test splits.

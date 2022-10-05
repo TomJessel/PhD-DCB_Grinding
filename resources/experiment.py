@@ -164,7 +164,7 @@ class Experiment:
         self.test_info = TestInfo(dataloc)
         self.date = date
         self.dataloc = dataloc
-        self.ae = AE(ae_files, self.test_info.pre_amp, self.test_info.acquisition[0], self.test_info)
+        self.ae = AE(ae_files, self.test_info.pre_amp, self.test_info,  self.test_info.acquisition[0])
         self.nc4 = NC4(nc4_files, self.test_info, self.test_info.dcb, self.test_info.acquisition[1])
         self.features = pd.DataFrame
 
