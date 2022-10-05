@@ -24,7 +24,6 @@ from scipy.stats import kurtosis
 from scipy.stats import skew
 from tqdm import tqdm
 from scipy.signal import hilbert, butter, filtfilt
-import time
 
 
 def rms(x):
@@ -35,7 +34,7 @@ def rms(x):
 def low_pass(data, cutoff, fs, order):
     data = np.pad(data, pad_width=10_000)
     norm_cutoff = cutoff / (0.5 * fs)
-    b, a = butter(N=order, Wn=norm_cutoff, btype='lowpass', analog=False)
+    b, a = butter(N=order, Wn=norm_cutoff, btype='low', analog=False, output='ba')
     y = filtfilt(b, a, data)
     return y[10_000:-10_000]
 
@@ -89,7 +88,7 @@ class AE:
         db = [20 * (np.log10(vin / v_ref)) for vin in v]
         return db
 
-    def fftcalc(self, fno, freqres):
+    def _fftcalc(self, fno, freqres):
         length = int(self._fs / freqres)
         data = self.readAE(fno)
         trig = self.trig_points.loc[fno]
@@ -153,7 +152,7 @@ class AE:
         if freqres in self.fft:
             p = self.fft[freqres][fno]
         else:
-            p = self.fftcalc(fno, freqres)
+            p = self._fftcalc(fno, freqres)
         f = np.arange(0, self._fs / 2, freqres, dtype=int)
 
         filename = self._files[fno].partition('_202')[0]
@@ -172,7 +171,7 @@ class AE:
     def process(self, trigger=False, FFT=False):
         with multiprocessing.Pool() as pool:
             if self.trig_points.empty or trigger:
-                trigs = list(tqdm(pool.imap(self.triggers, range(len(self._files))),
+                trigs = list(tqdm(pool.imap(self._triggers, range(len(self._files))),
                                   total=len(self._files),
                                   desc='Triggers'))
                 self.trig_points = pd.DataFrame(trigs,
@@ -186,7 +185,7 @@ class AE:
             results = np.array(results)
             if 1000 not in self.fft or FFT:
                 # print('Calculating FFT with 1kHz bins...')
-                fft = list(tqdm(pool.imap(partial(self.fftcalc, freqres=1000), range(len(self._files))),
+                fft = list(tqdm(pool.imap(partial(self._fftcalc, freqres=1000), range(len(self._files))),
                                 total=len(self._files),
                                 desc='Calc FFT 1 kHz'))
                 p = self.volt2db(np.array(fft))
@@ -196,7 +195,7 @@ class AE:
         self.kurt = results[:, 0]
         self.rms = results[:, 1]
         self.amplitude = results[:, 2]
-        self.skewness = results[:,3]
+        self.skewness = results[:, 3]
 
     def _calc(self, fno):
         data = self.readAE(fno)
@@ -209,7 +208,7 @@ class AE:
         # print(f'Completed File {fno}...')
         return k, r, a, sk
 
-    def triggers(self, i):
+    def _triggers(self, i):
         sig = self.readAE(i)
         e_sig = envelope_hilbert(sig[:6_000_000])
         f_sig = low_pass(e_sig, 10, self._fs, 3)
@@ -236,7 +235,7 @@ class AE:
             p = self.fft[freqres]
         else:
             with multiprocessing.Pool() as pool:
-                fft = list(tqdm(pool.imap(partial(self.fftcalc, freqres=freqres), range(len(self._files))),
+                fft = list(tqdm(pool.imap(partial(self._fftcalc, freqres=freqres), range(len(self._files))),
                                 total=len(self._files),
                                 desc=f'Calc FFT  {freqres / 1000} kHz'))
                 p = self.volt2db(np.array(fft))
@@ -318,3 +317,37 @@ class AE:
 
     def update(self, files):
         self._files = files
+
+    def plot_triggers(self, fno: int):
+        """
+        Plot calculated trigger points of the file on the hibert enveloped and lowpass filtered AE signal
+
+        :param fno: int:
+            File number to show triggers
+        """
+        try:
+            triggers = self.trig_points.loc[fno]
+        except KeyError:
+            print('No Triggers calculated for this test')
+            print('Process AE data with triggers then retry')
+            return
+
+        sig = self.readAE(fno)
+        ts = 1 / self._testinfo.acquisition[0]
+        n = sig.size
+        t = np.arange(0, n) * ts
+        filename = f'Test {fno:03d} - Triggers of enveloped & filtered AE signal'
+
+        en_sig = envelope_hilbert(sig)
+        sig = low_pass(en_sig, 10, 2000000, 3)
+
+        plt.figure()
+        plt.plot(t, sig, linewidth=1)
+        plt.axhline(triggers['trig y-val'], color='r', linewidth=1)
+        plt.axvline(triggers['trig st'] * ts, color='r', linewidth=1)
+        plt.axvline(triggers['trig end'] * ts, color='r', linewidth=1)
+        plt.title(filename)
+        plt.autoscale(enable=True, axis='x', tight=True)
+        plt.xlabel('Time (s)')
+        plt.ylabel('Voltage (V)')
+        plt.show()

@@ -427,12 +427,12 @@ if __name__ == '__main__':
 
     X_train, X_test, y_train, y_test = split_dataset(dataframe)
 
-    # pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
-    # plot_grid_results(grid_result, 'epochs')
+    pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, para_grid=param_grid, cv=10)
+    plot_grid_results(grid_result, 'epochs')
 
     pipe, train_scores = score_train(model=pipe, Xdata=X_train, ydata=y_train)
 
     pipe.fit(X_train, y_train, reg__validation_split=0.2)
-    # train_history(pipe)
+    train_history(pipe)
 
     test_score = score_test(pipe, X_test, y_test)

@@ -17,8 +17,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from resources import load
-from resources import create_pipeline, get_regression, split_dataset, score_test, score_train, train_history
+import resources
 
 
 def corr_matrix(df: pd.DataFrame, save_fig: bool = True):
@@ -88,71 +87,34 @@ def ae_hits(exp: object, s: np.array):
     pass
 
 
-def plot_triggers(ex_obj, fno):
-    sig = ex_obj.ae.readAE(fno)
-    ts = 1 / ex_obj.test_info.acquisition[0]
-    n = sig.size
-    t = np.arange(0, n) * ts
-    filename = f'Test {fno:03d}'
-
-    # en_sig = AE.envelope_hilbert(sig)
-    # fil_sig = AE.low_pass(en_sig, 10, 2000000, 3)
-
-    trigs = exp.ae.trig_points.loc[fno]
-
-    plt.close()
-    plt.figure()
-    plt.plot(t, sig, linewidth=1)
-    # plt.plot(t, fil_sig)
-    # plt.axhline(trigs['trig y-val'], color='r', linewidth=1)
-    plt.axvline(trigs['trig st'] * ts, color='r', linewidth=1)
-    plt.axvline(trigs['trig end'] * ts, color='r', linewidth=1)
-    plt.title(filename)
-    plt.autoscale(enable=True, axis='x', tight=True)
-    plt.xlabel('Time (s)')
-    plt.ylabel('Voltage (V)')
-    plt.show()
-
-
 if __name__ == '__main__':
-    exp = load(file='Test 5')
-    dataframe = exp.features.drop(columns=['Runout', 'Form error']).drop([0, 1, 23, 24])
+    exp = resources.load(file='Test 5')
+    exp.ae.plot_triggers(150)
 
-    pipe = create_pipeline(
-        model=get_regression,
-        model__init_mode='glorot_normal',
-        model__dropout=0.1,
-        model__hidden_layer_sizes=(32, 32),
-        optimizer='adam',
-        optimizer__learning_rate=0.001,
-        loss='mae',
-        metrics=['MAE', 'MSE'],
-        batch_size=10,
-        epochs=700,
-        verbose=0,
-    )
-
-    param_grid = dict(
-        # model__init_mode=['lecun_uniform', 'glorot_normal', 'glorot_uniform', 'he_normal', 'he_uniform'],
-        # model__hidden_layer_sizes=[(80,), (30, 25), (30, 30)],
-        # model__dropout=[0, 0.1, 0.3, 0.5],
-        # loss=['mse', 'mae'],
-        # batch_size=[5, 8, 10, 15, 25, 32],
-        # reg__epochs=[400, 500, 600]
-        # optimizer=['adam', 'SGD', 'RMSprop', 'Adagrad', 'Adamax', 'Adadelta'],
-        # optimizer__learning_rate=[0.0005, 0.0075, 0.001, 0.0025, 0.005, 0.01],
-    )
-
-    X_train, X_test, y_train, y_test = split_dataset(dataframe)
+    # dataframe = exp.features.drop(columns=['Runout', 'Form error']).drop([0, 1, 23, 24])
     #
-    # pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
+    # pipe = resources.create_pipeline(
+    #     model=resources.get_regression,
+    #     model__init_mode='glorot_normal',
+    #     model__dropout=0.1,
+    #     model__hidden_layer_sizes=(32, 32),
+    #     optimizer='adam',
+    #     optimizer__learning_rate=0.001,
+    #     loss='mae',
+    #     metrics=['MAE', 'MSE'],
+    #     batch_size=10,
+    #     epochs=700,
+    #     verbose=0,
+    # )
     #
-    pipe, train_scores = score_train(model=pipe, Xdata=X_train, ydata=y_train)
+    # X_train, X_test, y_train, y_test = resources.split_dataset(dataframe)
     #
-    pipe.fit(X_train, y_train, reg__validation_split=0.2)
-    train_history(pipe)
-
-    test_score = score_test(pipe, X_test, y_test)
+    # pipe, train_scores = resources.score_train(model=pipe, Xdata=X_train, ydata=y_train)
+    #
+    # pipe.fit(X_train, y_train, reg__validation_split=0.2)
+    # resources.train_history(pipe)
+    #
+    # test_score = resources.score_test(pipe, X_test, y_test)
 
     # plot_triggers(exp, 150)
 

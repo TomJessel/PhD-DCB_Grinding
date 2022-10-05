@@ -53,50 +53,6 @@ def _sort_rename(files, path):
             os.rename(fno[1], os.path.join(path, newfilename))
 
 
-def load(file: str = None, process=False):
-    """
-    Load in a saved exp pickle file, option to process data
-
-    :param file: str (default: None) choose file to load
-    :param process: bool (default:False) option to process data when loading
-    :rtype: object
-    """
-
-    f_locs = {
-        'test5': r'..\..\Testing\22_08_03_grit1000\Test 5.pickle',
-        'test2': r"..\..\Testing\TEST2Combined\Test 2.pickle",
-        'test1': r"..\..\Testing\28_2_22_grit1000\Test 1.pickle"
-    }
-
-    if file is None:
-        try:
-            file_path = tkfiledialog.askopenfilename(defaultextension='pickle')
-            if not file_path:
-                raise NotADirectoryError
-            with open(file_path, 'rb') as f:
-                data = pickle.load(f)
-        except NotADirectoryError:
-            print('No file selected.')
-            quit()
-    else:
-        try:
-            file_path = f_locs[file.lower().replace(' ', '')]
-            with open(file_path, 'rb') as f:
-                data = pickle.load(f)
-        except KeyError:
-            print(f'File location of {file} not saved')
-            quit()
-    if process:
-        try:
-            getattr(data.NC4, 'radius')
-        except AttributeError:
-            data.NC4.process()
-
-        if not data.ae.kurt.all():
-            data.ae.process()
-    return data
-
-
 def create_obj(process=False):
     """
     Creates object for individual test
@@ -346,3 +302,50 @@ class Experiment:
         print(df.head())
         self.features = df
         return df
+
+
+def load(file: str = None, process=False) -> Experiment:
+    """
+    Load in a saved exp pickle file, option to process data
+
+    :param file: str (default: None):
+        choose file to load
+    :param process: bool (default:False):
+        option to process data when loading
+    :return: data: Experiment:
+        Experiment class containing AE, NC4, and test info
+    """
+
+    f_locs = {
+        'test5': r'..\..\Testing\22_08_03_grit1000\Test 5.pickle',
+        'test2': r"..\..\Testing\TEST2Combined\Test 2.pickle",
+        'test1': r"..\..\Testing\28_2_22_grit1000\Test 1.pickle"
+    }
+
+    if file is None:
+        try:
+            file_path = tkfiledialog.askopenfilename(defaultextension='pickle')
+            if not file_path:
+                raise NotADirectoryError
+            with open(file_path, 'rb') as f:
+                data = pickle.load(f)
+        except NotADirectoryError:
+            print('No file selected.')
+            quit()
+    else:
+        try:
+            file_path = f_locs[file.lower().replace(' ', '')]
+            with open(file_path, 'rb') as f:
+                data = pickle.load(f)
+        except KeyError:
+            print(f'File location of {file} not saved')
+            quit()
+    if process:
+        try:
+            getattr(data.NC4, 'radius')
+        except AttributeError:
+            data.NC4.process()
+
+        if not data.ae.kurt.all():
+            data.ae.process()
+    return data
