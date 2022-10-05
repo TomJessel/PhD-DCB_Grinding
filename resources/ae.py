@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@File    :   AE.py
+@File    :   ae.py
 @Author  :   Tom Jessel
 @Contact :   jesselt@cardiff.ac.uk
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@File    :   Experiment.py
+@File    :   experiment.py
 @Author  :   Tom Jessel
 @Contact :   jesselt@cardiff.ac.uk
 
@@ -24,9 +24,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
 
-import TestInfo
-import AE
-import NC4
+from .ae import AE
+from .nc4 import NC4
 
 
 def _move_files(src: str, dst: str, ext: str = '*'):
@@ -89,9 +88,9 @@ def load(file: str = None, process=False):
             quit()
     if process:
         try:
-            getattr(data.nc4, 'radius')
+            getattr(data.NC4, 'radius')
         except AttributeError:
-            data.nc4.process()
+            data.NC4.process()
 
         if not data.ae.kurt.all():
             data.ae.process()
@@ -157,13 +156,60 @@ def create_obj(process=False):
     return obj
 
 
+class TestInfo:
+    def __init__(self, dataloc):
+        self.dataloc = dataloc
+        infofile = os.path.join(dataloc, 'TESTING INFO.txt')
+        try:
+            data = pd.read_table(infofile, delimiter='\t', header=None, skiprows=(0, 1))
+        except FileNotFoundError as err:
+            print(f'{err} \nNo "TESTING INFO.txt" file found!!')
+        else:
+            self.testno = int(data.iloc[0][1])
+            self.date = datetime.datetime.strptime(data.iloc[1][1], '%d %b %Y')
+            self.pre_amp = PreAmp(float(data.iloc[5][1]), data.iloc[6][1], data.iloc[7][1])
+            self.sensor = data.iloc[9][1]
+            self.acquisition = (float(data.iloc[11][1]) * 1E6, float(data.iloc[12][1]) * 1E3)
+            self.dcb = DCB(float(data.iloc[14][1]), float(data.iloc[15][1]), data.iloc[16][1])
+            self.grindprop = GrindProp(float(data.iloc[18][1]), float(data.iloc[19][1]), float(data.iloc[20][1]),
+                                       float(data.iloc[21][1]))
+
+
+class GrindProp:
+    def __init__(self, feedrate, doc_ax, doc_rad, v_spindle):
+        self.feedrate = feedrate
+        self.doc_ax = doc_ax
+        self.doc_rad = doc_rad
+        self.v_spindle = v_spindle
+
+
+class PreAmp:
+    def __init__(self, gain, spec, filt):
+        self.gain = gain
+        self.spec = spec
+        self.filter = filt
+
+
+class DCB:
+    def __init__(self, d, grit, form):
+        self.grainsize = None
+        self.diameter = d
+        self.grit = grit
+        self.form = form
+        self.gritsizeset()
+
+    def gritsizeset(self):
+        grainsizes = pd.read_csv('Reference/grainsizes.csv')
+        self.grainsize = float(grainsizes.iloc[np.where(grainsizes['Mesh'] == self.grit)]['AvgGrainSize'])
+
+
 class Experiment:
     def __init__(self, dataloc, date, ae_files, nc4_files):
-        self.test_info = TestInfo.TestInfo(dataloc)
+        self.test_info = TestInfo(dataloc)
         self.date = date
         self.dataloc = dataloc
-        self.ae = AE.AE(ae_files, self.test_info.pre_amp, self.test_info.acquisition[0], self.test_info)
-        self.nc4 = NC4.nc4(nc4_files, self.test_info, self.test_info.dcb, self.test_info.acquisition[1])
+        self.ae = AE(ae_files, self.test_info.pre_amp, self.test_info.acquisition[0], self.test_info)
+        self.nc4 = NC4(nc4_files, self.test_info, self.test_info.dcb, self.test_info.acquisition[1])
         self.features = pd.DataFrame
 
     def __repr__(self):

@@ -17,9 +17,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from Experiment import load
-from ml_regression import create_pipeline, get_regression, split_dataset, score_test, score_train, train_history
-import AE
+from resources import load
+from resources import create_pipeline, get_regression, split_dataset, score_test, score_train, train_history
 
 
 def corr_matrix(df: pd.DataFrame, save_fig: bool = True):
@@ -129,7 +128,7 @@ if __name__ == '__main__':
         loss='mae',
         metrics=['MAE', 'MSE'],
         batch_size=10,
-        epochs=1000,
+        epochs=700,
         verbose=0,
     )
 
@@ -145,11 +144,11 @@ if __name__ == '__main__':
     )
 
     X_train, X_test, y_train, y_test = split_dataset(dataframe)
-
+    #
     # pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, param_grid=param_grid, cv=10)
-
+    #
     pipe, train_scores = score_train(model=pipe, Xdata=X_train, ydata=y_train)
-
+    #
     pipe.fit(X_train, y_train, reg__validation_split=0.2)
     train_history(pipe)
 

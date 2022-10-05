@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@File    :   AE.py
+@File    :   ae.py
 @Author  :   Tom Jessel
 @Contact :   jesselt@cardiff.ac.uk
 
@@ -38,7 +38,7 @@ def compute_shift(zipped):
     return shift
 
 
-class nc4:
+class NC4:
     def __init__(self, files, testinfo, dcb, fs):
         self._files = files
         self._dcb = dcb
@@ -90,7 +90,6 @@ class nc4:
         en = time.time()
         print(f'Calc results done {en - st:.1f} s...')
         print(f'Total time: {en - st1:.1f} s')
-        pass
 
     def plot_att(self):
         mpl.use("Qt5Agg")
