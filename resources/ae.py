@@ -12,22 +12,18 @@
 
 import multiprocessing
 from functools import partial
-from typing import Tuple
+from typing import Tuple, Any, Union
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import moviepy.editor as mp
 import mplcursors
 import numpy as np
 import pandas as pd
-from matplotlib.animation import PillowWriter
 from nptdms import TdmsFile
 from scipy.stats import kurtosis
 from scipy.stats import skew
 from tqdm import tqdm
 from scipy.signal import hilbert, butter, filtfilt
-
-import resources.experiment
 
 
 def butter_filter(
@@ -38,14 +34,18 @@ def butter_filter(
         order: int = 3,
         ) -> np.ndarray:
     """
-    Apply butterworth filter to input data.
+        Apply butterworth filter to input data.
 
-    :param data: Input signal for filtering
-    :param ftype: Type of filter, (low, high, band)
-    :param cutoff: Filter cut off point, as a fraction of the nyquist freq
-    :param fs: Sample freq for the input signal
-    :param order: Filter order
-    :return: y: Filtered signal
+    Args:
+        data: Input signal for filtering
+        ftype: Type of filter, (low, high, band)
+        cutoff: Filter cut off point, as a fraction of the nyquist freq
+        fs: Sample freq for the input signal
+        order: Filter order
+
+    Returns:
+        Filtered signal
+
     """
     data = np.pad(data, pad_width=10_000)
     norm_cutoff = cutoff * (0.5 * fs)
@@ -58,19 +58,25 @@ def rms(x: np.ndarray) -> np.ndarray:
     """
     Calculate root-mean squared of a np.array.
 
-    :param x: Input array to calculate for
-    :return: r: RMS of inputted array
+    Args:
+        x: Input array to calculate for
+
+    Returns:
+        RMS of inputted array
     """
     r = np.sqrt(np.mean(x ** 2))
     return r
 
 
-def envelope_hilbert(s: np.ndarray) -> np.ndarray:
+def envelope_hilbert(s: Union[np.ndarray, list]) -> np.ndarray:
     """
     Envelope a signal with the hilbert transform and return the instantaneous amplitude.
 
-    :param s: Input signal to be enveloped
-    :return: inst_amp: Instaneous amplitude of the hilbert enveloped input signal
+    Args:
+        s: Input signal to be enveloped
+
+    Returns:
+        Instantaneous amplitude of the hilbert enveloped input signal
     """
     z = hilbert(s)
     inst_amp = np.abs(z)
@@ -78,17 +84,22 @@ def envelope_hilbert(s: np.ndarray) -> np.ndarray:
 
 
 def trigger_st(
-        d: np.ndarray,
+        d: Union[np.ndarray, list],
         chunk_size: int = 100_000,
         diff_change: float = 1.75E-6,
         ) -> [int, float]:
     """
     Find the index of the first trigger point based on change in gradient over a chunk size.
 
-    :param d: Data to find trigger of
-    :param chunk_size: Size of chunks to calculate gradient over
-    :param diff_change: Threshold for change in gradient to find trigger
-    :returns: [t, t_y]: Trigger index, Data value at trigger point
+    Args:
+        d: Data to find trigger of.
+        chunk_size: Size of chunks to calculate gradient over.
+        diff_change: Threshold for change in gradient to find trigger.
+
+    Returns:
+        A tuple comprimising of both the trigger index location and data value at that point.
+        [t, t_y]: Trigger index, Data value at trigger point
+
     """
     n_chunks = len(d) / chunk_size
 
@@ -113,12 +124,12 @@ class AE:
     def __init__(
             self,
             ae_files: Tuple,
-            pre_amp: resources.experiment.PreAmp,
-            testinfo: resources.experiment.TestInfo,
+            pre_amp: Any,
+            testinfo: Any,
             fs: float,
-            ):
+            ) -> None:
         """
-        AE class constructor.
+        AE class.
 
         Args:
             ae_files: File locations for each AE file.
@@ -153,7 +164,18 @@ class AE:
         db = [20 * (np.log10(vin / v_ref)) for vin in v]
         return db
 
-    def _fftcalc(self, fno, freqres):
+    def _fftcalc(self, fno: int, freqres: float) -> np.ndarray:
+        """
+        Function to calculate the fft of an AE signal within the experiment.
+
+        Args:
+            fno: File number to calculate the fft for.
+            freqres: Resolution of the fft, i.e. the size of averaging for the fft.
+
+        Returns:
+            fft_mean: FFT of the signal averaged over bands specified by freqres.
+
+        """
         length = int(self._fs / freqres)
         data = self.readAE(fno)
         trig = self.trig_points.loc[fno]
@@ -180,7 +202,17 @@ class AE:
         # print(f'Calc FFT - File {fno}... ')
         return fft_mean
 
-    def readAE(self, fno):
+    def readAE(self, fno: int) -> list:
+        """
+        Read data AE data from TDMS file and scale.
+
+        Args:
+            fno: TDMS file number to read into memory.
+
+        Returns:
+            data: AE data from the TDMS file.
+
+        """
         test = TdmsFile.read(self._files[fno])
         prop = test.properties
         data = []
@@ -196,10 +228,16 @@ class AE:
                 data = data / 10
         return data
 
-    def plotAE(self, fno):
+    def plotAE(self, fno: int) -> None:
+        """
+        Plot AE from file number.
+
+        Args:
+            fno: File number to plot the AE of.
+        """
         signal = self.readAE(fno)
         ts = 1 / self._fs
-        n = signal.size
+        n = len(signal)
         t = np.arange(0, n) * ts
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
@@ -213,7 +251,15 @@ class AE:
         mplcursors.cursor(multiple=True)
         plt.show()
 
-    def plotfft(self, fno, freqres=1000):
+    def plotfft(self, fno: int, freqres: float = 1000) -> None:
+        """
+        Plot fft of AE signal for given file number.
+
+        Args:
+            fno: File number to plot fft of.
+            freqres: Resolution of the fft, through averaging.
+
+        """
         if freqres in self.fft:
             p = self.fft[freqres][fno]
         else:
@@ -233,9 +279,20 @@ class AE:
         mplcursors.cursor(hover=True)
         plt.show()
 
-    def process(self, trigger=False, FFT=False):
+    def process(self, trigger: bool = True, FFT: bool = False) -> None:
+        """
+        Process the AE data calculating the crucial features.
+
+        Multiprocessing function to process AE data saving the common features wihtin the AE object, with the options
+        to calculate between the trigger points and calculate the 1kHz fft.
+
+        Args:
+            trigger: Option to calculate features within the trigger points.
+            FFT: Option to calculate the 1kHz fft for each signal.
+
+        """
         with multiprocessing.Pool() as pool:
-            if self.trig_points.empty or trigger:
+            if self.trig_points.empty and trigger:
                 trigs = list(tqdm(pool.imap(self._triggers, range(len(self._files))),
                                   total=len(self._files),
                                   desc='Triggers'))
@@ -262,7 +319,16 @@ class AE:
         self.amplitude = results[:, 2]
         self.skewness = results[:, 3]
 
-    def _calc(self, fno):
+    def _calc(self, fno: int) -> [np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Function for multiprocessing to calculate all the time driven AE results of an AE signal.
+
+        Args:
+            fno: File number to calculate features for.
+
+        Returns:
+            A tuple containg the kurtosis, rms, amplitude and skewness of the signal (k, r, a, sk)
+        """
         data = self.readAE(fno)
         trig = self.trig_points.loc[fno]
         data = data[int(trig['trig st']):int(trig['trig end'])]
@@ -273,8 +339,18 @@ class AE:
         # print(f'Completed File {fno}...')
         return k, r, a, sk
 
-    def _triggers(self, i):
-        sig = self.readAE(i)
+    def _triggers(self, fno: int) -> [int, int, float]:
+        """
+        Compute the start and end trigger indicies, as well as the y-value at those points.
+
+        Args:
+            fno: File number to find the triggers of.
+
+        Returns:
+            A tuple containing the start index, end index, and y value (trig_st, trig_end, trig_y_val).
+
+        """
+        sig = self.readAE(fno)
         e_sig = envelope_hilbert(sig[:6_000_000])
         f_sig = butter_filter(data=e_sig, cutoff=0.1, fs=self._fs, order=3, ftype='low')
         trig, trig_y_val = trigger_st(f_sig[100_000:])
@@ -295,7 +371,19 @@ class AE:
                 trig_end = len(sig) - trig_end
         return trig_st, trig_end, trig_y_val
 
-    def fftsurf(self, freqres=1000, freqlim=None):
+    def fftsurf(
+            self,
+            freqres: float = 1000,
+            freqlim: Union[None, list] = None
+            ) -> None:
+        """
+        Plot a 3D surface of the fft of each AE signal in the experiment.
+
+        Args:
+            freqres: Resolution of the ffts to plot the surface with.
+            freqlim: Limits of the freq axis for the surface.
+
+        """
         if freqres in self.fft:
             p = self.fft[freqres]
         else:
@@ -326,28 +414,52 @@ class AE:
         ax.set_title(f'Test No: {self._testinfo.testno} - FFT')
         fig.show()
 
-    def rolling_rms(self, fno):
+    def rolling_rms(self, fno: Union[int, tuple]) -> Union[np.ndarray, None]:
         """
-        Plot either rolling RMS of single AE file or creates animation of all the files in certain range
+        Produces either a figure or mp4/gif of the specified files.
 
-        :param fno: either int or tuple: int - single graph with return, tuple - range of animation plot
-        :return: for single plot: V_rms
+        Args:
+            fno: File numeber to produce the rolling rms for. For figure single int input.
+                For gif/mp4 tuple of start and end file.
+
+        Returns:
+            Array of the rolling rms of the selected file. Only with single input file.
         """
-        def calc_rms(i):
+        import moviepy.editor as mp
+        from matplotlib.animation import PillowWriter
+
+        def calc_roll_rms(i: int, win_size: float = 500_000) -> np.ndarray:
+            """
+            Calculate the rolling rms of the AE file
+
+            Args:
+                i: File number of the AE file to calculate for.
+                win_size: the size of the rolling window size.
+
+            Returns:
+                An array of the calculated rolling rms for the specified file.
+            """
             data = self.readAE(i)
             data = pd.DataFrame(data)
-            v = data.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
+            v = data.pow(2).rolling(win_size).mean().apply(np.sqrt, raw=True)
             v = v[1_000_000:41_000_000].to_numpy()
             return v
 
-        def mp4_conv(gifname):
+        def mp4_conv(gifname: str) -> None:
+            """
+            Convert a gif file to mp4 format.
+
+            Args:
+                gifname: Full gif file name.
+
+            """
             clip = mp.VideoFileClip(gifname)
             mp4name = gifname[:-4] + '.mp4'
             clip.write_videofile(mp4name)
 
         ts = 1 / self._fs
         if type(fno) is int:
-            v_rms = calc_rms(fno)
+            v_rms = calc_roll_rms(fno)
             n = v_rms.size
             t = np.arange(0, n) * ts
             mpl.use('Qt5Agg')
@@ -374,21 +486,29 @@ class AE:
             with writer.saving(fig, name, 200):
                 for no in range(fno[0], fno[1]):
                     x = np.arange(0, n) * ts
-                    y = calc_rms(no)
+                    y = calc_roll_rms(no)
                     l.set_data(x, y)
                     ax.set_title(f'File - {no:03d}')
                     writer.grab_frame()
             mp4_conv(name)
 
-    def update(self, files):
+    def update(self, files: Tuple[str]) -> None:
+        """
+        Update the file location list stored in this object.
+
+        Args:
+            files: Tuple of strings containing the paths to each AE file
+
+        """
         self._files = files
 
-    def plot_triggers(self, fno: int):
+    def plot_triggers(self, fno: int) -> None:
         """
         Plot calculated trigger points of the file on the hibert enveloped and lowpass filtered AE signal
 
-        :param fno: int:
-            File number to show triggers
+        Args:
+            fno: File number to show triggers
+
         """
         try:
             triggers = self.trig_points.loc[fno]
@@ -399,7 +519,7 @@ class AE:
 
         sig = self.readAE(fno)
         ts = 1 / self._fs
-        n = sig.size
+        n = len(sig)
         t = np.arange(0, n) * ts
         filename = f'Test {fno:03d} - Triggers of enveloped & filtered AE signal'
 
