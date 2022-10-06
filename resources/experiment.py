@@ -28,12 +28,29 @@ from .ae import AE
 from .nc4 import NC4
 
 
-def _move_files(src: str, dst: str, ext: str = '*'):
+def _move_files(src: str, dst: str, ext: str = '*') -> None:
+    """
+    Move filtered files depending on extension from one folder to another.
+
+    Args:
+        src: Source directory path to move files from.
+        dst: Destination directory path to move files to.
+        ext: Filter option, to allow only certain files to be moved.
+
+    """
     for f in fnmatch.filter(os.listdir(src), ext):
         os.rename(os.path.join(src, f), os.path.join(dst, f))
 
 
-def _sort_rename(files, path):
+def _sort_rename(files: list[str], path: str) -> None:
+    """
+    Rename all files in the list based on date and time stamp on the file.
+
+    Args:
+        files: List of file paths to sort and rename.
+        path:  Folder path of the file locations.
+
+    """
     def substring_after(s, delim):
         return s.partition(delim)[2]
 
@@ -53,67 +70,14 @@ def _sort_rename(files, path):
             os.rename(fno[1], os.path.join(path, newfilename))
 
 
-def create_obj(process=False):
-    """
-    Creates object for individual test
-
-    :param process: bool (default:False) decides if results should be processed
-    :return: experiment obj
-    """
-
-    def folder_exist(path):
-        # if folder doesn't exist create it
-        if not os.path.isdir(path) or not os.path.exists(path):
-            os.makedirs(path)
-
-    def getdate(AE_f, NC4_f):
-        if AE_f:
-            d = datetime.date.fromtimestamp(os.path.getmtime(AE_f[0]))
-        else:
-            d = datetime.date.fromtimestamp(os.path.getmtime(NC4_f[0]))
-        return d
-
-    # import file names and directories of AE and NC4
-    try:
-        folder_path = askdirectory(title='Select test folder:')
-        if not folder_path:
-            raise NotADirectoryError
-    except NotADirectoryError:
-        print('No Folder selected!')
-        sys.exit()
-
-    # setup file paths and create folder if needed
-    folder_path = os.path.normpath(folder_path)
-    folder_path = os.path.relpath(folder_path)
-    ae_path = os.path.join(folder_path, 'AE', 'TDMS')
-    nc4_path = os.path.join(folder_path, 'NC4', 'TDMS')
-    folder_exist(ae_path)
-    folder_exist(nc4_path)
-
-    if glob.glob(os.path.join(folder_path, "*MHz.tdms")):
-        print("Moving AE files...")
-        _move_files(folder_path, ae_path, '*MHz.tdms')
-    ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
-    _sort_rename(ae_files, ae_path)
-
-    if glob.glob(os.path.join(folder_path, "*kHz.tdms")):
-        print("Moving NC4 files...")
-        _move_files(folder_path, nc4_path, '*kHz.tdms')
-    nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
-    _sort_rename(nc4_files, nc4_path)
-    # collect data for exp obj
-    ae_files = tuple(glob.glob(os.path.join(ae_path, "*.tdms")))
-    nc4_files = tuple(glob.glob(os.path.join(nc4_path, "*.tdms")))
-    date = getdate(ae_files, nc4_files)
-    obj = Experiment(folder_path, date, ae_files, nc4_files)
-    if process:
-        obj.nc4.process()
-        obj.ae.process()
-    return obj
-
-
 class TestInfo:
-    def __init__(self, dataloc):
+    def __init__(self, dataloc: str) -> None:
+        """
+        Class to store data about the experiment from the experiment "TESTING INFO.txt" file.
+
+        Args:
+            dataloc: Location of the experiment folder, to find the "TESTING INFO.txt" file.
+        """
         self.dataloc = dataloc
         infofile = os.path.join(dataloc, 'TESTING INFO.txt')
         try:
@@ -132,7 +96,16 @@ class TestInfo:
 
 
 class GrindProp:
-    def __init__(self, feedrate, doc_ax, doc_rad, v_spindle):
+    def __init__(self, feedrate: float, doc_ax: float, doc_rad: float, v_spindle:float) -> None:
+        """
+        Class to store data about the grinding properties.
+
+        Args:
+            feedrate: Feedrate of the grinding during test. (mm/min)
+            doc_ax: Axial depth of cut during test. (mm)
+            doc_rad: Radial depth of cut during test. (mm)
+            v_spindle: Spindle speed during the test. (RPM)
+        """
         self.feedrate = feedrate
         self.doc_ax = doc_ax
         self.doc_rad = doc_rad
@@ -140,14 +113,30 @@ class GrindProp:
 
 
 class PreAmp:
-    def __init__(self, gain, spec, filt):
+    def __init__(self, gain: float, spec: str, filt: str) -> None:
+        """
+        Class to store data about the pre-amp during the test.
+
+        Args:
+            gain: Gain setting of the pre-amp. (dB)
+            spec: Pre-amp specification/type.
+            filt: Pre-amp built-in filter. (kHz)
+        """
         self.gain = gain
         self.spec = spec
         self.filter = filt
 
 
 class DCB:
-    def __init__(self, d, grit, form):
+    def __init__(self, d: float, grit: float, form: str) -> None:
+        """
+        Class to store data about the DCB used in the test.
+
+        Args:
+            d: Diameter of the DCB used in the test. (mm)
+            grit: Mesh size of the DCB used in the test. (#)
+            form: Form of the DCB used during the test.
+        """
         self.grainsize = None
         self.diameter = d
         self.grit = grit
@@ -160,7 +149,16 @@ class DCB:
 
 
 class Experiment:
-    def __init__(self, dataloc, date, ae_files, nc4_files):
+    def __init__(self, dataloc: str, date: datetime.date, ae_files: tuple[str], nc4_files: tuple[str]) -> None:
+        """
+        Experiment Class, including AE class, NC4 class, test_info and features.
+
+        Args:
+            dataloc: Folder path of the experiment folder.
+            date: Date the test was carried out.
+            ae_files: Tuple of file paths for AE TDMS files.
+            nc4_files: Tuple of file paths for NC4 TDMS files.
+        """
         self.test_info = TestInfo(dataloc)
         self.date = date
         self.dataloc = dataloc
@@ -172,15 +170,18 @@ class Experiment:
         rep = f'Test No: {self.test_info.testno} \nDate: {self.date} \nData: {self.dataloc}'
         return rep
 
-    def save(self):
+    def save(self) -> None:
         """
-        Save obj to the data location folder as a '.pickle' file
+        Save Experiment obj to the data location folder as a '.pickle' file.
         """
         with open(f'{self.dataloc}/Test {self.test_info.testno}.pickle', 'wb') as f:
             pickle.dump(self, f)
 
-    def update(self):
-        dataloc: str = self.test_info.dataloc
+    def update(self) -> None:
+        """
+        Update the Experiment class with new files.
+        """
+        dataloc = self.test_info.dataloc
         print(f'Updating experiemnt obj - {datetime.datetime.now()}')
         ae_path = os.path.join(dataloc, 'AE', 'TDMS')
         nc4_path = os.path.join(dataloc, 'NC4', 'TDMS')
@@ -204,15 +205,18 @@ class Experiment:
 
     # todo finish update func and print test update
 
-    def correlation(self, plotfig=True):
+    def correlation(self, plotfig: bool = True) -> None:
         """
         Corerlation between each freq bin and NC4 measurements
 
-        Produces correlation coeffs for each freq bin compared to mean radius
 
-        :param self: obj that is being used
-        :param plotfig: boolean for plotting the figure
-        :return: correlation coeffs
+        Produces correlation coeffs for each freq bin compared to mean radius
+        Args:
+            plotfig: Option to plot a figure.
+
+        Returns:
+            Correlation coefficients for each freq bin compared to NC4 measurements.
+
         """
 
         def plot(fre, c):
@@ -277,6 +281,7 @@ class Experiment:
 
         :param self: object: experiment obj containing data for dataframe
         :return: df: DataFrame: features of experiment
+        todo finish documenting from here
         """
         cols = ["RMS", 'Kurtosis', 'Amplitude', 'Skewness', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
                 'Mean radius', 'Runout', 'Form error']
@@ -349,3 +354,62 @@ def load(file: str = None, process=False) -> Experiment:
         if not data.ae.kurt.all():
             data.ae.process()
     return data
+
+
+def create_obj(process: True = False) -> Experiment:
+    """
+    Creates object for individual test
+
+    :param process: bool (default:False) decides if results should be processed
+    :return: experiment obj
+    """
+
+    def folder_exist(path):
+        # if folder doesn't exist create it
+        if not os.path.isdir(path) or not os.path.exists(path):
+            os.makedirs(path)
+
+    def getdate(AE_f, NC4_f):
+        if AE_f:
+            d = datetime.date.fromtimestamp(os.path.getmtime(AE_f[0]))
+        else:
+            d = datetime.date.fromtimestamp(os.path.getmtime(NC4_f[0]))
+        return d
+
+    # import file names and directories of AE and NC4
+    try:
+        folder_path = askdirectory(title='Select test folder:')
+        if not folder_path:
+            raise NotADirectoryError
+    except NotADirectoryError:
+        print('No Folder selected!')
+        sys.exit()
+
+    # setup file paths and create folder if needed
+    folder_path = os.path.normpath(folder_path)
+    folder_path = os.path.relpath(folder_path)
+    ae_path = os.path.join(folder_path, 'AE', 'TDMS')
+    nc4_path = os.path.join(folder_path, 'NC4', 'TDMS')
+    folder_exist(ae_path)
+    folder_exist(nc4_path)
+
+    if glob.glob(os.path.join(folder_path, "*MHz.tdms")):
+        print("Moving AE files...")
+        _move_files(folder_path, ae_path, '*MHz.tdms')
+    ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
+    _sort_rename(ae_files, ae_path)
+
+    if glob.glob(os.path.join(folder_path, "*kHz.tdms")):
+        print("Moving NC4 files...")
+        _move_files(folder_path, nc4_path, '*kHz.tdms')
+    nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
+    _sort_rename(nc4_files, nc4_path)
+    # collect data for exp obj
+    ae_files = tuple(glob.glob(os.path.join(ae_path, "*.tdms")))
+    nc4_files = tuple(glob.glob(os.path.join(nc4_path, "*.tdms")))
+    date = getdate(ae_files, nc4_files)
+    obj = Experiment(folder_path, date, ae_files, nc4_files)
+    if process:
+        obj.nc4.process()
+        obj.ae.process()
+    return obj
