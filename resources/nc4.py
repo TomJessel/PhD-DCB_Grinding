@@ -11,6 +11,8 @@
 """
 
 import os
+from typing import Any, Union
+
 from nptdms import TdmsFile
 import numpy as np
 import multiprocessing
@@ -27,7 +29,16 @@ import pickle
 mpl.use("Qt5Agg")
 
 
-def compute_shift(zipped):
+def compute_shift(zipped: tuple[Any, Any]) -> int:
+    """
+    Use fft correlation to compute the shift between two signals.
+
+    Args:
+        zipped: Zipped tuple containing the signals to compare between each other.
+
+    Returns:
+        Integer representing the number of samples of shift between the signals.
+    """
     x = zipped[0]
     y = zipped[1]
     assert len(x) == len(y)
@@ -39,14 +50,38 @@ def compute_shift(zipped):
 
 
 class NC4:
-    def __init__(self, files, testinfo, dcb, fs):
+    def __init__(
+            self,
+            files: Union[tuple[str], list[str]],
+            testinfo: Any,
+            dcb: Any,
+            fs: float,
+            ) -> None:
+        """
+        NC4 class.
+
+        Args:
+            files: File loactions for each NC4 TDMS file.
+            testinfo: Test info obj, containing testing info for the experiment.
+            dcb: DCB obj, containing info about the DCB used for the test.
+            fs: Sample rate for the NC4 acquisition during the test.
+        """
         self._files = files
         self._dcb = dcb
         self._fs = fs
         self._datano = np.arange(0, len(files))
         self._testinfo = testinfo
 
-    def readtdms(self, fno):
+    def readNC4(self, fno: int) -> list[float]:
+        """
+        Read NC4 data from TDMS file into memory.
+
+        Args:
+            fno: TDMS file number to read into memory
+
+        Returns:
+            NC4 data from the file.
+        """
         test = TdmsFile.read(self._files[fno])
         prop = test.properties
         data = []
@@ -57,7 +92,10 @@ class NC4:
             data = (data.astype(np.float) * prop.get('Gain')) + prop.get('Offset')
         return data
 
-    def process(self):
+    def process(self) -> None:
+        """
+        Function to process the NC4 data from a voltage to radius and compute useful features.
+        """
         print('Processing NC4 data...')
         st1 = time.time()
         with multiprocessing.Pool() as pool:
@@ -91,7 +129,10 @@ class NC4:
         print(f'Calc results done {en - st:.1f} s...')
         print(f'Total time: {en - st1:.1f} s')
 
-    def plot_att(self):
+    def plot_att(self) -> None:
+        """
+        Plot NC4 features for each measurement.
+        """
         mpl.use("Qt5Agg")
         path = f'{self._testinfo.dataloc}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.png'
@@ -130,26 +171,54 @@ class NC4:
         mplcursors.cursor(hover=2)
         fig.show()
 
-    def plot_xy(self):
+    def plot_xy(self, fno: tuple[int, int] = None) -> None:
+        """
+        Plot full radius measurement around tool circumference, for a slice or all measurements.
+
+        Args:
+            fno: Tuple of start and stop indices for slice of files to plot.
+
+        """
         mpl.use('Qt5Agg')
         path = f'{self._testinfo.dataloc}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 XY Plot.png'
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 XY Plot.pickle'
+
+        savefig = False
+
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
-        try:
-            with open(pic_name, 'rb') as f:
-                fig = pickle.load(f)
-        except IOError:
+
+        if fno is None:
+            radius = self.radius
+            try:
+                with open(pic_name, 'rb') as f:
+                    fig = pickle.load(f)
+            except IOError:
+                fig, ax = plt.subplots()
+                savefig = True
+                n = 0
+                for r in radius:
+                    ax.plot(self.theta, r, label=f'File {n:03.0f}', linewidth=0.5)
+                    n += 1
+                ax.set_xlabel('Angle (rad)')
+                ax.set_ylabel('Radius (mm)')
+                ax.set_title(f'Test No: {self._testinfo.testno} - NC4 Radius Plot')
+                ax.autoscale(enable=True, axis='x', tight=True)
+        else:
             fig, ax = plt.subplots()
+            slice_n = slice(fno[0], fno[1])
+            radius = self.radius[slice_n]
+            lbl = range(len(self._files))[slice_n]
             n = 0
-            for r in self.radius:
-                ax.plot(self.theta, r, label=f'File {n:03.0f}', linewidth=0.5)
+            for r in radius:
+                ax.plot(self.theta, r, label=f'File {lbl[n]:03.0f}', linewidth=0.5)
                 n += 1
             ax.set_xlabel('Angle (rad)')
             ax.set_ylabel('Radius (mm)')
             ax.set_title(f'Test No: {self._testinfo.testno} - NC4 Radius Plot')
             ax.autoscale(enable=True, axis='x', tight=True)
+        if savefig:
             try:
                 open(png_name)
             except IOError:
@@ -162,7 +231,11 @@ class NC4:
         mplcursors.cursor(multiple=True)
         fig.show()
 
-    def plot_surf(self):
+    def plot_surf(self) -> None:
+        """
+        Plot surface of DCB radius over measurements in time.
+
+        """
         mpl.use('Qt5Agg')
         path = f'{self._testinfo.dataloc}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Radius Surf.png'
@@ -197,8 +270,17 @@ class NC4:
                     pickle.dump(fig, f)
         fig.show()
 
-    def _sampleandpos(self, fno):
-        data = self.readtdms(fno)
+    def _sampleandpos(self, fno: int) -> [list[float], list[float], list[float], list[float]]:
+        """
+        # todo From here
+
+        Args:
+            fno:
+
+        Returns:
+
+        """
+        data = self.readNC4(fno)
         filt = 50
         scale = 1
         ysteps = np.around(np.arange(0.04, -0.02, -0.01), 2)

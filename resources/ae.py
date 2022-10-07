@@ -123,7 +123,7 @@ def trigger_st(
 class AE:
     def __init__(
             self,
-            ae_files: Tuple,
+            ae_files: Tuple[str],
             pre_amp: Any,
             testinfo: Any,
             fs: float,
@@ -132,10 +132,10 @@ class AE:
         AE class.
 
         Args:
-            ae_files: File locations for each AE file.
+            ae_files: File locations for each AE TDMS file.
             pre_amp: Pre-Amp object, containing pre-amp info for the experiment.
             testinfo: Test Info object, containing testing info for the experiment.
-            fs: Sample rate for the experiment.
+            fs: Sample rate for the AE acquisition during the test.
         """
         self._files = ae_files
         self.kurt = []
@@ -204,7 +204,7 @@ class AE:
 
     def readAE(self, fno: int) -> list:
         """
-        Read data AE data from TDMS file and scale.
+        Read AE data from TDMS file and scale.
 
         Args:
             fno: TDMS file number to read into memory.
