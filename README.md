@@ -106,9 +106,14 @@ param_grid = dict(
    optimizer__learning_rate=[0.0005, 0.0075, 0.001, 0.0025, 0.005, 0.01],
    )
 
-X_train, X_test, y_train, y_test = split_dataset(df)
 # GridsearchCV with the created model and param_grid
-pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, para_grid=param_grid, cv=10)
+pipe, grid_result = model_gridsearch(
+   model=pipe,
+   Xdata=X_train,
+   ydata=y_train,
+   para_grid=param_grid,
+   cv=10,
+)
 # Plot results of grid search based on one hyper-parameter
 plot_grid_results(grid_result, 'epochs')
 ```
