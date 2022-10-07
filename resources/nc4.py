@@ -272,13 +272,13 @@ class NC4:
 
     def _sampleandpos(self, fno: int) -> [list[float], list[float], list[float], list[float]]:
         """
-        # todo From here
+        Load in NC4 voltage data and select most appropriate section of the signal to carry forward.
 
         Args:
-            fno:
+            fno: File number to sample from.
 
         Returns:
-
+            A tuple containing the signal sample and y position for both the positive and negative signal.
         """
         data = self.readNC4(fno)
         filt = 50
@@ -325,14 +325,33 @@ class NC4:
         # print(f'Completed File {fno}...')
         return psample, posy, nsample, negy
 
-    def polyvalradius(self, x):
+    def polyvalradius(self, x: tuple[np.ndarray, float]) -> list[float]:
+        """
+        Convert NC4 voltage signal to radius, using NC4 calibration constants.
+
+        Args:
+            x: Tuple containing the signal sample and its y position.
+
+        Returns:
+            List of converting values to radius.
+        """
         pval = [-0.000341717477186167, 0.00459433449011791, -0.0237307202784755, 0.0585315537400639,
                 -0.0766338436136931, 5.15045955887124]
         d = self._dcb.diameter
         rad = np.polyval(pval, x[0]) - 5.1 + (d / 2) + x[1]
         return rad
 
-    def sigtorad(self, p, n):
+    def sigtorad(self, p: Any, n: Any) -> [list[float], list[float]]:
+        """
+        Multiprocessing function to convert signals to radius.
+
+        Args:
+            p: Zipped obj containing postive NC4 signal and the y position of the signal.
+            n: Zipped obj containing negative NC4 signal and the y position of the signal.
+
+        Returns:
+            Tuple containing a list of the converted postive signal and converted negative signal.
+        """
         # Converting to Radii rather then Voltage
         with multiprocessing.Pool() as pool:
             prad = pool.map(self.polyvalradius, p)
@@ -341,7 +360,17 @@ class NC4:
         return prad, nrad
 
     @staticmethod
-    def _alignposneg(prad, nrad):
+    def _alignposneg(prad: list, nrad: list) -> np.ndarray:
+        """
+        Combine the pos and neg halfs of the signal together.
+
+        Args:
+            prad: Array of radius values for positive half of signal.
+            nrad: Array of radius values for negative half of signal.
+
+        Returns:
+            Array of combined radius signal
+        """
         pradzero = np.subtract(np.transpose(prad), np.mean(prad, axis=1))
         nradzero = np.subtract(np.transpose(nrad), np.mean(nrad, axis=1))
         # print('Working out Lags')
@@ -355,7 +384,16 @@ class NC4:
         # print('Calculated radii')
         return radii
 
-    def _alignsigs(self, radii):
+    def _alignsigs(self, radii: np.ndarray) -> np.ndarray:
+        """
+        Shift radius signals so that they align with each other.
+
+        Args:
+            radii: Array containing radius vector for each measurement.
+
+        Returns:
+            Aligned radius array.
+        """
         radzero = radii - radii.mean(axis=1, keepdims=True)
         radzeros = zip(radzero, np.roll(radzero, -1, axis=0))
         with multiprocessing.Pool() as pool:
@@ -374,7 +412,13 @@ class NC4:
         self.radius = radius
         return radius
 
-    def _fitcircles(self):
+    def _fitcircles(self) -> list[tuple[float, float, float, float]]:
+        """
+        Fit a circle to each NC4 measurements and return its properties.
+
+        Returns:
+            List of tuples containing the x and y coords, the radius of the circle and the variance.
+        """
         radius = self.radius
         theta = self.theta
         x = np.array([np.multiply(r, np.sin(theta)) for r in radius])
@@ -389,6 +433,13 @@ class NC4:
         self.form_error = np.array([(np.max(rad) - np.min(rad)) for rad in radius])
         return circle
 
-    def update(self, files):
+    def update(self, files: Union[list[str], tuple[str]]) -> None:
+        """
+        Update the file location list stored in this object.
+
+        Args:
+            files: List of strings containing the paths to each NC4 file.
+
+        """
         self._files = files
         # todo add functionality to only process updated files
