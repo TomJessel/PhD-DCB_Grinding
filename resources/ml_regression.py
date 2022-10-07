@@ -235,8 +235,8 @@ def score_test(
     ax.set_ylabel('Mean Radius (mm)')
     ax.set_xlabel('Data Points')
     ax.legend()
-    png_name = f'ML Predictions Test Set'
-    fig.savefig(png_name, dpi=300)
+    png_name = fr'ML Predictions Test Set.png'
+    fig.savefig(fr'Figures/ML-Regression/{png_name}', dpi=300)
     logger.info(f'Figure saved - {png_name}')
     fig.show()
     logger.info('=' * 65)
@@ -279,8 +279,8 @@ def train_history(model: Union[KerasRegressor, Pipeline]) -> None:
     ax[0].set_ylabel('Mean\nAbsolute Error')
     ax[1].set_ylabel('Mean\nSquared Error')
     fig_ = ax[1].get_figure()
-    png_name_ = f'ML learning history'
-    fig_.savefig(png_name_, dpi=300)
+    png_name_ = fr'ML learning history.png'
+    fig_.savefig(fr'Figures/ML-Regression/{png_name_}', dpi=300)
     fig_.show()
     logger.info(f'Figure saved - {png_name_}')
 
