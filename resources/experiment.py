@@ -14,10 +14,10 @@ import datetime
 import fnmatch
 import glob
 import os
-import sys
-import tkinter.filedialog as tkfiledialog
-from tkinter.filedialog import askdirectory
+from tkinter.filedialog import askdirectory, askopenfilename
 import pickle
+from typing import Union
+
 import numpy as np
 import mplcursors
 import matplotlib as mpl
@@ -275,13 +275,12 @@ class Experiment:
         return coeff
 
     # todo same thing but for AE features other than FFT
-    def create_feat_df(self: object):
+    def create_feat_df(self) -> pd.DataFrame:
         """
-        Creates dataframe of useful calc features from obj.
+        Creates dataframe of useful calc features from test for ML.
 
-        :param self: object: experiment obj containing data for dataframe
-        :return: df: DataFrame: features of experiment
-        todo finish documenting from here
+        Returns:
+            DataFrame: Features of experiment
         """
         cols = ["RMS", 'Kurtosis', 'Amplitude', 'Skewness', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
                 'Mean radius', 'Runout', 'Form error']
@@ -309,16 +308,16 @@ class Experiment:
         return df
 
 
-def load(file: str = None, process=False) -> Experiment:
+def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
     """
-    Load in a saved exp pickle file, option to process data
+    Load in a saved exp pickle file, option to process data.
 
-    :param file: str (default: None):
-        choose file to load
-    :param process: bool (default:False):
-        option to process data when loading
-    :return: data: Experiment:
-        Experiment class containing AE, NC4, and test info
+    Args:
+        file: Name of test to load.
+        process: Option to process data in experiment object
+
+    Returns:
+        Saved experiment obj containing AE, NC4 data.
     """
 
     f_locs = {
@@ -329,22 +328,22 @@ def load(file: str = None, process=False) -> Experiment:
 
     if file is None:
         try:
-            file_path = tkfiledialog.askopenfilename(defaultextension='pickle')
+            file_path = askopenfilename(defaultextension='pickle')
             if not file_path:
                 raise NotADirectoryError
             with open(file_path, 'rb') as f:
                 data = pickle.load(f)
         except NotADirectoryError:
             print('No file selected.')
-            quit()
+            return
     else:
         try:
             file_path = f_locs[file.lower().replace(' ', '')]
             with open(file_path, 'rb') as f:
                 data = pickle.load(f)
         except KeyError:
-            print(f'File location of {file} not saved')
-            quit()
+            print(f'File location of {file} not saved in load function.')
+            return
     if process:
         try:
             getattr(data.NC4, 'radius')
@@ -356,20 +355,42 @@ def load(file: str = None, process=False) -> Experiment:
     return data
 
 
-def create_obj(process: True = False) -> Experiment:
+def create_obj(folder: str = None, process: True = False) -> Union[Experiment, None]:
     """
-    Creates object for individual test
+    Creates experiment obj for test from test folder, selected either by GUI or path input.
 
-    :param process: bool (default:False) decides if results should be processed
-    :return: experiment obj
+    Args:
+        folder: Test file path to create obj from, if blank will open GUI to select folder.
+        process: Option to process AE and NC4 data on creation of obj.
+
+    Returns:
+        Experiment obj containing storage for AE & NC4 data, and relevant features.
     """
 
-    def folder_exist(path):
+    def folder_exist_create(path: str) -> None:
+        """
+        Check if a folder exists, if not create it.
+
+        Args:
+            path: Folder path to check and create.
+
+        """
         # if folder doesn't exist create it
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
 
-    def getdate(AE_f, NC4_f):
+    def getdate(AE_f: Union[list[str], tuple[str]], NC4_f: Union[list[str], tuple[str]]) -> datetime.date:
+        """
+        Find the date of the first AE file, or first NC4 file if no AE data.
+
+        Args:
+            AE_f: List of AE files in the test folder.
+            NC4_f: List of NC4 files in the test folder.
+
+        Returns:
+            A date class of the first AE file.
+
+        """
         if AE_f:
             d = datetime.date.fromtimestamp(os.path.getmtime(AE_f[0]))
         else:
@@ -377,21 +398,31 @@ def create_obj(process: True = False) -> Experiment:
         return d
 
     # import file names and directories of AE and NC4
-    try:
-        folder_path = askdirectory(title='Select test folder:')
-        if not folder_path:
-            raise NotADirectoryError
-    except NotADirectoryError:
-        print('No Folder selected!')
-        sys.exit()
+    if folder is None:
+        try:
+            folder_path = askdirectory(title='Select test folder:')
+            if not folder_path:
+                raise NotADirectoryError
+        except NotADirectoryError:
+            print('No Folder selected!')
+            return
+    else:
+        try:
+            if os.path.isdir(folder):
+                folder_path = folder
+            else:
+                raise NotADirectoryError
+        except NotADirectoryError:
+            print('Not a valid folder path.')
+            return
 
     # setup file paths and create folder if needed
     folder_path = os.path.normpath(folder_path)
     folder_path = os.path.relpath(folder_path)
     ae_path = os.path.join(folder_path, 'AE', 'TDMS')
     nc4_path = os.path.join(folder_path, 'NC4', 'TDMS')
-    folder_exist(ae_path)
-    folder_exist(nc4_path)
+    folder_exist_create(ae_path)
+    folder_exist_create(nc4_path)
 
     if glob.glob(os.path.join(folder_path, "*MHz.tdms")):
         print("Moving AE files...")
