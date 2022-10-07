@@ -55,16 +55,14 @@ def get_regression(
     """
     Generate keras sequential regression model for SciKeras module
 
-    :param meta: Dict:
-        metadata from scikeras module containing model info
-    :param hidden_layer_sizes: Iter:
-        determines the number of layers and nodes in each layer
-    :param dropout: float:
-        dropout rate for each dropout layer in the model, between 0 - 1
-    :param init_mode: str:
-        node initialization function to be used
-    :return: model: keras.Sequential:
-        keras regression model
+    Args:
+        meta: Metadata from scikeras module containing model info.
+        hidden_layer_sizes: Iterable setting the number of hidden layers and neurons of the model.
+        dropout: Dropout rate for each dropout layer in the model, float between 0-1.
+        init_mode: node initialization function to be used for each neuron.
+
+    Returns:
+        Keras sequential regression model, with the specified properties.
     """
 
     n_features_in_ = meta['n_features_in_']
@@ -83,24 +81,20 @@ def model_gridsearch(
         ydata: np.ndarray,
         para_grid: Dict[str, iter],
         cv: int = 5
-        ) -> [Union[KerasRegressor, Pipeline], object]:
+        ) -> [Union[KerasRegressor, Pipeline], Any]:
     """
-    Gridsearch for given hyper-parameters
+    Gridsearch with cross-validation for given hyper-parameters of inputted model.
 
-    :param model: [KerasRegressor, Pipeline]:
-        model/pipeline to examine hyper-parameters over
-    :param Xdata: np.ndarray:
-        features training data to carry out gridsearch with
-    :param ydata: np.ndarray:
-        corresponding training data output
-    :param para_grid: Dict:
-        parameters to evaluate with gridsearch, key: parameter, item: iterable
-    :param cv: int: default= 5:
-        number of splits carried out by KFold for cross validation
-    :return: best_estimator: [KerasRegressor, Pipeline]:
-        the best model that performed the best on given hyper-parameters
-    :return: gd_result: object:
-        grid search cv results and estimators used
+    Args:
+        model: Pipeline/Model to analyse the hyper-parameters with.
+        Xdata: Feature training data to carry out gridsearch with.
+        ydata: Corresponding training data output.
+        para_grid: Dict containing the name and values of the hyper-parameters to evaluate.
+        cv: Number of splits to carry out when cross-validating each fitted model.
+
+    Returns:
+        Tuple containing the best performing estimator with given hyper-parameters, and the grid results object.
+
     """
 
     kfold = KFold(n_splits=cv, shuffle=True)
@@ -154,20 +148,16 @@ def score_train(
     """
     Score a model/pipeline on it's training set, using RepeatedKFold cross validation.
 
-    :param model: [KerasRegressor, Pipeline]:
-        model/pipeline to score
-    :param Xdata: np.ndarray:
-        training set features
-    :param ydata: np.ndarray:
-        training set results
-    :param cv_splits: int: default=10:
-        number of splits for cross validation per repetition
-    :param cv_repeats: int: default=5:
-        number of repeats of cross validation
-    :return: best_model: [KerasRegressor, Pipeline]:
-        model which scored the best during cv
-    :return: scores_: Dict:
-        dict of scores and times for each fitted model
+    Args:
+        model: Model/Pipeline to score.
+        Xdata: Training set input data.
+        ydata: Corresponding training set outputs.
+        cv_splits: Number of splits for cross validation per repetition.
+        cv_repeats: Number of repeats to be carried out for repeated cross validation.
+
+    Returns:
+        Tuple containing the best scoring model/pipeline, and a Dict containing the scoring and timing data from
+            cross-validation.
     """
 
     kfold = RepeatedKFold(n_splits=cv_splits, n_repeats=cv_repeats)
@@ -212,19 +202,16 @@ def score_test(
         ytest: np.ndarray
         ) -> Dict[str, float]:
     """
-    Score a fitted model/pipeline on it's test set.
+    Score a fitted model/pipeline on test set data.
 
+    Args:
+        model: Model/Pipeline for scoring.
+        Xtest: Test set input data.
+        ytest: Corresponding test set output data.
 
-    :param model: [KerasRegressor, Pipeline]:
-        fitted model for scoring
-    :param Xtest: np.ndarray:
-        test set features
-    :param ytest: np.ndarray:
-        test set results
-    :return: _test_score: Dict[str: float]:
-        dict of scores for fitted model
+    Returns:
+        Dict containing the scores for the fitted model.
     """
-
     logger.info('Evaluating model with TEST set')
     y_pred = model.predict(Xtest, verbose=0)
 
@@ -256,12 +243,13 @@ def score_test(
     return _test_score
 
 
-def train_history(model: Union[KerasRegressor, Pipeline]):
+def train_history(model: Union[KerasRegressor, Pipeline]) -> None:
     """
-    Plot training history of model, to show loss over epochs.
+    Plot training history of model, to show scores over epochs.
 
-    :param model: [KerasRegressor, Pipeline]:
-        fitted model to plot training history
+    Args:
+        model: Fitted model/pipeline to plot training history of.
+
     """
     logger.info('___Model learning/validation history___')
     logger.info('-' * 65)
@@ -302,21 +290,14 @@ def split_dataset(
         split_frac: float = 0.2
         ) -> [np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Separate dataset into features and results. Final column is results.
-    Then split into training and test splits.
+    Separate dataset into training and test set from full dataset (last column is results).
 
-    :param df: Dataframe:
-        Dataset to separate and then split
-    :param split_frac: float:
-        Fraction of data to split into test
-    :return x_tr: np.ndarray:
-        Features training set
-    :return x_te: np.ndarray:
-        Features test set
-    :return y_tr: np.ndarray:
-        Results training set
-    :return y_te: np.ndarray:
-        Results test set
+    Args:
+        df: Dataset to separate and then split.
+        split_frac: Fraction of dataset to split into the test set.
+
+    Returns:
+        Tuple containing the input training set, input test set, output test set, output training set.
     """
     dataset = df.values
     x = dataset[:, :-1]
@@ -329,23 +310,24 @@ def split_dataset(
 
 def create_pipeline(**kwargs) -> Pipeline:
     """
-    Create pipeline using input paramters. Made up of StandardScaler and KerasRegressor model
+    Create pipeline using input paramters. Made up of StandardScaler and KerasRegressor model.
 
-    :param kwargs:
-        Input paramters to create Keras regressor model with SciKeras, i.e.
-        model=get_regression,
-        model__init_mode='glorot_normal',
-        model__dropout=0.1,
-        model__hidden_layer_sizes=(30, 30),
-        optimizer='adam',
-        optimizer__learning_rate=0.001,
-        loss='mae',
-        metrics=['MAE', 'MSE'],
-        batch_size=10,
-        epochs=500,
-        verbose=0,
-    :return p: Pipeline:
-        Pipeline made up of standard scaler and keras regressor
+    Args:
+        **kwargs: Input paramters to create Keras regressor model with SciKeras, (i.e.
+            model=get_regression,
+            model__init_mode='glorot_normal',
+            model__dropout=0.1,
+            model__hidden_layer_sizes=(30, 30),
+            optimizer='adam',
+            optimizer__learning_rate=0.001,
+            loss='mae',
+            metrics=['MAE', 'MSE'],
+            batch_size=10,
+            epochs=500,
+            verbose=0,)
+
+    Returns:
+        Pipeline made up of a standard scaler and keras regressor.
     """
     reg = KerasRegressor(**kwargs)
     p = Pipeline([
@@ -355,14 +337,14 @@ def create_pipeline(**kwargs) -> Pipeline:
     return p
 
 
-def plot_grid_results(gd_results, comp_variable: str):
+def plot_grid_results(gd_results: Any, comp_variable: str) -> None:
     """
     Plot gridsearchcv scores relative to a variable within the param grid.
 
-    :param gd_results:
-        Grid results from the GridsearchCV
-    :param comp_variable: str
-        variable to plot on the x-axis, must be able to uniquely identify one parameter in the grid
+    Args:
+        gd_results: Gridsearch results object.
+        comp_variable: Variable name to plot on the x-axis, must be specific enough to identify only one param.
+
     """
     params = list(gd_results.param_grid.keys())
     param = [p for p in params if comp_variable in p]
