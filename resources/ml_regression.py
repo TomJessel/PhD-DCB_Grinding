@@ -258,7 +258,7 @@ def train_history(model: Union[KerasRegressor, Pipeline]) -> None:
         pipe_bool = True
 
     if pipe_bool:
-        hist = model['reg'].history_
+        hist = model['mlp_reg'].history_
     else:
         hist = model.history_
     history = pd.DataFrame(hist).drop(columns=['loss', 'val_loss']).rename(columns={
@@ -304,7 +304,7 @@ def split_dataset(
     y = dataset[:, -1]
 
     x_tr, x_te, y_tr, y_te = train_test_split(x, y, test_size=split_frac)
-    logger.info('Split Dataset into Train and Test')
+    # logger.info('Split Dataset into Train and Test')
     return x_tr, x_te, y_tr, y_te
 
 
@@ -332,7 +332,7 @@ def create_pipeline(**kwargs) -> Pipeline:
     reg = KerasRegressor(**kwargs)
     p = Pipeline([
         ('scaler', StandardScaler()),
-        ('reg', reg),
+        ('mlp_reg', reg),
     ])
     return p
 

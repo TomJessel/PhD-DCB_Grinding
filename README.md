@@ -147,3 +147,8 @@ exp.nc4.plot_xy(fno=[0, 100])
 # Plot NC4 radius surface of every measuremnt
 exp.nc4.plot_surf()
 ```
+### Scores - Test Data
+
+| MAE | MSE | R2  |
+| --- | --- |-----|
+| 0.5 | 0.9 | 1   |

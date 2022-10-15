@@ -96,7 +96,7 @@ class TestInfo:
 
 
 class GrindProp:
-    def __init__(self, feedrate: float, doc_ax: float, doc_rad: float, v_spindle:float) -> None:
+    def __init__(self, feedrate: float, doc_ax: float, doc_rad: float, v_spindle: float) -> None:
         """
         Class to store data about the grinding properties.
 
@@ -283,7 +283,7 @@ class Experiment:
             DataFrame: Features of experiment
         """
         cols = ["RMS", 'Kurtosis', 'Amplitude', 'Skewness', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
-                'Mean radius', 'Runout', 'Form error']
+                'Mean radius', 'Peak radius', 'Radius diff', 'Runout', 'Form error']
 
         rms = self.ae.rms[:-1]
         kurt = self.ae.kurt[:-1]
@@ -297,10 +297,12 @@ class Experiment:
         f_134: np.array = f[134][:-1]
 
         mean_rad: np.array = self.nc4.mean_radius[1:]
+        peak_rad = self.nc4.peak_radius[1:]
+        rad_diff = np.diff(self.nc4.mean_radius)
         run_out: np.array = self.nc4.runout[1:]
         form_err: np.array = self.nc4.form_error[1:]
 
-        m: np.array = np.stack((rms, kurt, amp, skew, f_10, f_35, f_134, mean_rad, run_out, form_err), axis=0)
+        m: np.array = np.stack((rms, kurt, amp, skew, f_10, f_35, f_134, mean_rad, peak_rad, rad_diff, run_out, form_err), axis=0)
         df: pd.DataFrame = pd.DataFrame(m.T, columns=cols)
         print(f'Feature DF of Test {self.test_info.testno}:')
         print(df.head())

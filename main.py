@@ -10,12 +10,14 @@
 22/08/2022 13:46   tomhj      1.0         Main file
 """
 import os
+import time
 
 import matplotlib.pyplot as plt
 import mplcursors
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import tensorflow as tf
 
 import resources
 
@@ -88,40 +90,10 @@ def ae_hits(exp: object, s: np.array):
 
 
 if __name__ == '__main__':
+
     exp = resources.load(file='Test 5')
-    # exp.ae.plot_triggers(150)
 
-    # dataframe = exp.features.drop(columns=['Runout', 'Form error']).drop([0, 1, 23, 24])
-    #
-    # pipe = resources.create_pipeline(
-    #     model=resources.get_regression,
-    #     model__init_mode='glorot_normal',
-    #     model__dropout=0.1,
-    #     model__hidden_layer_sizes=(32, 32),
-    #     optimizer='adam',
-    #     optimizer__learning_rate=0.001,
-    #     loss='mae',
-    #     metrics=['MAE', 'MSE'],
-    #     batch_size=10,
-    #     epochs=700,
-    #     verbose=0,
-    # )
-    #
-    # X_train, X_test, y_train, y_test = resources.split_dataset(dataframe)
-    #
-    # pipe, train_scores = resources.score_train(model=pipe, Xdata=X_train, ydata=y_train)
-    #
-    # pipe.fit(X_train, y_train, reg__validation_split=0.2)
-    # resources.train_history(pipe)
-    #
-    # test_score = resources.score_test(pipe, X_test, y_test)
-
-    # plot_triggers(exp, 150)
-
-    # envelope_hilbert(sig)
-
-    # ae_hits(exp, sig[0:3000000])
-    # feat = exp.features.copy()
-    # feat.drop([0, 1, 23, 24])
+    feat = exp.features.copy()
+    feat.drop([0, 1, 23, 24])
     # c = corr_matrix(feat.drop([0, 1, 23, 24]), save_fig=False)
     # corr_pairplot(feat.drop([0, 1, 23, 24]), save_fig=False)

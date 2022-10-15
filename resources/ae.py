@@ -29,7 +29,6 @@ from scipy.signal import hilbert, butter, filtfilt
 def butter_filter(
         data: np.ndarray,
         ftype: str = 'low',
-        cutoff: float = 10,
         fs: float = 2_000_000,
         order: int = 3,
         ) -> np.ndarray:
@@ -39,7 +38,6 @@ def butter_filter(
     Args:
         data: Input signal for filtering
         ftype: Type of filter, (low, high, band)
-        cutoff: Filter cut off point, as a fraction of the nyquist freq
         fs: Sample freq for the input signal
         order: Filter order
 
@@ -48,8 +46,7 @@ def butter_filter(
 
     """
     data = np.pad(data, pad_width=10_000)
-    norm_cutoff = cutoff * (0.5 * fs)
-    b, a = butter(N=order, Wn=norm_cutoff, btype=ftype, analog=False, output='ba')
+    b, a = butter(N=order, Wn=10, fs=fs, btype=ftype, analog=False, output='ba')
     y = filtfilt(b, a, data)
     return y[10_000:-10_000]
 
@@ -270,7 +267,7 @@ class AE:
         filename = filename[-8:]
         mpl.use('Qt5Agg')
         plt.figure()
-        plt.plot(f / 1000, p, linewidth=0.75)
+        plt.plot(f / 1000, p)
         plt.title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
         plt.autoscale(enable=True, axis='x', tight=True)
         plt.xlabel('Frequency (kHz)')
@@ -352,7 +349,7 @@ class AE:
         """
         sig = self.readAE(fno)
         e_sig = envelope_hilbert(sig[:6_000_000])
-        f_sig = butter_filter(data=e_sig, cutoff=0.1, fs=self._fs, order=3, ftype='low')
+        f_sig = butter_filter(data=e_sig, fs=self._fs, order=3, ftype='low')
         trig, trig_y_val = trigger_st(f_sig[100_000:])
         if trig is None:
             trig_st = 0
@@ -361,11 +358,11 @@ class AE:
         else:
             trig_st = trig + 100_000
             en_trig2 = envelope_hilbert(sig[-6_000_000:])
-            fil_trig2 = butter_filter(data=en_trig2, cutoff=0.1, fs=self._fs, order=3, ftype='low')
+            fil_trig2 = butter_filter(data=en_trig2, fs=self._fs, order=3, ftype='low')
             trig_end = (5_900_000 - np.argmax(fil_trig2[100_000:] < trig_y_val))
             if trig_end == 5_900_000:
                 en_trig2 = envelope_hilbert(sig[6_000_000:-6_000_000])
-                fil_trig2 = butter_filter(data=en_trig2, cutoff=0.1, fs=self._fs, order=3, ftype='low')
+                fil_trig2 = butter_filter(data=en_trig2, fs=self._fs, order=3, ftype='low')
                 trig_end = 6_100_000 + (np.argmax(fil_trig2[100_000:] < trig_y_val))
             else:
                 trig_end = len(sig) - trig_end
@@ -524,13 +521,13 @@ class AE:
         filename = f'Test {fno:03d} - Triggers of enveloped & filtered AE signal'
 
         en_sig = envelope_hilbert(sig)
-        sig = butter_filter(data=en_sig, cutoff=0.1, fs=self._fs, order=3, ftype='low')
+        sig = butter_filter(data=en_sig, fs=self._fs, order=3, ftype='low')
 
         plt.figure()
         plt.plot(t, sig, linewidth=1)
-        plt.axhline(triggers['trig y-val'], color='r', linewidth=1)
-        plt.axvline(triggers['trig st'] * ts, color='r', linewidth=1)
-        plt.axvline(triggers['trig end'] * ts, color='r', linewidth=1)
+        plt.axhline(triggers['trig y-val'], color='r', linewidth=1, alpha=0.5)
+        plt.axvline(triggers['trig st'] * ts, color='r', linewidth=1, alpha=0.5)
+        plt.axvline(triggers['trig end'] * ts, color='r', linewidth=1, alpha=0.5)
         plt.title(filename)
         plt.autoscale(enable=True, axis='x', tight=True)
         plt.xlabel('Time (s)')
