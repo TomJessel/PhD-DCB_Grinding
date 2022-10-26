@@ -10,6 +10,7 @@
 21/09/2022 09:23   tomhj      1.0         Functions to create and evaluate NN regression models
 """
 import os
+import time
 from typing import Dict, Any, Union
 import logging
 
@@ -25,12 +26,13 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import GridSearchCV
 from tensorflow import keras
+import tensorflow as tf
 
 from .experiment import load
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.ERROR)
 
 if not logger.handlers:
     formatter = logging.Formatter('%(asctime)s: %(name)s: %(levelname)s: %(message)s')
@@ -123,7 +125,7 @@ def model_gridsearch(
     logger.info('-' * 65)
     logger.info(f'Score: {gd_result.best_score_:.6f}')
     logger.info(f'Params:')
-    for key, value in gd_result.best_params_.items():
+    for key, value in gd_result.best_params_.cv_items():
         logger.info(f'{key}: {value}')
     logger.info('-' * 65)
 
@@ -177,7 +179,7 @@ def score_train(
         scoring=scoring,
         return_train_score=True,
         verbose=0,
-        n_jobs=-1,
+        # n_jobs=-1,
         return_estimator=True,
     )
     ind = np.argmax(scores_['test_r2'])
@@ -387,6 +389,10 @@ if __name__ == '__main__':
     logger.info('Loaded Dateset')
     dataframe = exp.features.drop(columns=['Runout', 'Form error']).drop([0, 1, 23, 24])
 
+    logdir = 'ml-results/logs/MLP/CV/'
+    run_name = f'{logdir}MLP-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
+    tb_writer = tf.summary.create_file_writer(run_name)
+
     pipe = create_pipeline(
         model=get_regression,
         model__init_mode='glorot_normal',
@@ -399,6 +405,7 @@ if __name__ == '__main__':
         batch_size=10,
         epochs=500,
         verbose=0,
+        callbacks=[tf.keras.callbacks.TensorBoard(log_dir=run_name, histogram_freq=1)]
     )
 
     param_grid = dict(
@@ -414,8 +421,8 @@ if __name__ == '__main__':
 
     X_train, X_test, y_train, y_test = split_dataset(dataframe)
 
-    pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, para_grid=param_grid, cv=10)
-    plot_grid_results(grid_result, 'epochs')
+    # pipe, grid_result = model_gridsearch(model=pipe, Xdata=X_train, ydata=y_train, para_grid=param_grid, cv=10)
+    # plot_grid_results(grid_result, 'epochs')
 
     pipe, train_scores = score_train(model=pipe, Xdata=X_train, ydata=y_train)
 

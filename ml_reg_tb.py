@@ -15,6 +15,7 @@ from typing import Union, Dict, Any
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import KFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 import tensorflow as tf
@@ -25,7 +26,7 @@ from textwrap import dedent
 
 import resources
 
-
+TARGET = 'Mean radius'
 def preprocess_df(df, val_frac):
     scaler = MinMaxScaler()
     for col in df.columns:
@@ -49,7 +50,7 @@ def create_mlp(
     model.add(Dense(
         units=no_nodes,
         activation=activation,
-        input_shape=(X_train.shape[1],),
+        input_shape=(7,),  # todo CHANGE TO WORK DYNAMICALLY
         kernel_initializer=init_mode,
         name='dense1',
         use_bias=True,
@@ -111,6 +112,7 @@ def score_test(
         Xtest: np.ndarray,
         ytest: np.ndarray,
         tb_wr: Any = None,
+        plot_fig: bool = True,
 ) -> Dict[str, float]:
     """
     Score a fitted model/pipeline on test set data.
@@ -152,15 +154,16 @@ def score_test(
         with tb_wr.as_default():
             tf.summary.text('Test Scores', md_scores, step=0)
 
-    fig, ax = plt.subplots()
-    ax.plot(ytest, color='red', label='Real data')
-    ax.plot(y_pred, color='blue', ls='--', label='Predicted data')
-    ax.set_title('Model Predictions - Test Set')
-    ax.set_ylabel('Mean Radius (mm)')
-    ax.set_xlabel('Data Points')
-    ax.legend()
-    fig.show()
-    print('=' * 65)
+    if plot_fig:
+        fig, ax = plt.subplots()
+        ax.plot(ytest, color='red', label='Real data')
+        ax.plot(y_pred, color='blue', ls='--', label='Predicted data')
+        ax.set_title('Model Predictions - Test Set')
+        ax.set_ylabel('Mean Radius (mm)')
+        ax.set_xlabel('Data Points')
+        ax.legend()
+        plt.show()
+        print('=' * 65)
     return _test_score
 
 
@@ -209,7 +212,8 @@ if __name__ == '__main__':
     TARGET = 'Mean radius'
 
     exp = resources.load('Test 5')
-    main_df = exp.features.drop(columns=['Runout', 'Form error', 'Freq 134 kHz']).drop([0, 1, 23, 24])
+    main_df = exp.features.drop(columns=['Runout', 'Form error'])\
+        .drop([0, 1, 23, 24])
     X_train, X_test, y_train, y_test = preprocess_df(main_df, TEST_FRAC)
     print(main_df.keys())
 
