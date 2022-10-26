@@ -187,3 +187,8 @@ if __name__ == "__main__":
 
     mlp_reg = MLP_Model(main_df=main_df, target='Mean radius')
     mlp_reg.model.fit(mlp_reg.train_data[0].values, mlp_reg.train_data[1].values)
+
+# todo add model scoring
+# todo add tensorboard interface
+# todo add cross-validation
+# todo add MLP-window and LSTM classes
