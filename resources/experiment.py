@@ -344,8 +344,10 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
             with open(file_path, 'rb') as f:
                 data = pickle.load(f)
         except KeyError:
-            print(f'File location of {file} not saved in load function.')
-            return
+            # print(f'File location of {file} not saved in load function.')
+            # print(f'Known file locations are : {f_locs}')
+            raise NotADirectoryError(f'File location of {file} not saved in load function. \
+Known file locations are : {f_locs.keys()}')
     if process:
         try:
             getattr(data.NC4, 'radius')

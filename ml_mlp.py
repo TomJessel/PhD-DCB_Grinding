@@ -11,8 +11,6 @@ from typing import Union, Any, Iterable
 
 import warnings
 
-import numpy as np
-
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
@@ -29,26 +27,102 @@ import resources
 class Base_Model:
     def __init__(
             self,
+            target: Iterable = None,
             model=None,
             main_df: pd.DataFrame = None,
-            target: Iterable = None,
+            file_name: str = None,
     ):
         self.model = model
         self.main_df = main_df
         self.target = target
-        self.train_data = pd.DataFrame,
-        self.val_data = pd.DataFrame,
+        self.train_data = pd.DataFrame
+        self.val_data = pd.DataFrame
+        self.file_name = file_name
+
+        if self.target is None:
+            raise AttributeError('There is no TARGET attribute set.')
+        if self.file_name is not None:
+            self.load_testdata(filename=file_name)
+        if self.main_df is None:
+            name = str(input('Enter experiment data name: ')) or None
+            self.load_testdata(filename=name)
+
+    def load_testdata(
+            self,
+            filename: str = None,
+    ) -> pd.DataFrame:
+        """
+        # todo
+        Args:
+            filename:
+
+        Returns:
+
+        """
+        experiment = resources.load(filename)
+        self.main_df = experiment.features
+        self.pre_process()
+        return self.main_df
+
+    def pre_process(self):
+        raise AttributeError('No assigned function to pre-process data for Base_Model')
+
+    def fit(self, **kwargs):
+        self.model.fit(**kwargs)
+
+
+class MLP_Model(Base_Model):
+    def __init__(
+            self,
+            **kwargs
+    ):
+        super().__init__(**kwargs)
+        if self.main_df is not None:
+            self.pre_process()
+            self.initialise_model()
+        else:
+            print('Choose data file to import as main_df with ".load_testdata()')
+
+    def pre_process(
+            self,
+            val_frac: float = 0.2,
+    ) -> [pd.DataFrame, pd.DataFrame]:
+        """
+        Pre-process the data for training an MLP model
+
+        Split the data for the test into a training and validation set. Then scale the data using a MinMax scaler, based
+        off the training data. Then save the splits into a tuple which contains the features and results separately.
+
+        Args:
+            val_frac: Fraction of data points used within the validation set
+
+        Returns: Two tuples which contain dataframes of the features and results for the training and validation sets.
+
+        """
+        scaler = MinMaxScaler()
+
+        train, test = train_test_split(self.main_df, test_size=val_frac)
+
+        for col in self.main_df.columns:
+            if col not in self.target:
+                train[col] = scaler.fit_transform(train[[col]])
+                test[col] = scaler.transform(test[[col]])
+        train.dropna(inplace=True)
+        test.dropna(inplace=True)
+
+        self.train_data = (train.drop(columns=self.target), train[[self.target]])
+        self.val_data = (test.drop(columns=self.target), test[[self.target]])
+        return self.train_data, self.val_data
 
     @staticmethod
     def build_mod(
-            # self,
             no_features=7,
             dropout=0.2,
             no_layers=2,
             no_nodes=32,
             activation='relu',
             init_mode='glorot_normal',
-    ):
+    ) -> Sequential:
         """
         Creates a vanilla MLP Keras Sequential Model.
 
@@ -105,7 +179,7 @@ class Base_Model:
             decay: float = 1e-6,
             verbose: int = 1,
             callbacks: Any = None,
-    ):
+    ) -> KerasRegressor:
         """
         Initialise a SciKeras Regression model with the given hyperparameters
 
@@ -150,43 +224,18 @@ class Base_Model:
             verbose=verbose,
             callbacks=callbacks,
         )
-
-
-class MLP_Model(Base_Model):
-    def __init__(
-            self,
-            **kwargs
-    ):
-        super().__init__(**kwargs)
-        self.pre_process()
-        self.initialise_model()
-
-    def pre_process(
-            self,
-            val_frac: float = 0.2,
-    ):
-        scaler = MinMaxScaler()
-
-        train, test = train_test_split(self.main_df, test_size=val_frac)
-
-        for col in self.main_df.columns:
-            if col not in self.target:
-                train[col] = scaler.fit_transform(train[[col]])
-                test[col] = scaler.transform(test[[col]])
-        train.dropna(inplace=True)
-        test.dropna(inplace=True)
-
-        self.train_data = (train.drop(columns=self.target), train[[self.target]])
-        self.val_data = (test.drop(columns=self.target), test[[self.target]])
+        return self.model
 
 
 if __name__ == "__main__":
     print('START')
-    exp = resources.load('Test5')
-    main_df = exp.features.drop(columns=['Runout', 'Form error']).drop([0, 1, 23, 24])
+    # exp = resources.load('Test5')
+    # main_df = exp.features.drop(columns=['Runout', 'Form error']).drop([0, 1, 23, 24])
 
-    mlp_reg = MLP_Model(main_df=main_df, target='Mean radius')
-    mlp_reg.model.fit(mlp_reg.train_data[0].values, mlp_reg.train_data[1].values)
+    # mlp_reg = MLP_Model(main_df=main_df, target='Mean radius')
+    # mlp_reg.fit(X=mlp_reg.train_data[0].values, y=mlp_reg.train_data[1].values)
+
+    mlp_reg = MLP_Model()
 
 # todo add model scoring
 # todo add tensorboard interface
