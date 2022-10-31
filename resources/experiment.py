@@ -15,6 +15,7 @@ import fnmatch
 import glob
 import os
 from tkinter.filedialog import askdirectory, askopenfilename
+import tkinter as tk
 import pickle
 from typing import Union
 
@@ -330,7 +331,9 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
 
     if file is None:
         try:
+            root = tk.Tk()
             file_path = askopenfilename(defaultextension='pickle')
+            root.withdraw()
             if not file_path:
                 raise NotADirectoryError
             with open(file_path, 'rb') as f:
@@ -359,7 +362,7 @@ Known file locations are : {f_locs.keys()}')
     return data
 
 
-def create_obj(folder: str = None, process: True = False) -> Union[Experiment, None]:
+def create_obj(folder: str = None, process: bool = False) -> Union[Experiment, None]:
     """
     Creates experiment obj for test from test folder, selected either by GUI or path input.
 
