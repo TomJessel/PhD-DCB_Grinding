@@ -7,7 +7,7 @@
 ------------      -------    --------    -----------
 26/10/2022 10:01   tomhj      1.0         Script to contain all code relating to MLP models
 """
-from typing import Union, Any, Iterable
+from typing import List, Union, Any, Iterable
 
 import warnings
 
@@ -18,6 +18,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout
 from scikeras.wrappers import KerasRegressor
 import pandas as pd
+from pandas import Dataframe
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
@@ -86,7 +87,7 @@ class MLP_Model(Base_Model):
     def pre_process(
             self,
             val_frac: float = 0.2,
-    ) -> [pd.DataFrame, pd.DataFrame]:
+    ) -> List[Dataframe, Dataframe]:
         """
         Pre-process the data for training an MLP model
 

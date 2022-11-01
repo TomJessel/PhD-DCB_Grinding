@@ -11,7 +11,7 @@
 """
 import os
 import time
-from typing import Dict, Any, Union
+from typing import Dict, Any, List, Union
 import logging
 
 import matplotlib.pyplot as plt
@@ -83,7 +83,7 @@ def model_gridsearch(
         ydata: np.ndarray,
         para_grid: Dict[str, iter],
         cv: int = 5
-        ) -> [Union[KerasRegressor, Pipeline], Any]:
+        ) -> List[Union[KerasRegressor, Pipeline], Any]:
     """
     Gridsearch with cross-validation for given hyper-parameters of inputted model.
 
@@ -146,7 +146,7 @@ def score_train(
         ydata: np.ndarray,
         cv_splits: int = 10,
         cv_repeats: int = 5
-        ) -> [Union[KerasRegressor, Pipeline], Dict]:
+        ) -> List[Union[KerasRegressor, Pipeline], Dict]:
     """
     Score a model/pipeline on it's training set, using RepeatedKFold cross validation.
 
@@ -290,7 +290,7 @@ def train_history(model: Union[KerasRegressor, Pipeline]) -> None:
 def split_dataset(
         df: pd.DataFrame,
         split_frac: float = 0.2
-        ) -> [np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        ) -> List[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Separate dataset into training and test set from full dataset (last column is results).
 
