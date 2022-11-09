@@ -14,6 +14,12 @@ import resources
 
 
 def check_ae(_exp: resources.experiment.Experiment):
+    """
+    Plots the most recent AE file in the Experiemnt obj.
+
+    Args:
+        _exp: Experiment object to use
+    """
     print(f'Plotting most recent AE file...')
     _exp.ae.plotAE(-1)
 

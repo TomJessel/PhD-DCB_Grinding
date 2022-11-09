@@ -189,20 +189,20 @@ class NC4:
 
         if fno is None:
             radius = self.radius
-            try:
-                with open(pic_name, 'rb') as f:
-                    fig = pickle.load(f)
-            except IOError:
-                fig, ax = plt.subplots()
-                savefig = True
-                n = 0
-                for r in radius:
-                    ax.plot(self.theta, r, label=f'File {n:03.0f}', linewidth=0.5)
-                    n += 1
-                ax.set_xlabel('Angle (rad)')
-                ax.set_ylabel('Radius (mm)')
-                ax.set_title(f'Test No: {self._testinfo.testno} - NC4 Radius Plot')
-                ax.autoscale(enable=True, axis='x', tight=True)
+            # try:
+            #     with open(pic_name, 'rb') as f:
+            #         fig = pickle.load(f)
+            # except IOError:
+            fig, ax = plt.subplots()
+            savefig = True
+            n = 0
+            for r in radius:
+                ax.plot(self.theta, r, label=f'File {n:03.0f}', linewidth=0.5)
+                n += 1
+            ax.set_xlabel('Angle (rad)')
+            ax.set_ylabel('Radius (mm)')
+            ax.set_title(f'Test No: {self._testinfo.testno} - NC4 Radius Plot')
+            ax.autoscale(enable=True, axis='x', tight=True)
         else:
             fig, ax = plt.subplots()
             slice_n = slice(fno[0], fno[1])
