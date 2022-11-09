@@ -17,8 +17,8 @@ try:
 except NotADirectoryError:
     exp = resources.experiment.create_obj()
 
-print('-'*65)
-print(f'TEST EXP FILE:')
+print(f'{"-"*22}TESTING EXP FILE{"-"*22}')
 print(exp)
-print('-'*65)
+print('-'*60)
 exp.update()
+exp.save()
