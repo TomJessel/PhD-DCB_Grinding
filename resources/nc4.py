@@ -96,6 +96,7 @@ class NC4:
         """
         Function to process the NC4 data from a voltage to radius and compute useful features.
         """
+        # todo use tqdm module to make moving progress bar when processing
         print('Processing NC4 data...')
         st1 = time.time()
         with multiprocessing.Pool() as pool:
@@ -153,7 +154,7 @@ class NC4:
             ax_r.set_title(f'Test No: {self._testinfo.testno} - NC4 Attributes')
             ax_r.autoscale(enable=True, axis='x', tight=True)
             ax_r.set_xlabel('Measurement No')
-            ax_e.set_ylabel('Radius (\u03BCm)')
+            ax_e.set_ylabel('Errors (\u03BCm)')
             ax_r.set_ylabel('Radius (mm)')
             ax_r.grid()
             # fig.legend(loc='upper right', bbox_to_anchor=[0.9, 0.875])
