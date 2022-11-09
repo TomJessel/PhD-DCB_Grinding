@@ -186,28 +186,34 @@ class Experiment:
         Update the Experiment class with new files.
         """
         dataloc = self.test_info.dataloc
-        print(f'Updating experiemnt obj - {datetime.datetime.now()}')
-        ae_path = os.path.join(dataloc, 'AE', 'TDMS')
-        nc4_path = os.path.join(dataloc, 'NC4', 'TDMS')
-        if glob.glob(os.path.join(dataloc, "*MHz.tdms")):
-            _move_files(dataloc, ae_path, '*MHz.tdms')
-            print('Moving new AE files...')
-            ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
-            _sort_rename(ae_files, ae_path)
-            ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
-            self.ae.update(tuple(ae_files))
-        else:
-            print('No new AE files')
+        if glob.glob(os.path.join(dataloc, "*.tdms")):
+            print(f'Updating experiemnt obj - {datetime.datetime.now()}')
+            ae_path = os.path.join(dataloc, 'AE', 'TDMS')
+            nc4_path = os.path.join(dataloc, 'NC4', 'TDMS')
+            if glob.glob(os.path.join(dataloc, "*MHz.tdms")):
+                _move_files(dataloc, ae_path, '*MHz.tdms')
+                print('Moving new AE files...')
+                ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
+                _sort_rename(ae_files, ae_path)
+                ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
+                self.ae.update(tuple(ae_files))
+            # else:
+            #     print('No new AE files')
 
-        if glob.glob(os.path.join(dataloc, "*kHz.tdms")):
-            print("Moving new NC4 files...")
-            _move_files(dataloc, nc4_path, '*kHz.tdms')
-            nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
-            _sort_rename(nc4_files, nc4_path)
-            nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
-            self.nc4.update(tuple(nc4_files))
-        else:
-            print('No new NC4 files.')
+            if glob.glob(os.path.join(dataloc, "*kHz.tdms")):
+                print("Moving new NC4 files...")
+                _move_files(dataloc, nc4_path, '*kHz.tdms')
+                nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
+                _sort_rename(nc4_files, nc4_path)
+                nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
+                self.nc4.update(tuple(nc4_files))
+            # else:
+            #     print('No new NC4 files.')
+
+            no_nc4 = len(self.nc4._files)
+            no_ae = len(self.ae._files)
+            print(f'No. Files: AE-{no_ae} NC4-{no_nc4}')
+
 
     # todo finish update func and print test update
 
