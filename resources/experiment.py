@@ -213,6 +213,7 @@ class Experiment:
             no_nc4 = len(self.nc4._files)
             no_ae = len(self.ae._files)
             print(f'No. Files: AE-{no_ae} NC4-{no_nc4}')
+            self.save()
 
 
     # todo finish update func and print test update
