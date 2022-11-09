@@ -16,3 +16,9 @@ try:
     exp = resources.load()
 except NotADirectoryError:
     exp = resources.experiment.create_obj()
+
+print('-'*65)
+print(f'TEST EXP FILE:')
+print(exp)
+print('-'*65)
+exp.update()
