@@ -168,7 +168,10 @@ class Experiment:
         self.features = pd.DataFrame
 
     def __repr__(self):
-        rep = f'Test No: {self.test_info.testno} \nDate: {self.date} \nData: {self.dataloc}'
+        no_nc4 = len(self.nc4._files)
+        no_ae = len(self.ae._files)
+        rep = f'Test No: {self.test_info.testno}\nDate: {self.date}\nData: {self.dataloc}\n' \
+              f'No. Files: AE-{no_ae} NC4-{no_nc4}'
         return rep
 
     def save(self) -> None:
