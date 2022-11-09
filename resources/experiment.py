@@ -215,7 +215,6 @@ class Experiment:
             print(f'No. Files: AE-{no_ae} NC4-{no_nc4}')
             self.save()
 
-
     # todo finish update func and print test update
 
     def correlation(self, plotfig: bool = True) -> None:
