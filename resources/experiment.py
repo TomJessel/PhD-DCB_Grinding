@@ -191,6 +191,7 @@ class Experiment:
             print('Moving new AE files...')
             ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
             _sort_rename(ae_files, ae_path)
+            ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
             self.ae.update(tuple(ae_files))
         else:
             print('No new AE files')
@@ -200,6 +201,7 @@ class Experiment:
             _move_files(dataloc, nc4_path, '*kHz.tdms')
             nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
             _sort_rename(nc4_files, nc4_path)
+            nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
             self.nc4.update(tuple(nc4_files))
         else:
             print('No new NC4 files.')
