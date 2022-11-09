@@ -140,35 +140,32 @@ class NC4:
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.pickle'
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
-        try:
-            with open(pic_name, 'rb') as f:
-                fig = pickle.load(f)
-        except IOError:
-            fig, ax_r = plt.subplots()
-            l1 = ax_r.plot(self._datano, self.mean_radius, 'C0', label='Mean Radius')
-            l2 = ax_r.plot(self._datano, self.peak_radius, 'C1', label='Peak Radius')
-            ax_e = ax_r.twinx()
-            l3 = ax_e.plot(self._datano, self.runout * 1000, 'C2', label='Runout')
-            l4 = ax_e.plot(self._datano, self.form_error * 1000, 'C3', label='Form Error')
 
-            ax_r.set_title(f'Test No: {self._testinfo.testno} - NC4 Attributes')
-            ax_r.autoscale(enable=True, axis='x', tight=True)
-            ax_r.set_xlabel('Measurement No')
-            ax_e.set_ylabel('Errors (\u03BCm)')
-            ax_r.set_ylabel('Radius (mm)')
-            ax_r.grid()
-            # fig.legend(loc='upper right', bbox_to_anchor=[0.9, 0.875])
-            ax_e.legend((l1 + l2 + l3 + l4), ['Mean Radius', 'Peak Radius', 'Runout', 'Form Error'],
-                        loc='upper right', fontsize=9)
-            try:
-                open(png_name)
-            except IOError:
-                fig.savefig(png_name, dpi=300)
-            try:
-                open(pic_name)
-            except IOError:
-                with open(pic_name, 'wb') as f:
-                    pickle.dump(fig, f)
+        fig, ax_r = plt.subplots()
+        l1 = ax_r.plot(self._datano, self.mean_radius, 'C0', label='Mean Radius')
+        l2 = ax_r.plot(self._datano, self.peak_radius, 'C1', label='Peak Radius')
+        ax_e = ax_r.twinx()
+        l3 = ax_e.plot(self._datano, self.runout * 1000, 'C2', label='Runout')
+        l4 = ax_e.plot(self._datano, self.form_error * 1000, 'C3', label='Form Error')
+
+        ax_r.set_title(f'Test No: {self._testinfo.testno} - NC4 Attributes')
+        ax_r.autoscale(enable=True, axis='x', tight=True)
+        ax_r.set_xlabel('Measurement No')
+        ax_e.set_ylabel('Errors (\u03BCm)')
+        ax_r.set_ylabel('Radius (mm)')
+        ax_r.grid()
+        # fig.legend(loc='upper right', bbox_to_anchor=[0.9, 0.875])
+        ax_e.legend((l1 + l2 + l3 + l4), ['Mean Radius', 'Peak Radius', 'Runout', 'Form Error'],
+                    loc='upper right', fontsize=9)
+        try:
+            open(png_name)
+        except IOError:
+            fig.savefig(png_name, dpi=300)
+        try:
+            open(pic_name)
+        except IOError:
+            with open(pic_name, 'wb') as f:
+                pickle.dump(fig, f)
         mplcursors.cursor(hover=2)
         fig.show()
 
