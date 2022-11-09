@@ -341,8 +341,8 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
             with open(file_path, 'rb') as f:
                 data = pickle.load(f)
         except NotADirectoryError:
-            print('No file selected.')
-            return
+            print('No existing exp file selected!')
+            raise NotADirectoryError('No existing exp file selected to load!')
     else:
         try:
             file_path = f_locs[file.lower().replace(' ', '')]
@@ -409,7 +409,9 @@ def create_obj(folder: str = None, process: bool = False) -> Union[Experiment, N
     # import file names and directories of AE and NC4
     if folder is None:
         try:
+            root = tk.Tk()
             folder_path = askdirectory(title='Select test folder:')
+            root.withdraw()
             if not folder_path:
                 raise NotADirectoryError
         except NotADirectoryError:
