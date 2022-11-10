@@ -40,4 +40,4 @@ def main() -> resources.experiment.Experiment:
 
 if __name__ == "__main__":
     exp = main()
-    check_ae(exp)
+    # check_ae(exp)

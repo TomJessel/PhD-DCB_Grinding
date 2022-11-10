@@ -239,14 +239,14 @@ class AE:
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
         mpl.use("Qt5Agg")
-        plt.figure()
-        plt.plot(t, signal, linewidth=1)
-        plt.title(filename)
-        plt.autoscale(enable=True, axis='x', tight=True)
-        plt.xlabel('Time (s)')
-        plt.ylabel('Voltage (V)')
+        fig, ax = plt.subplots()
+        ax.plot(t, signal, linewidth=1)
+        ax.set_title(filename)
+        ax.autoscale(enable=True, axis='x', tight=True)
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Voltage (V)')
         mplcursors.cursor(multiple=True)
-        plt.show()
+        fig.show()
 
     def plotfft(self, fno: int, freqres: float = 1000) -> None:
         """
@@ -266,15 +266,15 @@ class AE:
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
         mpl.use('Qt5Agg')
-        plt.figure()
-        plt.plot(f / 1000, p)
-        plt.title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
-        plt.autoscale(enable=True, axis='x', tight=True)
-        plt.xlabel('Frequency (kHz)')
-        plt.ylabel('Amplitude (dB)')
-        plt.grid()
+        fig, ax = plt.subplots()
+        ax.plot(f / 1000, p)
+        ax.set_title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
+        ax.autoscale(enable=True, axis='x', tight=True)
+        ax.set_xlabel('Frequency (kHz)')
+        ax.set_ylabel('Amplitude (dB)')
+        ax.grid()
         mplcursors.cursor(hover=True)
-        plt.show()
+        fig.show()
 
     def process(self, trigger: bool = True, FFT: bool = False) -> None:
         """
