@@ -14,6 +14,7 @@ import os
 from typing import Any, Union
 
 from nptdms import TdmsFile
+from tqdm import tqdm
 import numpy as np
 import multiprocessing
 import time
@@ -56,7 +57,7 @@ class NC4:
             testinfo: Any,
             dcb: Any,
             fs: float,
-            ) -> None:
+    ) -> None:
         """
         NC4 class.
 
@@ -97,10 +98,12 @@ class NC4:
         Function to process the NC4 data from a voltage to radius and compute useful features.
         """
         # todo use tqdm module to make moving progress bar when processing
-        print('Processing NC4 data...')
+        # print('Processing NC4 data...')
         st1 = time.time()
         with multiprocessing.Pool() as pool:
-            results = pool.map(self._sampleandpos, range(len(self._files)))
+            results = list(tqdm(pool.imap(self._sampleandpos, range(len(self._files)), chunksize=10),
+                                total=len(self._files),
+                                desc='NC4 - Sampling'))
         pool.close()
         en = time.time()
         print(f'Sampling done {en - st1:.1f} s...')
@@ -352,8 +355,12 @@ class NC4:
         """
         # Converting to Radii rather then Voltage
         with multiprocessing.Pool() as pool:
-            prad = pool.map(self.polyvalradius, p)
-            nrad = pool.map(self.polyvalradius, n)
+            prad = list(tqdm(pool.imap(self.polyvalradius, p, chunksize=10),
+                             total=len(self._files),
+                             desc='NC4 - Converting pos'))
+            nrad = list(tqdm(pool.imap(self.polyvalradius, n, chunksize=10),
+                             total=len(self._files),
+                             desc='NC4 - Converting neg'))
         pool.close()
         return prad, nrad
 
@@ -374,7 +381,9 @@ class NC4:
         # print('Working out Lags')
         radzeros = list(zip(np.transpose(pradzero), np.transpose(nradzero)))
         with multiprocessing.Pool() as pool:
-            lag = pool.map(compute_shift, radzeros)
+            lag = list(tqdm(pool.imap(compute_shift, radzeros, chunksize=10),
+                            total=len(radzeros),
+                            desc='NC4 - Align pos/neg'))
         pool.close()
         # print('Finished lags')
         nrad = np.array([np.roll(row, -x) for row, x in zip(nrad, lag)])
@@ -395,7 +404,9 @@ class NC4:
         radzero = radii - radii.mean(axis=1, keepdims=True)
         radzeros = zip(radzero, np.roll(radzero, -1, axis=0))
         with multiprocessing.Pool() as pool:
-            lags = pool.map(compute_shift, radzeros)
+            lags = list(tqdm(pool.imap(compute_shift, radzeros, chunksize=10),
+                             total=len(self._files),
+                             desc='NC4 - Align signals'))
         pool.close()
 
         dly = np.cumsum(lags)
@@ -423,7 +434,9 @@ class NC4:
         y = np.array([np.multiply(r, np.cos(theta)) for r in radius])
         xy = np.array(list(zip(x, y))).transpose([0, 2, 1])
         with multiprocessing.Pool() as pool:
-            circle = pool.map(circle_fit.hyper_fit, xy)
+            circle = list(tqdm(pool.imap(circle_fit.hyper_fit, xy, chunksize=10),
+                               total=len(xy),
+                               desc='NC4 - Calc results'))
         pool.close()
         self.runout = np.array([2 * (np.sqrt(x[0] ** 2 + x[1] ** 2)) for x in circle])
         self.mean_radius = np.array([x[2] for x in circle])
