@@ -97,16 +97,15 @@ class NC4:
         """
         Function to process the NC4 data from a voltage to radius and compute useful features.
         """
-        # todo use tqdm module to make moving progress bar when processing
         # print('Processing NC4 data...')
         st1 = time.time()
         with multiprocessing.Pool() as pool:
             results = list(tqdm(pool.imap(self._sampleandpos, range(len(self._files)), chunksize=10),
                                 total=len(self._files),
-                                desc='NC4 - Sampling'))
+                                desc='NC4- Sampling'))
         pool.close()
         en = time.time()
-        print(f'Sampling done {en - st1:.1f} s...')
+        # print(f'Sampling done {en - st1:.1f} s...')
 
         psample = [tple[0] for tple in results]
         posy = ([tple[1] for tple in results])
@@ -119,18 +118,18 @@ class NC4:
         st = time.time()
         prad, nrad = self.sigtorad(p, n)
         en = time.time()
-        print(f'Converting done {en - st:.1f} s...')
+        # print(f'Converting done {en - st:.1f} s...')
 
         st = time.time()
         radii = self._alignposneg(prad, nrad)
         self._alignsigs(radii)
         en = time.time()
-        print(f'Aligning done {en - st:.1f} s...')
+        # print(f'Aligning done {en - st:.1f} s...')
 
         st = time.time()
         self._fitcircles()
         en = time.time()
-        print(f'Calc results done {en - st:.1f} s...')
+        # print(f'Calc results done {en - st:.1f} s...')
         print(f'Total time: {en - st1:.1f} s')
 
     def plot_att(self) -> None:
@@ -357,10 +356,10 @@ class NC4:
         with multiprocessing.Pool() as pool:
             prad = list(tqdm(pool.imap(self.polyvalradius, p, chunksize=10),
                              total=len(self._files),
-                             desc='NC4 - Converting pos'))
+                             desc='NC4- Conv pos'))
             nrad = list(tqdm(pool.imap(self.polyvalradius, n, chunksize=10),
                              total=len(self._files),
-                             desc='NC4 - Converting neg'))
+                             desc='NC4- Conv neg'))
         pool.close()
         return prad, nrad
 
@@ -383,7 +382,7 @@ class NC4:
         with multiprocessing.Pool() as pool:
             lag = list(tqdm(pool.imap(compute_shift, radzeros, chunksize=10),
                             total=len(radzeros),
-                            desc='NC4 - Align pos/neg'))
+                            desc='NC4- Merge pn'))
         pool.close()
         # print('Finished lags')
         nrad = np.array([np.roll(row, -x) for row, x in zip(nrad, lag)])
@@ -406,7 +405,7 @@ class NC4:
         with multiprocessing.Pool() as pool:
             lags = list(tqdm(pool.imap(compute_shift, radzeros, chunksize=10),
                              total=len(self._files),
-                             desc='NC4 - Align signals'))
+                             desc='NC4- Aln sigs'))
         pool.close()
 
         dly = np.cumsum(lags)
@@ -436,7 +435,7 @@ class NC4:
         with multiprocessing.Pool() as pool:
             circle = list(tqdm(pool.imap(circle_fit.hyper_fit, xy, chunksize=10),
                                total=len(xy),
-                               desc='NC4 - Calc results'))
+                               desc='NC4- Calc att'))
         pool.close()
         self.runout = np.array([2 * (np.sqrt(x[0] ** 2 + x[1] ** 2)) for x in circle])
         self.mean_radius = np.array([x[2] for x in circle])
