@@ -11,9 +11,10 @@
 """
 
 import os
-from typing import Any, Union
+from typing import Any, Union, Tuple
 
 from nptdms import TdmsFile
+from numpy import ndarray
 from tqdm import tqdm
 import numpy as np
 import multiprocessing
@@ -26,6 +27,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import mplcursors
 import pickle
+import pandas as pd
 
 mpl.use("Qt5Agg")
 
@@ -98,13 +100,13 @@ class NC4:
         Function to process the NC4 data from a voltage to radius and compute useful features.
         """
         # print('Processing NC4 data...')
-        st1 = time.time()
+        # st1 = time.time()
         with multiprocessing.Pool() as pool:
             results = list(tqdm(pool.imap(self._sampleandpos, range(len(self._files)), chunksize=10),
                                 total=len(self._files),
                                 desc='NC4- Sampling'))
         pool.close()
-        en = time.time()
+        # en = time.time()
         # print(f'Sampling done {en - st1:.1f} s...')
 
         psample = [tple[0] for tple in results]
@@ -115,22 +117,55 @@ class NC4:
         p = zip(psample, posy)
         n = zip(nsample, negy)
 
-        st = time.time()
+        # st = time.time()
         prad, nrad = self.sigtorad(p, n)
-        en = time.time()
+        # en = time.time()
         # print(f'Converting done {en - st:.1f} s...')
 
-        st = time.time()
+        # st = time.time()
         radii = self._alignposneg(prad, nrad)
-        self._alignsigs(radii)
-        en = time.time()
+        radius = self._alignsigs(radii)
+        self.radius = radius
+        # en = time.time()
         # print(f'Aligning done {en - st:.1f} s...')
 
-        st = time.time()
-        self._fitcircles()
-        en = time.time()
+        # st = time.time()
+        mean_radius, peak_radius, runout, form_error = self._fitcircles(radius)
+        self.mean_radius = pd.Series(mean_radius)
+        self.peak_radius = pd.Series(peak_radius)
+        self.runout = pd.Series(runout)
+        self.form_error = pd.Series(form_error)
+        # en = time.time()
         # print(f'Calc results done {en - st:.1f} s...')
-        print(f'Total time: {en - st1:.1f} s')
+        # print(f'Total time: {en - st1:.1f} s')
+
+    def check_last(self):
+        psample, posy, nsample, negy = self._sampleandpos(fno=-1)
+        prad = self.polyvalradius((psample, posy))
+        nrad = self.polyvalradius((nsample, negy))
+        prad = np.transpose(prad.reshape(-1, 1))
+        nrad = np.transpose(nrad.reshape(-1, 1))
+        radii = self._alignposneg(prad, nrad)
+        st = np.argmin(radii[0, 0:int(self._fs)])
+        rpy = 4
+        clip = 0.5
+        radius = radii[:, np.arange(st, st + (radii.shape[1]) / (rpy - (2 * clip)), dtype=int)]
+        mean_radius, peak_radius, runout, form_error = self._fitcircles(radius)
+        index = len(self._files) - 1
+        self.mean_radius[index] = mean_radius
+        self.peak_radius[index] = peak_radius
+        self.runout[index] = runout
+        self.form_error[index] = form_error
+
+        wear = (self.mean_radius[-1] - self.mean_radius[0])/self.mean_radius[0] * 100
+
+        print('-' * 60)
+        print(f'NC4 - File {index}:')
+        print(f'\tMean radius = {mean_radius[0,]:.6f} mm')
+        print(f'\tRunout = {runout[0,] * 1000:.3f} um')
+        print(f'\tWear = {wear:.3f} %')
+        print('-' * 60)
+        self.plot_att()
 
     def plot_att(self) -> None:
         """
@@ -364,7 +399,7 @@ class NC4:
         return prad, nrad
 
     @staticmethod
-    def _alignposneg(prad: list, nrad: list) -> np.ndarray:
+    def _alignposneg(prad: Union[list, np.ndarray], nrad: Union[list, np.ndarray]) -> np.ndarray:
         """
         Combine the pos and neg halfs of the signal together.
 
@@ -379,11 +414,14 @@ class NC4:
         nradzero = np.subtract(np.transpose(nrad), np.mean(nrad, axis=1))
         # print('Working out Lags')
         radzeros = list(zip(np.transpose(pradzero), np.transpose(nradzero)))
-        with multiprocessing.Pool() as pool:
-            lag = list(tqdm(pool.imap(compute_shift, radzeros, chunksize=10),
-                            total=len(radzeros),
-                            desc='NC4- Merge pn'))
-        pool.close()
+        if len(radzeros) == 1:
+            lag = [compute_shift(radzeros[0])]
+        else:
+            with multiprocessing.Pool() as pool:
+                lag = list(tqdm(pool.imap(compute_shift, radzeros, chunksize=10),
+                                total=len(radzeros),
+                                desc='NC4- Merge pn'))
+            pool.close()
         # print('Finished lags')
         nrad = np.array([np.roll(row, -x) for row, x in zip(nrad, lag)])
         radii = np.array([(p + n) / 2 for p, n in zip(prad, nrad)])
@@ -417,31 +455,36 @@ class NC4:
         rpy = 4
         clip = 0.5
         radius = radii[:, np.arange(st, st + (radii.shape[1]) / (rpy - (2 * clip)), dtype=int)]
-        self.radius = radius
+        # self.radius = radius
         return radius
 
-    def _fitcircles(self) -> list[tuple[float, float, float, float]]:
+    def _fitcircles(self, radius: np.ndarray) -> tuple[ndarray, ndarray, ndarray, ndarray]:
         """
         Fit a circle to each NC4 measurements and return its properties.
+
+        Args:
+            radius: Array of radius to calc attributes for
 
         Returns:
             List of tuples containing the x and y coords, the radius of the circle and the variance.
         """
-        radius = self.radius
         theta = self.theta
         x = np.array([np.multiply(r, np.sin(theta)) for r in radius])
         y = np.array([np.multiply(r, np.cos(theta)) for r in radius])
         xy = np.array(list(zip(x, y))).transpose([0, 2, 1])
-        with multiprocessing.Pool() as pool:
-            circle = list(tqdm(pool.imap(circle_fit.hyper_fit, xy, chunksize=10),
-                               total=len(xy),
-                               desc='NC4- Calc att'))
-        pool.close()
-        self.runout = np.array([2 * (np.sqrt(x[0] ** 2 + x[1] ** 2)) for x in circle])
-        self.mean_radius = np.array([x[2] for x in circle])
-        self.peak_radius = np.array([np.max(rad) for rad in radius])
-        self.form_error = np.array([(np.max(rad) - np.min(rad)) for rad in radius])
-        return circle
+        if len(x) == 1:
+            circle = [circle_fit.hyper_fit(xy[0])]
+        else:
+            with multiprocessing.Pool() as pool:
+                circle = list(tqdm(pool.imap(circle_fit.hyper_fit, xy, chunksize=10),
+                                   total=len(xy),
+                                   desc='NC4- Calc att'))
+            pool.close()
+        runout = np.array([2 * (np.sqrt(x[0] ** 2 + x[1] ** 2)) for x in circle])
+        mean_radius = np.array([x[2] for x in circle])
+        peak_radius = np.array([np.max(rad) for rad in radius])
+        form_error = np.array([(np.max(rad) - np.min(rad)) for rad in radius])
+        return mean_radius, peak_radius, runout, form_error
 
     def update(self, files: Union[list[str], tuple[str]]) -> None:
         """
