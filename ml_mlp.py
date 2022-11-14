@@ -7,7 +7,7 @@
 ------------      -------    --------    -----------
 26/10/2022 10:01   tomhj      1.0         Script to contain all code relating to MLP models
 """
-from typing import List, Union, Any, Iterable
+from typing import Union, Any, Iterable
 
 import warnings
 
@@ -18,7 +18,6 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout
 from scikeras.wrappers import KerasRegressor
 import pandas as pd
-from pandas import Dataframe
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
@@ -87,7 +86,7 @@ class MLP_Model(Base_Model):
     def pre_process(
             self,
             val_frac: float = 0.2,
-    ) -> List[Dataframe, Dataframe]:
+    ) -> [pd.DataFrame, pd.DataFrame]:
         """
         Pre-process the data for training an MLP model
 
@@ -230,13 +229,20 @@ class MLP_Model(Base_Model):
 
 if __name__ == "__main__":
     print('START')
-    # exp = resources.load('Test5')
+    exp5 = resources.load('Test5')
+    exp7 = resources.load('Test7')
+    exp8 = resources.load('Test8')
+
+    dfs = [exp5.features, exp7.features, exp8.features]
+    main_df = pd.concat(dfs)
+    main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff'])
+
     # main_df = exp.features.drop(columns=['Runout', 'Form error']).drop([0, 1, 23, 24])
 
     # mlp_reg = MLP_Model(main_df=main_df, target='Mean radius')
     # mlp_reg.fit(X=mlp_reg.train_data[0].values, y=mlp_reg.train_data[1].values)
 
-    mlp_reg = MLP_Model()
+    # mlp_reg = MLP_Model()
 
 # todo add model scoring
 # todo add tensorboard interface

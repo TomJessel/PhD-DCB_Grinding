@@ -297,16 +297,16 @@ class Experiment:
         cols = ["RMS", 'Kurtosis', 'Amplitude', 'Skewness', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
                 'Mean radius', 'Peak radius', 'Radius diff', 'Runout', 'Form error']
 
-        rms = self.ae.rms[:-1]
-        kurt = self.ae.kurt[:-1]
-        amp = self.ae.amplitude[:-1]
-        skew = self.ae.skewness[:-1]
+        rms = self.ae.rms
+        kurt = self.ae.kurt
+        amp = self.ae.amplitude
+        skew = self.ae.skewness
 
         f = np.array(self.ae.fft[1000])
         f = f.T
-        f_35: np.array = f[35][:-1]
-        f_10: np.array = f[10][:-1]
-        f_134: np.array = f[134][:-1]
+        f_35: np.array = f[35]
+        f_10: np.array = f[10]
+        f_134: np.array = f[134]
 
         mean_rad: np.array = self.nc4.mean_radius[1:]
         peak_rad = self.nc4.peak_radius[1:]
@@ -334,12 +334,6 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
         Saved experiment obj containing AE, NC4 data.
     """
 
-    f_locs = {
-        'test5': r'..\..\Testing\22_08_03_grit1000\Test 5.pickle',
-        'test2': r"..\..\Testing\TEST2Combined\Test 2.pickle",
-        'test1': r"..\..\Testing\28_2_22_grit1000\Test 1.pickle"
-    }
-
     if file is None:
         try:
             root = tk.Tk()
@@ -353,6 +347,9 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
             print('No existing exp file selected!')
             raise NotADirectoryError('No existing exp file selected to load!')
     else:
+        f_locs = pd.read_csv(r"Test obj locations.txt", sep='\t', index_col=0)
+        f_locs = f_locs.to_dict()['Obj location']
+        f_locs = {k: "..\\..\\" + v for k, v in f_locs.items()}
         try:
             file_path = f_locs[file.lower().replace(' ', '')]
             with open(file_path, 'rb') as f:
