@@ -7,7 +7,7 @@
 ------------      -------    --------    -----------
 26/10/2022 10:01   tomhj      1.0         Script to contain all code relating to MLP models
 """
-from typing import Union, Any, Iterable
+from typing import Union, Any, Iterable, Dict
 
 import warnings
 
@@ -79,12 +79,24 @@ class Base_Model:
 class MLP_Model(Base_Model):
     def __init__(
             self,
-            **kwargs
+            params: Dict = None,
+            **kwargs,
     ):
+        """
+        MLP_Model constructor.
+
+        Passes the params dict to the creation of the mlp model. And passes **kwargs to class creation
+
+        Args:
+            params: Dict of mlp model parameters passed to self.initialise_model
+            **kwargs:
+        """
         super().__init__(**kwargs)
+        if params is None:
+            params = {}
         if self.main_df is not None:
             self.pre_process()
-            self.initialise_model()
+            self.initialise_model(**params)
         else:
             print('Choose data file to import as main_df with ".load_testdata()')
 
@@ -271,7 +283,7 @@ if __name__ == "__main__":
     main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop([0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
 
-    mlp_reg = MLP_Model(main_df=main_df, target='Mean radius')
+    mlp_reg = MLP_Model(main_df=main_df, target='Mean radius', params={'loss': 'mse'})
     mlp_reg.fit(X=mlp_reg.train_data[0].values, y=mlp_reg.train_data[1].values, validation_split=0.2, verbose=2)
     mlp_reg.score(X=mlp_reg.val_data[0].values, y=mlp_reg.val_data[1].values, plot_fig=True)
 
