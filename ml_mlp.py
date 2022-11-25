@@ -72,8 +72,26 @@ class Base_Model:
     def pre_process(self):
         raise AttributeError('No assigned function to pre-process data for Base_Model')
 
-    def fit(self, **kwargs):
-        self.model.fit(**kwargs)
+    def fit(
+            self,
+            X: np.ndarray = None,
+            y: np.ndarray = None,
+            **kwargs,
+    ):
+        """
+        Fit the model with the keras fit method.
+
+        Args:
+            X: Input training data for model to learn from.
+            y: Corresponding output for model to train with.
+            **kwargs: Additional inputs for keras fit method.
+        """
+        if X is None:
+            X = self.train_data[0].values
+        if y is None:
+            y = self.train_data[1].values
+
+        self.model.fit(X=X, y=y, **kwargs)
 
 
 class MLP_Model(Base_Model):
@@ -89,7 +107,7 @@ class MLP_Model(Base_Model):
 
         Args:
             params: Dict of mlp model parameters passed to self.initialise_model
-            **kwargs:
+            **kwargs: Inputs for Base_Model init
         """
         super().__init__(**kwargs)
         if params is None:
@@ -243,7 +261,30 @@ class MLP_Model(Base_Model):
         )
         return self.model
 
-    def score(self, X: np.ndarray, y: np.ndarray, plot_fig: bool = False):
+    def score(
+            self,
+            X: np.ndarray = None,
+            y: np.ndarray = None,
+            plot_fig: bool = False
+    ) -> Dict:
+        """
+        Score the mlp regression model on unseen data.
+
+        Use trained model to predict results on unseen validation data, and then calc metrics for scoring.
+        Args:
+            X: Inputs for predictions from unseen validation data set.
+            y: Corresponding outputs from validation data set
+            plot_fig: Choice to plot the predictions plot
+
+        Returns:
+            Dict containing the calculated scores
+        """
+        if X is None:
+            X = self.val_data[0].values
+        if y is None:
+            y = self.val_data[1].values
+
+        # noinspection PyTypeChecker
         y_pred = self.model.predict(X, verbose=0)
         _test_score = {
             'MAE': mean_absolute_error(y, y_pred),
@@ -283,9 +324,13 @@ if __name__ == "__main__":
     main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop([0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
 
-    mlp_reg = MLP_Model(main_df=main_df, target='Mean radius', params={'loss': 'mse'})
-    mlp_reg.fit(X=mlp_reg.train_data[0].values, y=mlp_reg.train_data[1].values, validation_split=0.2, verbose=2)
-    mlp_reg.score(X=mlp_reg.val_data[0].values, y=mlp_reg.val_data[1].values, plot_fig=True)
+    mlp_reg = MLP_Model(main_df=main_df,
+                        target='Mean radius',
+                        params={'loss': 'mae'},
+                        )
+
+    mlp_reg.fit(validation_split=0.2, verbose=1)
+    mlp_reg.score(plot_fig=True)
 
 # todo add tensorboard interface
 # todo add cross-validation
