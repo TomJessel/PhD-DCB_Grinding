@@ -7,11 +7,14 @@
 ------------      -------    --------    -----------
 26/10/2022 10:01   tomhj      1.0         Script to contain all code relating to MLP models
 """
+import time
+from textwrap import dedent
 from typing import Union, Any, Iterable, Dict
 
 import warnings
 
 import numpy as np
+from keras import Input
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
@@ -36,13 +39,26 @@ class Base_Model:
             model=None,
             main_df: pd.DataFrame = None,
             file_name: str = None,
+            tb: bool = True,
     ):
+        """
+        Base_Model constructor.
+
+        Args:
+            target: Label of the feature to predict from the dataframe
+            model: MLP model
+            main_df: Feature dataframe of which to train and predict
+            file_name: File name of exp file to load
+            tb: Option to record model progress and results in Tensorboard
+        """
         self.model = model
         self.main_df = main_df
         self.target = target
         self.train_data = pd.DataFrame
         self.val_data = pd.DataFrame
         self.file_name = file_name
+        self._tb = tb
+        self._run_name = None
 
         if self.target is None:
             raise AttributeError('There is no TARGET attribute set.')
@@ -92,6 +108,44 @@ class Base_Model:
             y = self.train_data[1].values
 
         self.model.fit(X=X, y=y, **kwargs)
+
+        if self._tb:
+            tb_writer = tf.summary.create_file_writer(self._run_name)
+            self.tb_model_desc(tb_wr=tb_writer)
+
+    def tb_model_desc(self, tb_wr):
+        # Model.summary()
+        lines = []
+        self.model.model_.summary(print_fn=lines.append)
+
+        dropout = self.model.model_.layers[1].get_config()['rate']
+        layers = self.model.model_.get_config()['layers']
+        nodes = [layer['config']['units'] for layer in layers if layer['class_name'] in ('Dense', 'LSTM')]
+        no_layers = len(nodes) - 1
+        activation = layers[1]['config']['activation']
+        opt = self.model.model_.optimizer.get_config()
+        optimiser = opt['name']
+        learning_rate = opt['learning_rate']
+        decay = opt['decay']
+
+        hp = dedent(f"""       
+            ### Parameters:   
+            ___
+
+            | Epochs | Batch Size | No Layers | No Neurons | Init Mode | Activation | Dropout | Loss | Optimiser |\
+             Learning rate | Decay |
+            |--------|------------|-----------|------------|-----------|------------|---------|------|-----------|\
+            ---------------|-------|
+            |{self.model.epochs}|{self.model.batch_size}|{no_layers}|{nodes[:-1]}|{self.model.model__init_mode}|\
+            {activation}|{dropout:.3f}|{self.model.loss}|{optimiser}|{learning_rate:.3E}|{decay:.3E}|
+
+            """)
+
+        lines = '    ' + '\n    '.join(lines)
+
+        with tb_wr.as_default():
+            tf.summary.text('Model Info', lines, step=0)
+            tf.summary.text('Model Info', hp, step=1)
 
 
 class MLP_Model(Base_Model):
@@ -213,7 +267,7 @@ class MLP_Model(Base_Model):
             learning_rate: float = 0.001,
             decay: float = 1e-6,
             verbose: int = 1,
-            callbacks: Any = None,
+            callbacks: list[tf.keras.callbacks] = None,
     ) -> KerasRegressor:
         """
         Initialise a SciKeras Regression model with the given hyperparameters
@@ -241,6 +295,15 @@ class MLP_Model(Base_Model):
 
         """
         no_features = pd.DataFrame.to_numpy(self.train_data[0]).shape[1]
+        # tensorboard set-up
+        if self._tb:
+            if callbacks is None:
+                callbacks = []
+            logdir = 'tb/MLP/'
+            self._run_name = f'{logdir}MLP-E-{epochs}-B-{batch_size}-L{np.full(no_layers, no_nodes)}-D-{dropout}' \
+                             f'-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
+            callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=self._run_name, histogram_freq=1))
+
         self.model = KerasRegressor(
             model=self.build_mod,
             model__no_features=no_features,
@@ -310,6 +373,19 @@ class MLP_Model(Base_Model):
             plt.show()
             print('=' * 65)
 
+        if self._tb:
+            tb_writer = tf.summary.create_file_writer(self._run_name)
+            md_scores = dedent(f'''
+                    ### Scores - Validation Data
+
+                     | MAE | MSE |  R2  |
+                     | ---- | ---- | ---- |
+                     | {_test_score['MAE'] * 1e3:.3f} | {_test_score['MSE'] * 1e6:.3f} | {_test_score['r2']:.3f} |  
+
+                    ''')
+            with tb_writer.as_default():
+                tf.summary.text('Model Info', md_scores, step=2)
+
         return _test_score
 
 
@@ -326,12 +402,12 @@ if __name__ == "__main__":
 
     mlp_reg = MLP_Model(main_df=main_df,
                         target='Mean radius',
+                        tb=True,
                         params={'loss': 'mae'},
                         )
 
-    mlp_reg.fit(validation_split=0.2, verbose=1)
+    mlp_reg.fit(validation_split=0.2, verbose=2)
     mlp_reg.score(plot_fig=True)
 
-# todo add tensorboard interface
 # todo add cross-validation
 # todo add MLP-window and LSTM classes
