@@ -9,18 +9,13 @@
 """
 import time
 from textwrap import dedent
-from typing import Union, Any, Iterable, Dict
-
+from typing import Union, Iterable, Dict
 import warnings
-
 import numpy as np
-from keras import Input
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import tensorflow as tf
-
 tf.config.set_visible_devices([], 'GPU')
 from keras.models import Sequential
 from keras.layers import Dense, Dropout
@@ -36,9 +31,7 @@ class Base_Model:
     def __init__(
             self,
             target: Iterable = None,
-            model=None,
-            main_df: pd.DataFrame = None,
-            file_name: str = None,
+            feature_df: pd.DataFrame = None,
             tb: bool = True,
     ):
         """
@@ -46,44 +39,21 @@ class Base_Model:
 
         Args:
             target: Label of the feature to predict from the dataframe
-            model: MLP model
-            main_df: Feature dataframe of which to train and predict
-            file_name: File name of exp file to load
+            feature_df: Feature dataframe of which to train and predict
             tb: Option to record model progress and results in Tensorboard
         """
-        self.model = model
-        self.main_df = main_df
+        self.model = None
+        self.main_df = feature_df
         self.target = target
         self.train_data = pd.DataFrame
         self.val_data = pd.DataFrame
-        self.file_name = file_name
         self._tb = tb
         self._run_name = None
 
         if self.target is None:
             raise AttributeError('There is no TARGET attribute set.')
-        if self.file_name is not None:
-            self.load_testdata(filename=file_name)
         if self.main_df is None:
-            name = str(input('Enter experiment data name: ')) or None
-            self.load_testdata(filename=name)
-
-    def load_testdata(
-            self,
-            filename: str = None,
-    ) -> pd.DataFrame:
-        """
-        # todo
-        Args:
-            filename:
-
-        Returns:
-
-        """
-        experiment = resources.load(filename)
-        self.main_df = experiment.features
-        self.pre_process()
-        return self.main_df
+            raise AttributeError('There is no MAIN_DF attribute.')
 
     def pre_process(self):
         raise AttributeError('No assigned function to pre-process data for Base_Model')
