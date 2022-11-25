@@ -11,8 +11,13 @@ from typing import Union, Any, Iterable
 
 import warnings
 
+import numpy as np
+from matplotlib import pyplot as plt
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import tensorflow as tf
+
 tf.config.set_visible_devices([], 'GPU')
 from keras.models import Sequential
 from keras.layers import Dense, Dropout
@@ -226,25 +231,50 @@ class MLP_Model(Base_Model):
         )
         return self.model
 
+    def score(self, X: np.ndarray, y: np.ndarray, plot_fig: bool = False):
+        y_pred = self.model.predict(X, verbose=0)
+        _test_score = {
+            'MAE': mean_absolute_error(y, y_pred),
+            'MSE': mean_squared_error(y, y_pred),
+            'r2': r2_score(y, y_pred),
+        }
+        print('-' * 65)
+        print(f'Model Test Scores:')
+        print('-' * 65)
+        print(f'MAE = {np.abs(_test_score["MAE"]) * 1000:.3f} um')
+        print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
+        print(f'R^2 = {np.mean(_test_score["r2"]):.3f}')
+        print('-' * 65)
+
+        if plot_fig:
+            fig, ax = plt.subplots()
+            ax.plot(y, color='red', label='Real data')
+            ax.plot(y_pred, color='blue', ls='--', label='Predicted data')
+            ax.set_title('Model Predictions - Test Set')
+            ax.set_ylabel('Mean Radius (mm)')
+            ax.set_xlabel('Data Points')
+            ax.legend()
+            plt.show()
+            print('=' * 65)
+
+        return _test_score
+
 
 if __name__ == "__main__":
     print('START')
-    exp5 = resources.load('Test5')
-    exp7 = resources.load('Test7')
-    exp8 = resources.load('Test8')
+    exp5 = resources.load('Test 5')
+    exp7 = resources.load('Test 7')
+    exp8 = resources.load('Test 8')
 
-    dfs = [exp5.features, exp7.features, exp8.features]
+    dfs = [exp5.features.drop([23, 24]), exp7.features, exp8.features]
     main_df = pd.concat(dfs)
-    main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff'])
+    main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop([0, 1, 2, 3])
+    main_df.reset_index(drop=True, inplace=True)
 
-    # main_df = exp.features.drop(columns=['Runout', 'Form error']).drop([0, 1, 23, 24])
+    mlp_reg = MLP_Model(main_df=main_df, target='Mean radius')
+    mlp_reg.fit(X=mlp_reg.train_data[0].values, y=mlp_reg.train_data[1].values, validation_split=0.2, verbose=2)
+    mlp_reg.score(X=mlp_reg.val_data[0].values, y=mlp_reg.val_data[1].values, plot_fig=True)
 
-    # mlp_reg = MLP_Model(main_df=main_df, target='Mean radius')
-    # mlp_reg.fit(X=mlp_reg.train_data[0].values, y=mlp_reg.train_data[1].values)
-
-    # mlp_reg = MLP_Model()
-
-# todo add model scoring
 # todo add tensorboard interface
 # todo add cross-validation
 # todo add MLP-window and LSTM classes
