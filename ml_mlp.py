@@ -7,21 +7,25 @@
 ------------      -------    --------    -----------
 26/10/2022 10:01   tomhj      1.0         Script to contain all code relating to MLP models
 """
+import multiprocessing
 import time
 from textwrap import dedent
 from typing import Union, Iterable, Dict
 import warnings
 import numpy as np
+import tqdm
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import tensorflow as tf
+
 tf.config.set_visible_devices([], 'GPU')
 from keras.models import Sequential
 from keras.layers import Dense, Dropout
 from scikeras.wrappers import KerasRegressor
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import MinMaxScaler
 
 import resources
@@ -117,6 +121,110 @@ class Base_Model:
             tf.summary.text('Model Info', lines, step=0)
             tf.summary.text('Model Info', hp, step=1)
 
+    def score(
+            self,
+            model: KerasRegressor = None,
+            X: np.ndarray = None,
+            y: np.ndarray = None,
+            print_score: bool = True,
+    ) -> Dict:
+        """
+        Score the mlp regression model on unseen data.
+
+        Use trained model to predict results on unseen validation data, and then calc metrics for scoring.
+        Args:
+            model: Ml model to score
+            X: Inputs for predictions from unseen validation data set.
+            y: Corresponding outputs from validation data set
+
+        Returns:
+            Dict containing the calculated scores
+        """
+        if model is None:
+            model = self.model
+        if X is None:
+            X = self.val_data[0].values
+        if y is None:
+            y = self.val_data[1].values
+
+        # noinspection PyTypeChecker
+        y_pred = model.predict(X, verbose=0)
+        _test_score = {
+            'MAE': mean_absolute_error(y, y_pred),
+            'MSE': mean_squared_error(y, y_pred),
+            'r2': r2_score(y, y_pred),
+        }
+        if print_score:
+            print('-' * 65)
+            print(f'Model Test Scores:')
+            print('-' * 65)
+            print(f'MAE = {np.abs(_test_score["MAE"]) * 1000:.3f} um')
+            print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
+            print(f'R^2 = {np.mean(_test_score["r2"]):.3f}')
+            print('-' * 65)
+        return _test_score
+
+    def initialise_model(self, verbose=1) -> KerasRegressor:
+        pass
+
+    # todo finish CV and think of how it will be used
+
+    def _cv_model(
+            self,
+            run_no,
+            tr_index,
+            te_index,
+    ):
+        model = self.initialise_model(verbose=0)
+        model.callbacks = None
+        # Does this need the validation data in the fit function as its not being used for history
+        model.fit(
+            X=self.train_data[0].values[tr_index],
+            y=self.train_data[1].values[tr_index],
+            # validation_data=(self.train_data[0].values[tr_index], self.train_data[1].values[tr_index])
+        )
+        score = self.score(
+            model=model,
+            X=self.train_data[0].values[te_index],
+            y=self.train_data[1].values[te_index],
+            print_score=False,
+        )
+        return score
+
+    def _cv_model_star(self, args):
+        return self._cv_model(*args)
+
+    def cv(self,
+           n_splits: int = 5
+           ):
+        cv = KFold(n_splits=n_splits,
+                   shuffle=True,
+                   # random_state=10,
+                   )
+        cv_items = [(i, train, test) for i, (train, test) in enumerate(cv.split(self.train_data[0].values))]
+
+        # scores = []
+        # for run_no, tr_index, te_index in cv_items:
+        #     scores.append(self._cv_model(run_no, tr_index, te_index))
+        with multiprocessing.Pool() as pool:
+            scores = list(tqdm.tqdm(pool.imap(self._cv_model_star, cv_items),
+                                    total=len(cv_items),
+                                    desc='CV Model'
+                                    ))
+
+        mean_MAE = np.mean([score['MAE'] for score in scores])
+        mean_MSE = np.mean([score['MSE'] for score in scores])
+        mean_r2 = np.mean([score['r2'] for score in scores])
+
+        std_MAE = np.std([score['MAE'] for score in scores])
+        std_MSE = np.std([score['MSE'] for score in scores])
+        std_r2 = np.std([score['r2'] for score in scores])
+
+        print(f'CV Training Scores:')
+        print(f'MAE: {mean_MAE * 1_000:.3f} (\u00B1{std_MAE * 1_000: .3f}) \u00B5m')
+        print(f'MSE: {mean_MSE * 1_000_000:.3f} (\u00B1{std_MSE * 1_000_000: .3f}) \u00B5m\u00B2')
+        print(f'R^2: {mean_r2:.3f} (\u00B1{std_r2: .3f})')
+
 
 class MLP_Model(Base_Model):
     def __init__(
@@ -138,7 +246,7 @@ class MLP_Model(Base_Model):
             params = {}
         if self.main_df is not None:
             self.pre_process()
-            self.initialise_model(**params)
+            self.model = self.initialise_model(**params)
         else:
             print('Choose data file to import as main_df with ".load_testdata()')
 
@@ -274,7 +382,7 @@ class MLP_Model(Base_Model):
                              f'-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
             callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=self._run_name, histogram_freq=1))
 
-        self.model = KerasRegressor(
+        model = KerasRegressor(
             model=self.build_mod,
             model__no_features=no_features,
             model__dropout=dropout,
@@ -292,13 +400,15 @@ class MLP_Model(Base_Model):
             verbose=verbose,
             callbacks=callbacks,
         )
-        return self.model
+        return model
 
     def score(
             self,
+            model: KerasRegressor = None,
             X: np.ndarray = None,
             y: np.ndarray = None,
-            plot_fig: bool = False
+            plot_fig: bool = False,
+            print_score: bool = True
     ) -> Dict:
         """
         Score the mlp regression model on unseen data.
@@ -312,25 +422,28 @@ class MLP_Model(Base_Model):
         Returns:
             Dict containing the calculated scores
         """
+        if model is None:
+            model = self.model
         if X is None:
             X = self.val_data[0].values
         if y is None:
             y = self.val_data[1].values
 
         # noinspection PyTypeChecker
-        y_pred = self.model.predict(X, verbose=0)
+        y_pred = model.predict(X, verbose=0)
         _test_score = {
             'MAE': mean_absolute_error(y, y_pred),
             'MSE': mean_squared_error(y, y_pred),
             'r2': r2_score(y, y_pred),
         }
-        print('-' * 65)
-        print(f'Model Test Scores:')
-        print('-' * 65)
-        print(f'MAE = {np.abs(_test_score["MAE"]) * 1000:.3f} um')
-        print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
-        print(f'R^2 = {np.mean(_test_score["r2"]):.3f}')
-        print('-' * 65)
+        if print_score:
+            print('-' * 65)
+            print(f'Model Test Scores:')
+            print('-' * 65)
+            print(f'MAE = {np.abs(_test_score["MAE"]) * 1000:.3f} um')
+            print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
+            print(f'R^2 = {np.mean(_test_score["r2"]):.3f}')
+            print('-' * 65)
 
         if plot_fig:
             fig, ax = plt.subplots()
@@ -360,6 +473,7 @@ class MLP_Model(Base_Model):
 
 
 if __name__ == "__main__":
+    __spec__ = None
     print('START')
     exp5 = resources.load('Test 5')
     exp7 = resources.load('Test 7')
@@ -370,14 +484,12 @@ if __name__ == "__main__":
     main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop([0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
 
-    mlp_reg = MLP_Model(main_df=main_df,
+    mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
                         tb=True,
                         params={'loss': 'mae'},
                         )
 
-    mlp_reg.fit(validation_split=0.2, verbose=2)
-    mlp_reg.score(plot_fig=True)
+    mlp_reg.cv(n_splits=10)
 
-# todo add cross-validation
 # todo add MLP-window and LSTM classes
