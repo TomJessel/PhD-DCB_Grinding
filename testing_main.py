@@ -27,6 +27,8 @@ def check_ae(_exp: resources.experiment.Experiment):
 def check_nc4(_exp: resources.experiment.Experiment):
     print('Checking most recent NC4 file...')
     _exp.nc4.check_last()
+    _exp.save()
+    # todo change so first one has always been calculated
 
 
 def main() -> resources.experiment.Experiment:

@@ -69,6 +69,11 @@ class NC4:
             dcb: DCB obj, containing info about the DCB used for the test.
             fs: Sample rate for the NC4 acquisition during the test.
         """
+        self.radius = pd.Series(0, index=np.arange(len(files)))
+        self.form_error = pd.Series(0, index=np.arange(len(files)))
+        self.runout = pd.Series(0, index=np.arange(len(files)))
+        self.peak_radius = pd.Series(0, index=np.arange(len(files)))
+        self.mean_radius = pd.Series(0, index=np.arange(len(files)))
         self._files = files
         self._dcb = dcb
         self._fs = fs
@@ -146,6 +151,7 @@ class NC4:
         prad = np.transpose(prad.reshape(-1, 1))
         nrad = np.transpose(nrad.reshape(-1, 1))
         radii = self._alignposneg(prad, nrad)
+        self.theta = 2 * np.pi * np.arange(0, 1, 1 / self._fs)
         st = np.argmin(radii[0, 0:int(self._fs)])
         rpy = 4
         clip = 0.5
@@ -157,13 +163,13 @@ class NC4:
         self.runout[index] = runout
         self.form_error[index] = form_error
 
-        wear = (self.mean_radius[-1] - self.mean_radius[0])/self.mean_radius[0] * 100
-
+        # wear = (self.mean_radius[-1] - self.mean_radius[0])/self.mean_radius[0] * 100
+        # todo need to change code so that there is always a [0] index to compare wear to
         print('-' * 60)
         print(f'NC4 - File {index}:')
         print(f'\tMean radius = {mean_radius[0,]:.6f} mm')
         print(f'\tRunout = {runout[0,] * 1000:.3f} um')
-        print(f'\tWear = {wear:.3f} %')
+        # print(f'\tWear = {wear:.3f} %')
         print('-' * 60)
         self.plot_att()
 
