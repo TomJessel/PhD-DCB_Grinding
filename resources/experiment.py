@@ -14,6 +14,7 @@ import datetime
 import fnmatch
 import glob
 import os
+import re
 from tkinter.filedialog import askdirectory, askopenfilename
 import tkinter as tk
 import pickle
@@ -66,7 +67,8 @@ def _sort_rename(files: list[str], path: str) -> None:
 
     for fno in sdfiles:
         number = str('%03.f' % fno[0])
-        newfilename = 'File_' + number + '_202' + substring_after(fno[1], '202')
+        ind = re.search(r'^.*202', fno[1]).end()
+        newfilename = 'File_' + number + '_202' + fno[1][ind:]
         if not newfilename == fno[1]:
             os.rename(fno[1], os.path.join(path, newfilename))
 
@@ -214,8 +216,6 @@ class Experiment:
             no_ae = len(self.ae._files)
             print(f'No. Files: AE-{no_ae} NC4-{no_nc4}')
             self.save()
-
-    # todo finish update func and print test update
 
     def correlation(self, plotfig: bool = True) -> None:
         """

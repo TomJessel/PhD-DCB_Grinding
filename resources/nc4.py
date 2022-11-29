@@ -11,14 +11,13 @@
 """
 
 import os
-from typing import Any, Union, Tuple
+from typing import Any, Union
 
 from nptdms import TdmsFile
 from numpy import ndarray
 from tqdm import tqdm
 import numpy as np
 import multiprocessing
-import time
 import math
 from scipy.ndimage.filters import uniform_filter1d
 from scipy import signal
@@ -150,8 +149,8 @@ class NC4:
             psample, posy, nsample, negy = self._sampleandpos(fno=fno)
             prad = self.polyvalradius((psample, posy))
             nrad = self.polyvalradius((nsample, negy))
-            prad = np.transpose(prad.reshape(-1, 1))
-            nrad = np.transpose(nrad.reshape(-1, 1))
+            prad = np.transpose(np.reshape(prad, (-1, 1)))
+            nrad = np.transpose(np.reshape(nrad, (-1, 1)))
             radii = self._alignposneg(prad, nrad)
             st = np.argmin(radii[0, 0:int(self._fs)])
             rpy = 4
