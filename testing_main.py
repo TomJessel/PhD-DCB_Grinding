@@ -30,6 +30,17 @@ def check_nc4(_exp: resources.experiment.Experiment):
     _exp.save()
 
 
+def update(_exp: resources.experiment.Experiment = None):
+    if _exp is None:
+        exp.update()
+        check_nc4(exp)
+        exp.save()
+    else:
+        _exp.update()
+        check_nc4(_exp)
+        _exp.save()
+
+
 def main() -> resources.experiment.Experiment:
     try:
         _exp = resources.load()
