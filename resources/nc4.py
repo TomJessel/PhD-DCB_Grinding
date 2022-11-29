@@ -69,11 +69,12 @@ class NC4:
             dcb: DCB obj, containing info about the DCB used for the test.
             fs: Sample rate for the NC4 acquisition during the test.
         """
-        self.radius = pd.Series(0, index=np.arange(len(files)))
-        self.form_error = pd.Series(0, index=np.arange(len(files)))
-        self.runout = pd.Series(0, index=np.arange(len(files)))
-        self.peak_radius = pd.Series(0, index=np.arange(len(files)))
-        self.mean_radius = pd.Series(0, index=np.arange(len(files)))
+        self.theta = None
+        self.radius = pd.Series(np.nan, index=np.arange(len(files)))
+        self.form_error = pd.Series(np.nan, index=np.arange(len(files)))
+        self.runout = pd.Series(np.nan, index=np.arange(len(files)))
+        self.peak_radius = pd.Series(np.nan, index=np.arange(len(files)))
+        self.mean_radius = pd.Series(np.nan, index=np.arange(len(files)))
         self._files = files
         self._dcb = dcb
         self._fs = fs
@@ -145,31 +146,37 @@ class NC4:
         # print(f'Total time: {en - st1:.1f} s')
 
     def check_last(self):
-        psample, posy, nsample, negy = self._sampleandpos(fno=-1)
-        prad = self.polyvalradius((psample, posy))
-        nrad = self.polyvalradius((nsample, negy))
-        prad = np.transpose(prad.reshape(-1, 1))
-        nrad = np.transpose(nrad.reshape(-1, 1))
-        radii = self._alignposneg(prad, nrad)
-        self.theta = 2 * np.pi * np.arange(0, 1, 1 / self._fs)
-        st = np.argmin(radii[0, 0:int(self._fs)])
-        rpy = 4
-        clip = 0.5
-        radius = radii[:, np.arange(st, st + (radii.shape[1]) / (rpy - (2 * clip)), dtype=int)]
-        mean_radius, peak_radius, runout, form_error = self._fitcircles(radius)
-        index = len(self._files) - 1
-        self.mean_radius[index] = mean_radius
-        self.peak_radius[index] = peak_radius
-        self.runout[index] = runout
-        self.form_error[index] = form_error
+        def _compute_nc4(fno):
+            psample, posy, nsample, negy = self._sampleandpos(fno=fno)
+            prad = self.polyvalradius((psample, posy))
+            nrad = self.polyvalradius((nsample, negy))
+            prad = np.transpose(prad.reshape(-1, 1))
+            nrad = np.transpose(nrad.reshape(-1, 1))
+            radii = self._alignposneg(prad, nrad)
+            st = np.argmin(radii[0, 0:int(self._fs)])
+            rpy = 4
+            clip = 0.5
+            radius = radii[:, np.arange(st, st + (radii.shape[1]) / (rpy - (2 * clip)), dtype=int)]
+            mean_radius, peak_radius, runout, form_error = self._fitcircles(radius)
+            return mean_radius, peak_radius, runout, form_error
 
-        # wear = (self.mean_radius[-1] - self.mean_radius[0])/self.mean_radius[0] * 100
-        # todo need to change code so that there is always a [0] index to compare wear to
+        self.theta = 2 * np.pi * np.arange(0, 1, 1 / self._fs)
+
+        if np.isnan(self.mean_radius[0]):
+            self.mean_radius[0], self.peak_radius[0], self.runout[0], self.form_error[0] = _compute_nc4(fno=0)
+
+        index = len(self._files) - 1
+        if index > 0:
+            self.mean_radius[index], self.peak_radius[index], self.runout[index], self.form_error[index] = _compute_nc4(
+                fno=index)
+
+        wear = (self.mean_radius.iloc[-1] - self.mean_radius.iloc[0])/self.mean_radius.iloc[0] * 100
+
         print('-' * 60)
         print(f'NC4 - File {index}:')
-        print(f'\tMean radius = {mean_radius[0,]:.6f} mm')
-        print(f'\tRunout = {runout[0,] * 1000:.3f} um')
-        # print(f'\tWear = {wear:.3f} %')
+        print(f'\tMean radius = {self.mean_radius.iloc[-1]:.6f} mm')
+        print(f'\tRunout = {self.runout.iloc[-1] * 1000:.3f} um')
+        print(f'\tWear = {wear:.3f} %')
         print('-' * 60)
         self.plot_att()
 
@@ -185,11 +192,11 @@ class NC4:
             os.makedirs(path)
 
         fig, ax_r = plt.subplots()
-        l1 = ax_r.plot(self._datano, self.mean_radius, 'C0', label='Mean Radius')
-        l2 = ax_r.plot(self._datano, self.peak_radius, 'C1', label='Peak Radius')
+        self.mean_radius.dropna().plot(color='C0', label='Mean Radius')
+        self.peak_radius.dropna().plot(color='C1', label='Peak Radius')
         ax_e = ax_r.twinx()
-        l3 = ax_e.plot(self._datano, self.runout * 1000, 'C2', label='Runout')
-        l4 = ax_e.plot(self._datano, self.form_error * 1000, 'C3', label='Form Error')
+        self.runout.dropna().multiply(1000).plot(color='C2', label='Runout')
+        self.form_error.dropna().multiply(1000).plot(color='C3', label='Form Error')
 
         ax_r.set_title(f'Test No: {self._testinfo.testno} - NC4 Attributes')
         ax_r.autoscale(enable=True, axis='x', tight=True)
@@ -197,9 +204,10 @@ class NC4:
         ax_e.set_ylabel('Errors (\u03BCm)')
         ax_r.set_ylabel('Radius (mm)')
         ax_r.grid()
-        # fig.legend(loc='upper right', bbox_to_anchor=[0.9, 0.875])
-        ax_e.legend((l1 + l2 + l3 + l4), ['Mean Radius', 'Peak Radius', 'Runout', 'Form Error'],
-                    loc='upper right', fontsize=9)
+        l1, lab1 = ax_r.get_legend_handles_labels()
+        l2, lab2 = ax_e.get_legend_handles_labels()
+        ax_e.legend(l1 + l2, lab1 + lab2, loc='upper right', fontsize=9)
+
         try:
             open(png_name)
         except IOError:
