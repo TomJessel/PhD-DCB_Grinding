@@ -159,7 +159,7 @@ class Base_Model:
         }
         if print_score:
             print('-' * 65)
-            print(f'Model Test Scores:')
+            print(f'Model Validation Scores:')
             print('-' * 65)
             print(f'MAE = {np.abs(_test_score["MAE"]) * 1000:.3f} um')
             print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
@@ -175,7 +175,6 @@ class Base_Model:
             ax.set_xlabel('Data Points')
             ax.legend()
             plt.show()
-            print('=' * 65)
 
         if self._tb:
             tb_writer = tf.summary.create_file_writer(self._run_name)
@@ -268,10 +267,13 @@ class Base_Model:
         std_MSE = np.std([score['MSE'] for score in scores])
         std_r2 = np.std([score['r2'] for score in scores])
 
+        print('-' * 65)
         print(f'CV Training Scores:')
+        print('-' * 65)
         print(f'MAE: {mean_MAE * 1_000:.3f} (\u00B1{std_MAE * 1_000: .3f}) \u00B5m')
         print(f'MSE: {mean_MSE * 1_000_000:.3f} (\u00B1{std_MSE * 1_000_000: .3f}) \u00B5m\u00B2')
         print(f'R^2: {mean_r2:.3f} (\u00B1{std_r2: .3f})')
+        print('-' * 65)
 
         _cv_score = {
             'MAE': mean_MAE,
