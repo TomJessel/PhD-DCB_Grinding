@@ -21,6 +21,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 import tensorflow as tf
 
 tf.config.set_visible_devices([], 'GPU')
+tf.get_logger().setLevel('ERROR')
 from keras.models import Sequential
 from keras.layers import Dense, Dropout
 from scikeras.wrappers import KerasRegressor
@@ -215,6 +216,7 @@ class Base_Model:
         """
         model = self.initialise_model(verbose=0)
         model.callbacks = None
+        self._tb = False
         model.fit(
             X=self.train_data[0].values[tr_index],
             y=self.train_data[1].values[tr_index],
@@ -226,6 +228,7 @@ class Base_Model:
             y=self.train_data[1].values[te_index],
             print_score=False,
         )
+        self._tb = True
         return score
 
     def _cv_model_star(self, args):
@@ -236,7 +239,7 @@ class Base_Model:
 
     def cv(self,
            n_splits: int = 5
-    ) -> Dict:
+           ) -> Dict:
         """
         Cross validate a ML model with Kfolds
 
@@ -283,6 +286,21 @@ class Base_Model:
             'std_MSE': std_MSE,
             'std_r2': std_r2,
         }
+
+        if self._tb:
+            tb_writer = tf.summary.create_file_writer(self._run_name)
+            md_scores = dedent(f'''
+                    ### Scores - Cross-validation
+                    No splits = {n_splits}
+
+                     | MAE | MSE |  R2  |
+                     | ---- | ---- | ---- |
+                     | {mean_MAE * 1e3:.3f} | {mean_MSE * 1e6:.3f} | {mean_r2:.3f}  | 
+                     | (\u00B1{std_MAE * 1_000: .3f}) | (\u00B1{std_MSE * 1_000_000: .3f}) | (\u00B1{std_r2: .3f}) |
+                     
+                    ''')
+            with tb_writer.as_default():
+                tf.summary.text('Model Info', md_scores, step=3)
         return _cv_score
 
 
@@ -434,12 +452,13 @@ class MLP_Model(Base_Model):
         """
         no_features = pd.DataFrame.to_numpy(self.train_data[0]).shape[1]
         # tensorboard set-up
-        if self._tb:
-            if callbacks is None:
-                callbacks = []
+        if self._run_name is None:
             logdir = 'tb/MLP/'
             self._run_name = f'{logdir}MLP-E-{epochs}-B-{batch_size}-L{np.full(no_layers, no_nodes)}-D-{dropout}' \
                              f'-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
+        if self._tb:
+            if callbacks is None:
+                callbacks = []
             callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=self._run_name, histogram_freq=1))
 
         model = KerasRegressor(
@@ -482,5 +501,8 @@ if __name__ == "__main__":
                         )
 
     mlp_reg.cv(n_splits=10)
+    mlp_reg.fit(validation_split=0.2, verbose=2)
+    mlp_reg.score()
 
 # todo add MLP-window and LSTM classes
+# todo change tensorboard output to show scores next to each other
