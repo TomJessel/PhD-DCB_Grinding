@@ -347,7 +347,7 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
             print('No existing exp file selected!')
             raise NotADirectoryError('No existing exp file selected to load!')
     else:
-        f_locs = pd.read_csv(r"Test obj locations.txt", sep='\t', index_col=0)
+        f_locs = pd.read_csv(r"reference//Test obj locations.txt", sep='\t', index_col=0)
         f_locs = f_locs.to_dict()['Obj location']
         f_locs = {k: "..\\..\\" + v for k, v in f_locs.items()}
         try:
