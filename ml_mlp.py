@@ -126,16 +126,19 @@ class Base_Model:
             model: KerasRegressor = None,
             X: np.ndarray = None,
             y: np.ndarray = None,
-            print_score: bool = True,
+            plot_fig: bool = False,
+            print_score: bool = True
     ) -> Dict:
         """
         Score the mlp regression model on unseen data.
 
         Use trained model to predict results on unseen validation data, and then calc metrics for scoring.
         Args:
-            model: Ml model to score
-            X: Inputs for predictions from unseen validation data set.
+            model: ML model to score
+            X: Inputs for predictions from unseen validation data set
             y: Corresponding outputs from validation data set
+            plot_fig: Choice to plot the predictions plot
+            print_score: Choice to print scores to terminal
 
         Returns:
             Dict containing the calculated scores
@@ -162,6 +165,31 @@ class Base_Model:
             print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
             print(f'R^2 = {np.mean(_test_score["r2"]):.3f}')
             print('-' * 65)
+
+        if plot_fig:
+            fig, ax = plt.subplots()
+            ax.plot(y, color='red', label='Real data')
+            ax.plot(y_pred, color='blue', ls='--', label='Predicted data')
+            ax.set_title('Model Predictions - Test Set')
+            ax.set_ylabel('Mean Radius (mm)')
+            ax.set_xlabel('Data Points')
+            ax.legend()
+            plt.show()
+            print('=' * 65)
+
+        if self._tb:
+            tb_writer = tf.summary.create_file_writer(self._run_name)
+            md_scores = dedent(f'''
+                    ### Scores - Validation Data
+
+                     | MAE | MSE |  R2  |
+                     | ---- | ---- | ---- |
+                     | {_test_score['MAE'] * 1e3:.3f} | {_test_score['MSE'] * 1e6:.3f} | {_test_score['r2']:.3f} |  
+
+                    ''')
+            with tb_writer.as_default():
+                tf.summary.text('Model Info', md_scores, step=2)
+
         return _test_score
 
     def initialise_model(self, verbose=1) -> KerasRegressor:
@@ -174,10 +202,20 @@ class Base_Model:
             run_no,
             tr_index,
             te_index,
-    ):
+    ) -> Dict:
+        """
+        Multiprocessing worker function to cross validate one instance of the model
+
+        Args:
+            run_no: Iteration of the cv model
+            tr_index: Index locations for the training data in the split
+            te_index: Index locations for the testing data in the split
+
+        Returns:
+            Dict containing models scores
+        """
         model = self.initialise_model(verbose=0)
         model.callbacks = None
-        # Does this need the validation data in the fit function as its not being used for history
         model.fit(
             X=self.train_data[0].values[tr_index],
             y=self.train_data[1].values[tr_index],
@@ -192,20 +230,30 @@ class Base_Model:
         return score
 
     def _cv_model_star(self, args):
+        """
+        Function to allow imap to use multiple inputs
+        """
         return self._cv_model(*args)
 
     def cv(self,
            n_splits: int = 5
-           ):
+    ) -> Dict:
+        """
+        Cross validate a ML model with Kfolds
+
+        Args:
+            n_splits: No splits in the kfolds system
+
+        Returns:
+            Dict of cv scores including mean values and stds
+
+        """
         cv = KFold(n_splits=n_splits,
                    shuffle=True,
                    # random_state=10,
                    )
         cv_items = [(i, train, test) for i, (train, test) in enumerate(cv.split(self.train_data[0].values))]
 
-        # scores = []
-        # for run_no, tr_index, te_index in cv_items:
-        #     scores.append(self._cv_model(run_no, tr_index, te_index))
         with multiprocessing.Pool() as pool:
             scores = list(tqdm.tqdm(pool.imap(self._cv_model_star, cv_items),
                                     total=len(cv_items),
@@ -224,6 +272,16 @@ class Base_Model:
         print(f'MAE: {mean_MAE * 1_000:.3f} (\u00B1{std_MAE * 1_000: .3f}) \u00B5m')
         print(f'MSE: {mean_MSE * 1_000_000:.3f} (\u00B1{std_MSE * 1_000_000: .3f}) \u00B5m\u00B2')
         print(f'R^2: {mean_r2:.3f} (\u00B1{std_r2: .3f})')
+
+        _cv_score = {
+            'MAE': mean_MAE,
+            'MSE': mean_MSE,
+            'r2': mean_r2,
+            'std_MAE': std_MAE,
+            'std_MSE': std_MSE,
+            'std_r2': std_r2,
+        }
+        return _cv_score
 
 
 class MLP_Model(Base_Model):
@@ -401,75 +459,6 @@ class MLP_Model(Base_Model):
             callbacks=callbacks,
         )
         return model
-
-    def score(
-            self,
-            model: KerasRegressor = None,
-            X: np.ndarray = None,
-            y: np.ndarray = None,
-            plot_fig: bool = False,
-            print_score: bool = True
-    ) -> Dict:
-        """
-        Score the mlp regression model on unseen data.
-
-        Use trained model to predict results on unseen validation data, and then calc metrics for scoring.
-        Args:
-            X: Inputs for predictions from unseen validation data set.
-            y: Corresponding outputs from validation data set
-            plot_fig: Choice to plot the predictions plot
-
-        Returns:
-            Dict containing the calculated scores
-        """
-        if model is None:
-            model = self.model
-        if X is None:
-            X = self.val_data[0].values
-        if y is None:
-            y = self.val_data[1].values
-
-        # noinspection PyTypeChecker
-        y_pred = model.predict(X, verbose=0)
-        _test_score = {
-            'MAE': mean_absolute_error(y, y_pred),
-            'MSE': mean_squared_error(y, y_pred),
-            'r2': r2_score(y, y_pred),
-        }
-        if print_score:
-            print('-' * 65)
-            print(f'Model Test Scores:')
-            print('-' * 65)
-            print(f'MAE = {np.abs(_test_score["MAE"]) * 1000:.3f} um')
-            print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
-            print(f'R^2 = {np.mean(_test_score["r2"]):.3f}')
-            print('-' * 65)
-
-        if plot_fig:
-            fig, ax = plt.subplots()
-            ax.plot(y, color='red', label='Real data')
-            ax.plot(y_pred, color='blue', ls='--', label='Predicted data')
-            ax.set_title('Model Predictions - Test Set')
-            ax.set_ylabel('Mean Radius (mm)')
-            ax.set_xlabel('Data Points')
-            ax.legend()
-            plt.show()
-            print('=' * 65)
-
-        if self._tb:
-            tb_writer = tf.summary.create_file_writer(self._run_name)
-            md_scores = dedent(f'''
-                    ### Scores - Validation Data
-
-                     | MAE | MSE |  R2  |
-                     | ---- | ---- | ---- |
-                     | {_test_score['MAE'] * 1e3:.3f} | {_test_score['MSE'] * 1e6:.3f} | {_test_score['r2']:.3f} |  
-
-                    ''')
-            with tb_writer.as_default():
-                tf.summary.text('Model Info', md_scores, step=2)
-
-        return _test_score
 
 
 if __name__ == "__main__":
