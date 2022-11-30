@@ -512,4 +512,3 @@ class NC4:
         """
         self._files = files
         self._datano = np.arange(0, len(self._files))
-        # todo add functionality to only process updated files

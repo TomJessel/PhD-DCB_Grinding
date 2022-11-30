@@ -116,10 +116,9 @@ class Base_Model:
 
             """)
 
-        lines = '    ' + '\n    '.join(lines)
-
         with tb_wr.as_default():
             # Code to ouput Tensorboard model.summary
+            # lines = '    ' + '\n    '.join(lines)
             # tf.summary.text('Model Info', lines, step=0)
             # Code to output Tensorboard hyperparams
             tf.summary.text('Model Info', hp, step=1)
@@ -197,8 +196,6 @@ class Base_Model:
     def initialise_model(self, verbose=1) -> KerasRegressor:
         pass
 
-    # todo finish CV and think of how it will be used
-
     def _cv_model(
             self,
             run_no,
@@ -262,11 +259,11 @@ class Base_Model:
 
         with multiprocessing.Pool() as pool:
             outputs = list(tqdm.tqdm(pool.imap(self._cv_model_star, cv_items),
-                                    total=len(cv_items),
-                                    desc='CV Model'
-                                    ))
+                                     total=len(cv_items),
+                                     desc='CV Model'
+                                     ))
         scores = [output[0] for output in outputs]
-        models = [output[1] for output in outputs]
+        # models = [output[1] for output in outputs]
 
         # bmod_r2 = max(scores, key=lambda x: x['r2'])['run_no']
         # bmod_MAE = min(scores, key=lambda x: x['MAE'])['run_no']
@@ -511,9 +508,9 @@ if __name__ == "__main__":
 
     mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
-                        tb=True,
-                        params={'loss': 'mae',
-                                'no_layers': 3,
+                        tb=False,
+                        params={'loss': KerasRegressor.r_squared,
+                                'no_layers': 2,
                                 },
                         )
 
@@ -523,3 +520,6 @@ if __name__ == "__main__":
 
 # todo add MLP-window and LSTM classes
 # todo change tensorboard output to show scores next to each other
+# todo try loss of r2 instead of MAE or MSE
+# todo compare to linear model https://machinelearningmastery.com/robust-regression-for-machine-learning-in-python/
+# todo add usage of repeated kfold cross validation instead of just kfold
