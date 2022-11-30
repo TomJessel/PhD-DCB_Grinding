@@ -20,12 +20,12 @@ def check_ae(_exp: resources.experiment.Experiment):
     Args:
         _exp: Experiment object to use
     """
-    print(f'Plotting most recent AE file...')
+    # print(f'Plotting most recent AE file...')
     _exp.ae.plotAE(-1)
 
 
 def check_nc4(_exp: resources.experiment.Experiment):
-    print('Checking most recent NC4 file...')
+    # print('Checking most recent NC4 file...')
     _exp.nc4.check_last()
     _exp.save()
 
@@ -57,4 +57,5 @@ def main() -> resources.experiment.Experiment:
 
 if __name__ == "__main__":
     exp = main()
+    # check_nc4(exp)
     # check_ae(exp)

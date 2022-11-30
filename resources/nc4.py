@@ -69,7 +69,7 @@ class NC4:
             fs: Sample rate for the NC4 acquisition during the test.
         """
         self.theta = None
-        self.radius = pd.Series(np.nan, index=np.arange(len(files)))
+        self.radius = pd.Series(np.nan, index=np.arange(len(files))) # todo change these to None and condition for updating to if none or [0] is none
         self.form_error = pd.Series(np.nan, index=np.arange(len(files)))
         self.runout = pd.Series(np.nan, index=np.arange(len(files)))
         self.peak_radius = pd.Series(np.nan, index=np.arange(len(files)))
@@ -166,10 +166,13 @@ class NC4:
 
         index = len(self._files) - 1
         if index > 0:
-            self.mean_radius[index], self.peak_radius[index], self.runout[index], self.form_error[index] = _compute_nc4(
-                fno=index)
+            mean_rad, peak_rad, runout, form_error = _compute_nc4(fno=index)
+            self.mean_radius[index] = mean_rad[0]
+            self.peak_radius[index] = peak_rad[0]
+            self.runout[index] = runout[0]
+            self.form_error[index] = form_error[0]
 
-        wear = (self.mean_radius.iloc[-1] - self.mean_radius.iloc[0])/self.mean_radius.iloc[0] * 100
+        wear = (self.mean_radius.iloc[-1] - self.mean_radius.iloc[0]) / self.mean_radius.iloc[0] * 100
 
         print('-' * 60)
         print(f'NC4 - File {index}:')
