@@ -119,7 +119,9 @@ class Base_Model:
         lines = '    ' + '\n    '.join(lines)
 
         with tb_wr.as_default():
-            tf.summary.text('Model Info', lines, step=0)
+            # Code to ouput Tensorboard model.summary
+            # tf.summary.text('Model Info', lines, step=0)
+            # Code to output Tensorboard hyperparams
             tf.summary.text('Model Info', hp, step=1)
 
     def score(
@@ -202,7 +204,7 @@ class Base_Model:
             run_no,
             tr_index,
             te_index,
-    ) -> Dict:
+    ) -> [Dict, KerasRegressor]:
         """
         Multiprocessing worker function to cross validate one instance of the model
 
@@ -213,6 +215,7 @@ class Base_Model:
 
         Returns:
             Dict containing models scores
+            Model that was scored on
         """
         model = self.initialise_model(verbose=0)
         model.callbacks = None
@@ -229,7 +232,8 @@ class Base_Model:
             print_score=False,
         )
         self._tb = True
-        return score
+        score['run_no'] = run_no
+        return score, model
 
     def _cv_model_star(self, args):
         """
@@ -257,10 +261,21 @@ class Base_Model:
         cv_items = [(i, train, test) for i, (train, test) in enumerate(cv.split(self.train_data[0].values))]
 
         with multiprocessing.Pool() as pool:
-            scores = list(tqdm.tqdm(pool.imap(self._cv_model_star, cv_items),
+            outputs = list(tqdm.tqdm(pool.imap(self._cv_model_star, cv_items),
                                     total=len(cv_items),
                                     desc='CV Model'
                                     ))
+        scores = [output[0] for output in outputs]
+        models = [output[1] for output in outputs]
+
+        # bmod_r2 = max(scores, key=lambda x: x['r2'])['run_no']
+        # bmod_MAE = min(scores, key=lambda x: x['MAE'])['run_no']
+        # bmod_MSE = min(scores, key=lambda x: x['MSE'])['run_no']
+        # # Whichever score is first is list will be default if no best over more than one score
+        # bmod = [bmod_MAE, bmod_MSE, bmod_r2]
+        #
+        # model = models[max(bmod, key=bmod.count, default=None)]
+        # self.model = model
 
         mean_MAE = np.mean([score['MAE'] for score in scores])
         mean_MSE = np.mean([score['MSE'] for score in scores])
@@ -497,11 +512,13 @@ if __name__ == "__main__":
     mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
                         tb=True,
-                        params={'loss': 'mae'},
+                        params={'loss': 'mae',
+                                'no_layers': 3,
+                                },
                         )
 
     mlp_reg.cv(n_splits=10)
-    mlp_reg.fit(validation_split=0.2, verbose=2)
+    mlp_reg.fit(validation_split=0.2, verbose=0)
     mlp_reg.score()
 
 # todo add MLP-window and LSTM classes
