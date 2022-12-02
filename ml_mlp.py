@@ -15,8 +15,9 @@ from typing import Union, Iterable, Dict
 
 import numpy as np
 from matplotlib import pyplot as plt
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from tqdm.autonotebook import tqdm
+from tqdm.auto import tqdm
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import tensorflow as tf
@@ -350,19 +351,21 @@ class MLP_Model(Base_Model):
             print('Choose data file to import as main_df with ".load_testdata()')
 
     def pre_process(
-            self,
+            self: Base_Model,
             val_frac: float = 0.2,
     ) -> [pd.DataFrame, pd.DataFrame]:
         """
         Pre-process the data for training an MLP model
 
-        Split the data for the test into a training and validation set. Then scale the data using a MinMax scaler, based
-        off the training data. Then save the splits into a tuple which contains the features and results separately.
+            Split the data for the test into a training and validation set. Then scale the data using a MinMax scaler,
+            based off the training data. Then save the splits into a tuple which contains the features and results
+            separately.
 
         Args:
             val_frac: Fraction of data points used within the validation set
 
-        Returns: Two tuples which contain dataframes of the features and results for the training and validation sets.
+        Returns:
+            Two tuples which contain dataframes of the features and results for the training and validation sets.
 
         """
         scaler = MinMaxScaler()
@@ -509,6 +512,137 @@ class MLP_Model(Base_Model):
         return model
 
 
+class Linear_Model(Base_Model):
+    def __init__(
+            self,
+            params: Dict = None,
+            **kwargs,
+    ):
+        """
+        Linear_Model constructor.
+
+        Passes the params dict to the creation of the linear model. And passes **kwargs to class creation
+
+        Args:
+            params: Dict of linear model parameters passed to self.initialise_model
+            **kwargs: Inputs for Base_Model init
+        """
+        super().__init__(**kwargs)
+
+        if params is None:
+            params = {}
+        self.params = params
+
+        if self.main_df is not None:
+            self.pre_process()
+            self.model = self.initialise_model(**params)
+        else:
+            print('Choose data file to import as main_df with ".load_testdata()')
+        self._tb = False
+
+    def pre_process(
+            self,
+            val_frac: float = 0.2,
+    ) -> [pd.DataFrame, pd.DataFrame]:
+        """
+        Function to pre-process the data for a linear model
+
+            Uses MLP_Model pre_process function.
+
+        Args:
+            val_frac: Fraction of data points used within the validation set
+
+        Returns:
+            Two tuples which contain dataframes of the features and results for the training and validation sets.
+
+        """
+        func = MLP_Model.pre_process
+        func(self)
+
+    def initialise_model(
+            self,
+            **params,
+    ) -> LinearRegression:
+        """
+        Initialise a Linear regression model with optional parameters
+
+        Args:
+            **params: Optional params passed to sklearn.LinearRegression func
+
+        Returns:
+            Sklearn LinearRegression model
+        """
+        from sklearn.linear_model import LinearRegression
+        model = LinearRegression(**params)
+        return model
+
+    def score(
+            self,
+            model: KerasRegressor = None,
+            X: np.ndarray = None,
+            y: np.ndarray = None,
+            plot_fig: bool = False,
+            print_score: bool = True
+    ) -> Dict:
+        """
+        Score the mlp regression model on unseen data.
+
+        Use trained model to predict results on unseen validation data, and then calc metrics for scoring.
+        Args:
+            model: ML model to score
+            X: Inputs for predictions from unseen validation data set
+            y: Corresponding outputs from validation data set
+            plot_fig: Choice to plot the predictions plot
+            print_score: Choice to print scores to terminal
+
+        Returns:
+            Dict containing the calculated scores
+        """
+        from sklearn.model_selection import cross_validate, RepeatedKFold
+
+        if model is None:
+            model = self.model
+        if X is None:
+            X = self.val_data[0].values
+        if y is None:
+            y = self.val_data[1].values
+
+        scoring = {'MAE': 'neg_mean_absolute_error',
+                   'MSE': 'neg_mean_squared_error',
+                   'r2': 'r2'}
+
+        cv = RepeatedKFold(n_splits=10, n_repeats=10)
+
+        _test_score = cross_validate(estimator=model,
+                                     X=X,
+                                     y=y,
+                                     scoring=scoring,
+                                     cv=cv,
+                                     return_train_score=False,
+                                     n_jobs=-1,
+                                     )
+
+        if print_score:
+            print('-' * 65)
+            print(f'Model Validation Scores:')
+            print('-' * 65)
+            print(f'MAE = {np.abs(_test_score["test_MAE"].mean()) * 1000:.3f} um')
+            print(f'MSE = {np.abs(_test_score["test_MSE"].mean()) * 1_000_000:.3f} um^2')
+            print(f'R^2 = {np.mean(_test_score["test_r2"].mean()):.3f}')
+            print('-' * 65)
+
+        if plot_fig:
+            model.fit(X, y)
+
+            fig, ax = plt.subplots()
+            ax.scatter(X[:, 0], y)
+            xaxis = np.arange(X[:, 0].min(), X[:, 0].max(), 0.01)
+            yaxis = model.predict(xaxis.reshape((len(xaxis), 1)))
+            ax.plot(xaxis, yaxis, color='r')
+            plt.show()
+        return _test_score
+
+
 if __name__ == "__main__":
     __spec__ = None
     print('START')
@@ -521,22 +655,27 @@ if __name__ == "__main__":
     main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop([0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
 
-    mlp_reg = MLP_Model(feature_df=main_df,
-                        target='Mean radius',
-                        tb=False,
-                        params={'loss': 'mse',
-                                'epochs': 100,
-                                'no_layers': 2,
-                                },
-                        )
+    # mlp_reg = MLP_Model(feature_df=main_df,
+    #                     target='Mean radius',
+    #                     tb=False,
+    #                     params={'loss': 'mse',
+    #                             'epochs': 100,
+    #                             'no_layers': 2,
+    #                             },
+    #                     )
+    #
+    # mlp_reg.cv(n_splits=10)
+    # mlp_reg.fit(validation_split=0.2, verbose=0)
+    # mlp_reg.score()
 
-    mlp_reg.cv(n_splits=10)
-    mlp_reg.fit(validation_split=0.2, verbose=0)
-    mlp_reg.score()
+    lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
+    lin_reg.fit()
+    lin_reg.score(plot_fig=True)
 
 # todo add MLP-window and LSTM classes
 # todo change tensorboard output to show scores next to each other
 # todo try loss of r2 instead of MAE or MSE
-# todo compare to linear model https://machinelearningmastery.com/robust-regression-for-machine-learning-in-python/
 # todo add usage of repeated kfold cross validation instead of just kfold
 # todo include way to specifying the tb log dir
+# todo visualise linear model results
+# todo document linear model
