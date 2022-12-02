@@ -54,6 +54,7 @@ class Base_Model:
         self.val_data = pd.DataFrame
         self._tb = tb
         self._run_name = None
+        self.params = {}
 
         if self.target is None:
             raise AttributeError('There is no TARGET attribute set.')
@@ -193,7 +194,7 @@ class Base_Model:
 
         return _test_score
 
-    def initialise_model(self, verbose=1) -> KerasRegressor:
+    def initialise_model(self, verbose=1, **params) -> KerasRegressor:
         pass
 
     def _cv_model(
@@ -214,7 +215,7 @@ class Base_Model:
             Dict containing models scores
             Model that was scored on
         """
-        model = self.initialise_model(verbose=0)
+        model = self.initialise_model(verbose=0, **self.params)
         model.callbacks = None
         self._tb = False
         model.fit(
@@ -262,6 +263,11 @@ class Base_Model:
                                      total=len(cv_items),
                                      desc='CV Model'
                                      ))
+
+        # outputs = []
+        # for cv_item in cv_items:
+        #     outputs.append(self._cv_model_star(cv_item))
+
         scores = [output[0] for output in outputs]
         # models = [output[1] for output in outputs]
 
@@ -334,6 +340,7 @@ class MLP_Model(Base_Model):
         super().__init__(**kwargs)
         if params is None:
             params = {}
+        self.params = params
         if self.main_df is not None:
             self.pre_process()
             self.model = self.initialise_model(**params)
@@ -436,6 +443,7 @@ class MLP_Model(Base_Model):
             decay: float = 1e-6,
             verbose: int = 1,
             callbacks: list[tf.keras.callbacks] = None,
+            **params,
     ) -> KerasRegressor:
         """
         Initialise a SciKeras Regression model with the given hyperparameters
@@ -509,7 +517,8 @@ if __name__ == "__main__":
     mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
                         tb=False,
-                        params={'loss': KerasRegressor.r_squared,
+                        params={'loss': 'mse',
+                                'epochs': 1000,
                                 'no_layers': 2,
                                 },
                         )
@@ -523,3 +532,5 @@ if __name__ == "__main__":
 # todo try loss of r2 instead of MAE or MSE
 # todo compare to linear model https://machinelearningmastery.com/robust-regression-for-machine-learning-in-python/
 # todo add usage of repeated kfold cross validation instead of just kfold
+# todo include way to specifying the tb log dir
+# todo implement tqdm callback into fit keras models https://www.tensorflow.org/addons/tutorials/tqdm_progress_bar
