@@ -9,16 +9,18 @@
 """
 import multiprocessing
 import time
+import warnings
 from textwrap import dedent
 from typing import Union, Iterable, Dict
-import warnings
+
 import numpy as np
-import tqdm
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from tqdm.autonotebook import tqdm
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import tensorflow as tf
+import tensorflow_addons as tfa
 
 tf.config.set_visible_devices([], 'GPU')
 tf.get_logger().setLevel('ERROR')
@@ -259,7 +261,7 @@ class Base_Model:
         cv_items = [(i, train, test) for i, (train, test) in enumerate(cv.split(self.train_data[0].values))]
 
         with multiprocessing.Pool() as pool:
-            outputs = list(tqdm.tqdm(pool.imap(self._cv_model_star, cv_items),
+            outputs = list(tqdm(pool.imap(self._cv_model_star, cv_items),
                                      total=len(cv_items),
                                      desc='CV Model'
                                      ))
@@ -476,9 +478,14 @@ class MLP_Model(Base_Model):
             logdir = 'tb/MLP/'
             self._run_name = f'{logdir}MLP-E-{epochs}-B-{batch_size}-L{np.full(no_layers, no_nodes)}-D-{dropout}' \
                              f'-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
+
+        if callbacks is None:
+            callbacks = []
+        # Add in TQDM progress bar for fitting
+        callbacks.append(tfa.callbacks.TQDMProgressBar(show_epoch_progress=False))
+
         if self._tb:
-            if callbacks is None:
-                callbacks = []
+            # Add in tensorboard logging
             callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=self._run_name, histogram_freq=1))
 
         model = KerasRegressor(
@@ -518,7 +525,7 @@ if __name__ == "__main__":
                         target='Mean radius',
                         tb=False,
                         params={'loss': 'mse',
-                                'epochs': 1000,
+                                'epochs': 100,
                                 'no_layers': 2,
                                 },
                         )
@@ -533,4 +540,3 @@ if __name__ == "__main__":
 # todo compare to linear model https://machinelearningmastery.com/robust-regression-for-machine-learning-in-python/
 # todo add usage of repeated kfold cross validation instead of just kfold
 # todo include way to specifying the tb log dir
-# todo implement tqdm callback into fit keras models https://www.tensorflow.org/addons/tutorials/tqdm_progress_bar
