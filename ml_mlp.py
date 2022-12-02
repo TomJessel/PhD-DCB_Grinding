@@ -633,12 +633,14 @@ class Linear_Model(Base_Model):
 
         if plot_fig:
             model.fit(X, y)
+            i = 6
+            x_0 = np.zeros(np.shape(X))
+            x_0[:, i] = X[:, i].reshape((len(X), 1)).T
+            y_pred = model.predict(x_0)
 
             fig, ax = plt.subplots()
-            ax.scatter(X[:, 0], y)
-            xaxis = np.arange(X[:, 0].min(), X[:, 0].max(), 0.01)
-            yaxis = model.predict(xaxis.reshape((len(xaxis), 1)))
-            ax.plot(xaxis, yaxis, color='r')
+            ax.scatter(X[:, i], y)
+            ax.scatter(X[:, i], y_pred, color='r')
             plt.show()
         return _test_score
 
@@ -677,5 +679,7 @@ if __name__ == "__main__":
 # todo try loss of r2 instead of MAE or MSE
 # todo add usage of repeated kfold cross validation instead of just kfold
 # todo include way to specifying the tb log dir
-# todo visualise linear model results
-# todo document linear model
+# todo visualise linear mod results https://machinelearningmastery.com/robust-regression-for-machine-learning-in-python/
+# todo document linear model scatter -> plot
+# todo finish linear visualisation
+# https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
