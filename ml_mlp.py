@@ -262,9 +262,9 @@ class Base_Model:
 
         with multiprocessing.Pool() as pool:
             outputs = list(tqdm(pool.imap(self._cv_model_star, cv_items),
-                                     total=len(cv_items),
-                                     desc='CV Model'
-                                     ))
+                                total=len(cv_items),
+                                desc='CV Model'
+                                ))
 
         # outputs = []
         # for cv_item in cv_items:
