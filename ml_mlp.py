@@ -11,11 +11,11 @@ import multiprocessing
 import time
 import warnings
 from textwrap import dedent
-from typing import Union, Iterable, Dict
+from typing import Union, Iterable, Dict, Any
 
 import numpy as np
 from matplotlib import pyplot as plt
-from sklearn.linear_model import LinearRegression
+# from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from tqdm.auto import tqdm
 
@@ -528,7 +528,6 @@ class Linear_Model(Base_Model):
             **kwargs: Inputs for Base_Model init
         """
         super().__init__(**kwargs)
-
         if params is None:
             params = {}
         self.params = params
@@ -562,7 +561,7 @@ class Linear_Model(Base_Model):
     def initialise_model(
             self,
             **params,
-    ) -> LinearRegression:
+    ) -> Any:
         """
         Initialise a Linear regression model with optional parameters
 
@@ -585,9 +584,10 @@ class Linear_Model(Base_Model):
             print_score: bool = True
     ) -> Dict:
         """
-        Score the mlp regression model on unseen data.
+        Score the linear regression model on unseen data.
 
-        Use trained model to predict results on unseen validation data, and then calc metrics for scoring.
+        Use trained model to predict results on unseen validation data, and then calc metrics for scoring. And plot
+        visualisation of the predictions and feature impacts.
         Args:
             model: ML model to score
             X: Inputs for predictions from unseen validation data set
@@ -633,14 +633,28 @@ class Linear_Model(Base_Model):
 
         if plot_fig:
             model.fit(X, y)
-            i = 6
-            x_0 = np.zeros(np.shape(X))
-            x_0[:, i] = X[:, i].reshape((len(X), 1)).T
-            y_pred = model.predict(x_0)
 
+            no_features = np.shape(X)[1]
+            fig, ax = plt.subplots(1, no_features)
+            # loop to isolate results/predictions based on one feature
+            for i in range(no_features):
+                xaxis = np.arange(X[:, i].min(), X[:, i].max(), 0.01)
+                x_0 = np.zeros((len(xaxis), no_features))
+                x_0[:, i] = xaxis
+                yaxis = model.predict(x_0)
+
+                ax[i].scatter(X[:, i], y)
+                ax[i].plot(xaxis, yaxis, color='r')
+            plt.show()
+
+            y_pred = model.predict(X)
             fig, ax = plt.subplots()
-            ax.scatter(X[:, i], y)
-            ax.scatter(X[:, i], y_pred, color='r')
+            ax.plot(y, color='red', label='Real data')
+            ax.plot(y_pred, color='blue', ls='--', label='Predicted data')
+            ax.set_title('Model Predictions - Test Set')
+            ax.set_ylabel('Mean Radius (mm)')
+            ax.set_xlabel('Data Points')
+            ax.legend()
             plt.show()
         return _test_score
 
@@ -672,14 +686,11 @@ if __name__ == "__main__":
 
     lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
     lin_reg.fit()
-    lin_reg.score(plot_fig=True)
+    lin_reg.score(plot_fig=False)
 
 # todo add MLP-window and LSTM classes
 # todo change tensorboard output to show scores next to each other
 # todo try loss of r2 instead of MAE or MSE
 # todo add usage of repeated kfold cross validation instead of just kfold
 # todo include way to specifying the tb log dir
-# todo visualise linear mod results https://machinelearningmastery.com/robust-regression-for-machine-learning-in-python/
-# todo document linear model scatter -> plot
-# todo finish linear visualisation
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
