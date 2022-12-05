@@ -14,9 +14,10 @@ import os
 from typing import Any, Union
 
 from nptdms import TdmsFile
+from numpy import ndarray
+from tqdm import tqdm
 import numpy as np
 import multiprocessing
-import time
 import math
 from scipy.ndimage.filters import uniform_filter1d
 from scipy import signal
@@ -25,6 +26,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import mplcursors
 import pickle
+import pandas as pd
 
 mpl.use("Qt5Agg")
 
@@ -56,7 +58,7 @@ class NC4:
             testinfo: Any,
             dcb: Any,
             fs: float,
-            ) -> None:
+    ) -> None:
         """
         NC4 class.
 
@@ -66,6 +68,12 @@ class NC4:
             dcb: DCB obj, containing info about the DCB used for the test.
             fs: Sample rate for the NC4 acquisition during the test.
         """
+        self.theta = None
+        self.radius = pd.Series(np.nan, index=np.arange(len(files))) # todo change these to None and condition for updating to if none or [0] is none
+        self.form_error = pd.Series(np.nan, index=np.arange(len(files)))
+        self.runout = pd.Series(np.nan, index=np.arange(len(files)))
+        self.peak_radius = pd.Series(np.nan, index=np.arange(len(files)))
+        self.mean_radius = pd.Series(np.nan, index=np.arange(len(files)))
         self._files = files
         self._dcb = dcb
         self._fs = fs
@@ -96,13 +104,15 @@ class NC4:
         """
         Function to process the NC4 data from a voltage to radius and compute useful features.
         """
-        print('Processing NC4 data...')
-        st1 = time.time()
+        # print('Processing NC4 data...')
+        # st1 = time.time()
         with multiprocessing.Pool() as pool:
-            results = pool.map(self._sampleandpos, range(len(self._files)))
+            results = list(tqdm(pool.imap(self._sampleandpos, range(len(self._files)), chunksize=10),
+                                total=len(self._files),
+                                desc='NC4- Sampling'))
         pool.close()
-        en = time.time()
-        print(f'Sampling done {en - st1:.1f} s...')
+        # en = time.time()
+        # print(f'Sampling done {en - st1:.1f} s...')
 
         psample = [tple[0] for tple in results]
         posy = ([tple[1] for tple in results])
@@ -112,22 +122,65 @@ class NC4:
         p = zip(psample, posy)
         n = zip(nsample, negy)
 
-        st = time.time()
+        # st = time.time()
         prad, nrad = self.sigtorad(p, n)
-        en = time.time()
-        print(f'Converting done {en - st:.1f} s...')
+        # en = time.time()
+        # print(f'Converting done {en - st:.1f} s...')
 
-        st = time.time()
+        # st = time.time()
         radii = self._alignposneg(prad, nrad)
-        self._alignsigs(radii)
-        en = time.time()
-        print(f'Aligning done {en - st:.1f} s...')
+        radius = self._alignsigs(radii)
+        self.radius = radius
+        # en = time.time()
+        # print(f'Aligning done {en - st:.1f} s...')
 
-        st = time.time()
-        self._fitcircles()
-        en = time.time()
-        print(f'Calc results done {en - st:.1f} s...')
-        print(f'Total time: {en - st1:.1f} s')
+        # st = time.time()
+        mean_radius, peak_radius, runout, form_error = self._fitcircles(radius)
+        self.mean_radius = pd.Series(mean_radius)
+        self.peak_radius = pd.Series(peak_radius)
+        self.runout = pd.Series(runout)
+        self.form_error = pd.Series(form_error)
+        # en = time.time()
+        # print(f'Calc results done {en - st:.1f} s...')
+        # print(f'Total time: {en - st1:.1f} s')
+
+    def check_last(self):
+        def _compute_nc4(fno):
+            psample, posy, nsample, negy = self._sampleandpos(fno=fno)
+            prad = self.polyvalradius((psample, posy))
+            nrad = self.polyvalradius((nsample, negy))
+            prad = np.transpose(np.reshape(prad, (-1, 1)))
+            nrad = np.transpose(np.reshape(nrad, (-1, 1)))
+            radii = self._alignposneg(prad, nrad)
+            st = np.argmin(radii[0, 0:int(self._fs)])
+            rpy = 4
+            clip = 0.5
+            radius = radii[:, np.arange(st, st + (radii.shape[1]) / (rpy - (2 * clip)), dtype=int)]
+            mean_radius, peak_radius, runout, form_error = self._fitcircles(radius)
+            return mean_radius, peak_radius, runout, form_error
+
+        self.theta = 2 * np.pi * np.arange(0, 1, 1 / self._fs)
+
+        if np.isnan(self.mean_radius[0]):
+            self.mean_radius[0], self.peak_radius[0], self.runout[0], self.form_error[0] = _compute_nc4(fno=0)
+
+        index = len(self._files) - 1
+        if index > 0:
+            mean_rad, peak_rad, runout, form_error = _compute_nc4(fno=index)
+            self.mean_radius[index] = mean_rad[0]
+            self.peak_radius[index] = peak_rad[0]
+            self.runout[index] = runout[0]
+            self.form_error[index] = form_error[0]
+
+        wear = (self.mean_radius.iloc[-1] - self.mean_radius.iloc[0]) / self.mean_radius.iloc[0] * 100
+
+        print('-' * 60)
+        print(f'NC4 - File {index}:')
+        print(f'\tMean radius = {self.mean_radius.iloc[-1]:.6f} mm')
+        print(f'\tRunout = {self.runout.iloc[-1] * 1000:.3f} um')
+        print(f'\tWear = {wear:.3f} %')
+        print('-' * 60)
+        self.plot_att()
 
     def plot_att(self) -> None:
         """
@@ -139,35 +192,33 @@ class NC4:
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.pickle'
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
-        try:
-            with open(pic_name, 'rb') as f:
-                fig = pickle.load(f)
-        except IOError:
-            fig, ax_r = plt.subplots()
-            l1 = ax_r.plot(self._datano, self.mean_radius, 'C0', label='Mean Radius')
-            l2 = ax_r.plot(self._datano, self.peak_radius, 'C1', label='Peak Radius')
-            ax_e = ax_r.twinx()
-            l3 = ax_e.plot(self._datano, self.runout * 1000, 'C2', label='Runout')
-            l4 = ax_e.plot(self._datano, self.form_error * 1000, 'C3', label='Form Error')
 
-            ax_r.set_title(f'Test No: {self._testinfo.testno} - NC4 Attributes')
-            ax_r.autoscale(enable=True, axis='x', tight=True)
-            ax_r.set_xlabel('Measurement No')
-            ax_e.set_ylabel('Radius (\u03BCm)')
-            ax_r.set_ylabel('Radius (mm)')
-            ax_r.grid()
-            # fig.legend(loc='upper right', bbox_to_anchor=[0.9, 0.875])
-            ax_e.legend((l1 + l2 + l3 + l4), ['Mean Radius', 'Peak Radius', 'Runout', 'Form Error'],
-                        loc='upper right', fontsize=9)
-            try:
-                open(png_name)
-            except IOError:
-                fig.savefig(png_name, dpi=300)
-            try:
-                open(pic_name)
-            except IOError:
-                with open(pic_name, 'wb') as f:
-                    pickle.dump(fig, f)
+        fig, ax_r = plt.subplots()
+        self.mean_radius.dropna().plot(color='C0', label='Mean Radius')
+        self.peak_radius.dropna().plot(color='C1', label='Peak Radius')
+        ax_e = ax_r.twinx()
+        self.runout.dropna().multiply(1000).plot(color='C2', label='Runout')
+        self.form_error.dropna().multiply(1000).plot(color='C3', label='Form Error')
+
+        ax_r.set_title(f'Test No: {self._testinfo.testno} - NC4 Attributes')
+        ax_r.autoscale(enable=True, axis='x', tight=True)
+        ax_r.set_xlabel('Measurement No')
+        ax_e.set_ylabel('Errors (\u03BCm)')
+        ax_r.set_ylabel('Radius (mm)')
+        ax_r.grid()
+        l1, lab1 = ax_r.get_legend_handles_labels()
+        l2, lab2 = ax_e.get_legend_handles_labels()
+        ax_e.legend(l1 + l2, lab1 + lab2, loc='upper right', fontsize=9)
+
+        try:
+            open(png_name)
+        except IOError:
+            fig.savefig(png_name, dpi=300)
+        try:
+            open(pic_name)
+        except IOError:
+            with open(pic_name, 'wb') as f:
+                pickle.dump(fig, f)
         mplcursors.cursor(hover=2)
         fig.show()
 
@@ -191,20 +242,20 @@ class NC4:
 
         if fno is None:
             radius = self.radius
-            try:
-                with open(pic_name, 'rb') as f:
-                    fig = pickle.load(f)
-            except IOError:
-                fig, ax = plt.subplots()
-                savefig = True
-                n = 0
-                for r in radius:
-                    ax.plot(self.theta, r, label=f'File {n:03.0f}', linewidth=0.5)
-                    n += 1
-                ax.set_xlabel('Angle (rad)')
-                ax.set_ylabel('Radius (mm)')
-                ax.set_title(f'Test No: {self._testinfo.testno} - NC4 Radius Plot')
-                ax.autoscale(enable=True, axis='x', tight=True)
+            # try:
+            #     with open(pic_name, 'rb') as f:
+            #         fig = pickle.load(f)
+            # except IOError:
+            fig, ax = plt.subplots()
+            savefig = True
+            n = 0
+            for r in radius:
+                ax.plot(self.theta, r, label=f'File {n:03.0f}', linewidth=0.5)
+                n += 1
+            ax.set_xlabel('Angle (rad)')
+            ax.set_ylabel('Radius (mm)')
+            ax.set_title(f'Test No: {self._testinfo.testno} - NC4 Radius Plot')
+            ax.autoscale(enable=True, axis='x', tight=True)
         else:
             fig, ax = plt.subplots()
             slice_n = slice(fno[0], fno[1])
@@ -354,13 +405,17 @@ class NC4:
         """
         # Converting to Radii rather then Voltage
         with multiprocessing.Pool() as pool:
-            prad = pool.map(self.polyvalradius, p)
-            nrad = pool.map(self.polyvalradius, n)
+            prad = list(tqdm(pool.imap(self.polyvalradius, p, chunksize=10),
+                             total=len(self._files),
+                             desc='NC4- Conv pos'))
+            nrad = list(tqdm(pool.imap(self.polyvalradius, n, chunksize=10),
+                             total=len(self._files),
+                             desc='NC4- Conv neg'))
         pool.close()
         return prad, nrad
 
     @staticmethod
-    def _alignposneg(prad: list, nrad: list) -> np.ndarray:
+    def _alignposneg(prad: Union[list, np.ndarray], nrad: Union[list, np.ndarray]) -> np.ndarray:
         """
         Combine the pos and neg halfs of the signal together.
 
@@ -375,9 +430,14 @@ class NC4:
         nradzero = np.subtract(np.transpose(nrad), np.mean(nrad, axis=1))
         # print('Working out Lags')
         radzeros = list(zip(np.transpose(pradzero), np.transpose(nradzero)))
-        with multiprocessing.Pool() as pool:
-            lag = pool.map(compute_shift, radzeros)
-        pool.close()
+        if len(radzeros) == 1:
+            lag = [compute_shift(radzeros[0])]
+        else:
+            with multiprocessing.Pool() as pool:
+                lag = list(tqdm(pool.imap(compute_shift, radzeros, chunksize=10),
+                                total=len(radzeros),
+                                desc='NC4- Merge pn'))
+            pool.close()
         # print('Finished lags')
         nrad = np.array([np.roll(row, -x) for row, x in zip(nrad, lag)])
         radii = np.array([(p + n) / 2 for p, n in zip(prad, nrad)])
@@ -397,7 +457,9 @@ class NC4:
         radzero = radii - radii.mean(axis=1, keepdims=True)
         radzeros = zip(radzero, np.roll(radzero, -1, axis=0))
         with multiprocessing.Pool() as pool:
-            lags = pool.map(compute_shift, radzeros)
+            lags = list(tqdm(pool.imap(compute_shift, radzeros, chunksize=10),
+                             total=len(self._files),
+                             desc='NC4- Aln sigs'))
         pool.close()
 
         dly = np.cumsum(lags)
@@ -409,29 +471,36 @@ class NC4:
         rpy = 4
         clip = 0.5
         radius = radii[:, np.arange(st, st + (radii.shape[1]) / (rpy - (2 * clip)), dtype=int)]
-        self.radius = radius
+        # self.radius = radius
         return radius
 
-    def _fitcircles(self) -> list[tuple[float, float, float, float]]:
+    def _fitcircles(self, radius: np.ndarray) -> tuple[ndarray, ndarray, ndarray, ndarray]:
         """
         Fit a circle to each NC4 measurements and return its properties.
+
+        Args:
+            radius: Array of radius to calc attributes for
 
         Returns:
             List of tuples containing the x and y coords, the radius of the circle and the variance.
         """
-        radius = self.radius
         theta = self.theta
         x = np.array([np.multiply(r, np.sin(theta)) for r in radius])
         y = np.array([np.multiply(r, np.cos(theta)) for r in radius])
         xy = np.array(list(zip(x, y))).transpose([0, 2, 1])
-        with multiprocessing.Pool() as pool:
-            circle = pool.map(circle_fit.hyper_fit, xy)
-        pool.close()
-        self.runout = np.array([2 * (np.sqrt(x[0] ** 2 + x[1] ** 2)) for x in circle])
-        self.mean_radius = np.array([x[2] for x in circle])
-        self.peak_radius = np.array([np.max(rad) for rad in radius])
-        self.form_error = np.array([(np.max(rad) - np.min(rad)) for rad in radius])
-        return circle
+        if len(x) == 1:
+            circle = [circle_fit.hyper_fit(xy[0])]
+        else:
+            with multiprocessing.Pool() as pool:
+                circle = list(tqdm(pool.imap(circle_fit.hyper_fit, xy, chunksize=10),
+                                   total=len(xy),
+                                   desc='NC4- Calc att'))
+            pool.close()
+        runout = np.array([2 * (np.sqrt(x[0] ** 2 + x[1] ** 2)) for x in circle])
+        mean_radius = np.array([x[2] for x in circle])
+        peak_radius = np.array([np.max(rad) for rad in radius])
+        form_error = np.array([(np.max(rad) - np.min(rad)) for rad in radius])
+        return mean_radius, peak_radius, runout, form_error
 
     def update(self, files: Union[list[str], tuple[str]]) -> None:
         """
@@ -442,4 +511,4 @@ class NC4:
 
         """
         self._files = files
-        # todo add functionality to only process updated files
+        self._datano = np.arange(0, len(self._files))

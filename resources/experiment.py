@@ -14,7 +14,9 @@ import datetime
 import fnmatch
 import glob
 import os
+import re
 from tkinter.filedialog import askdirectory, askopenfilename
+import tkinter as tk
 import pickle
 from typing import Union
 
@@ -65,7 +67,8 @@ def _sort_rename(files: list[str], path: str) -> None:
 
     for fno in sdfiles:
         number = str('%03.f' % fno[0])
-        newfilename = 'File_' + number + '_202' + substring_after(fno[1], '202')
+        ind = re.search(r'^.*202', fno[1]).end()
+        newfilename = 'File_' + number + '_202' + fno[1][ind:]
         if not newfilename == fno[1]:
             os.rename(fno[1], os.path.join(path, newfilename))
 
@@ -167,7 +170,10 @@ class Experiment:
         self.features = pd.DataFrame
 
     def __repr__(self):
-        rep = f'Test No: {self.test_info.testno} \nDate: {self.date} \nData: {self.dataloc}'
+        no_nc4 = len(self.nc4._files)
+        no_ae = len(self.ae._files)
+        rep = f'Test No: {self.test_info.testno}\nDate: {self.date}\nData: {self.dataloc}\n' \
+              f'No. Files: AE-{no_ae} NC4-{no_nc4}'
         return rep
 
     def save(self) -> None:
@@ -182,28 +188,36 @@ class Experiment:
         Update the Experiment class with new files.
         """
         dataloc = self.test_info.dataloc
-        print(f'Updating experiemnt obj - {datetime.datetime.now()}')
-        ae_path = os.path.join(dataloc, 'AE', 'TDMS')
-        nc4_path = os.path.join(dataloc, 'NC4', 'TDMS')
-        if glob.glob(os.path.join(dataloc, "*MHz.tdms")):
-            _move_files(dataloc, ae_path, '*MHz.tdms')
-            print('Moving new AE files...')
-            ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
-            _sort_rename(ae_files, ae_path)
-            self.ae.update(tuple(ae_files))
-        else:
-            print('No new AE files')
+        if glob.glob(os.path.join(dataloc, "*.tdms")):
+            print('-' * 60)
+            print(f'Updating experiemnt obj - {datetime.datetime.now()}')
+            ae_path = os.path.join(dataloc, 'AE', 'TDMS')
+            nc4_path = os.path.join(dataloc, 'NC4', 'TDMS')
+            if glob.glob(os.path.join(dataloc, "*MHz.tdms")):
+                _move_files(dataloc, ae_path, '*MHz.tdms')
+                # print('Moving new AE files...')
+                ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
+                _sort_rename(ae_files, ae_path)
+                ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
+                self.ae.update(tuple(ae_files))
+            # else:
+            #     print('No new AE files')
 
-        if glob.glob(os.path.join(dataloc, "*kHz.tdms")):
-            print("Moving new NC4 files...")
-            _move_files(dataloc, nc4_path, '*kHz.tdms')
-            nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
-            _sort_rename(nc4_files, nc4_path)
-            self.nc4.update(tuple(nc4_files))
-        else:
-            print('No new NC4 files.')
+            if glob.glob(os.path.join(dataloc, "*kHz.tdms")):
+                # print("Moving new NC4 files...")
+                _move_files(dataloc, nc4_path, '*kHz.tdms')
+                nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
+                _sort_rename(nc4_files, nc4_path)
+                nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
+                self.nc4.update(tuple(nc4_files))
+            # else:
+            #     print('No new NC4 files.')
 
-    # todo finish update func and print test update
+            no_nc4 = len(self.nc4._files)
+            no_ae = len(self.ae._files)
+            # print('-' * 60)
+            print(f'No. Files: AE-{no_ae} NC4-{no_nc4}')
+            self.save()
 
     def correlation(self, plotfig: bool = True) -> None:
         """
@@ -285,16 +299,16 @@ class Experiment:
         cols = ["RMS", 'Kurtosis', 'Amplitude', 'Skewness', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
                 'Mean radius', 'Peak radius', 'Radius diff', 'Runout', 'Form error']
 
-        rms = self.ae.rms[:-1]
-        kurt = self.ae.kurt[:-1]
-        amp = self.ae.amplitude[:-1]
-        skew = self.ae.skewness[:-1]
+        rms = self.ae.rms
+        kurt = self.ae.kurt
+        amp = self.ae.amplitude
+        skew = self.ae.skewness
 
         f = np.array(self.ae.fft[1000])
         f = f.T
-        f_35: np.array = f[35][:-1]
-        f_10: np.array = f[10][:-1]
-        f_134: np.array = f[134][:-1]
+        f_35: np.array = f[35]
+        f_10: np.array = f[10]
+        f_134: np.array = f[134]
 
         mean_rad: np.array = self.nc4.mean_radius[1:]
         peak_rad = self.nc4.peak_radius[1:]
@@ -322,30 +336,31 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
         Saved experiment obj containing AE, NC4 data.
     """
 
-    f_locs = {
-        'test5': r'..\..\Testing\22_08_03_grit1000\Test 5.pickle',
-        'test2': r"..\..\Testing\TEST2Combined\Test 2.pickle",
-        'test1': r"..\..\Testing\28_2_22_grit1000\Test 1.pickle"
-    }
-
     if file is None:
         try:
+            root = tk.Tk()
             file_path = askopenfilename(defaultextension='pickle')
+            root.withdraw()
             if not file_path:
                 raise NotADirectoryError
             with open(file_path, 'rb') as f:
                 data = pickle.load(f)
         except NotADirectoryError:
-            print('No file selected.')
-            return
+            print('No existing exp file selected!')
+            raise NotADirectoryError('No existing exp file selected to load!')
     else:
+        f_locs = pd.read_csv(r"reference//Test obj locations.txt", sep=',', index_col=0)
+        f_locs = f_locs.to_dict()['Obj location']
+        f_locs = {k: "..\\..\\" + str(v) for k, v in f_locs.items()}
         try:
             file_path = f_locs[file.lower().replace(' ', '')]
             with open(file_path, 'rb') as f:
                 data = pickle.load(f)
         except KeyError:
-            print(f'File location of {file} not saved in load function.')
-            return
+            # print(f'File location of {file} not saved in load function.')
+            # print(f'Known file locations are : {f_locs}')
+            raise NotADirectoryError(f'File location of {file} not saved in load function. \
+Known file locations are : {f_locs.keys()}')
     if process:
         try:
             getattr(data.NC4, 'radius')
@@ -357,7 +372,7 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
     return data
 
 
-def create_obj(folder: str = None, process: True = False) -> Union[Experiment, None]:
+def create_obj(folder: str = None, process: bool = False) -> Union[Experiment, None]:
     """
     Creates experiment obj for test from test folder, selected either by GUI or path input.
 
@@ -402,7 +417,9 @@ def create_obj(folder: str = None, process: True = False) -> Union[Experiment, N
     # import file names and directories of AE and NC4
     if folder is None:
         try:
+            root = tk.Tk()
             folder_path = askdirectory(title='Select test folder:')
+            root.withdraw()
             if not folder_path:
                 raise NotADirectoryError
         except NotADirectoryError:

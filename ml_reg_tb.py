@@ -27,6 +27,8 @@ from textwrap import dedent
 import resources
 
 TARGET = 'Mean radius'
+
+
 def preprocess_df(df, val_frac):
     scaler = MinMaxScaler()
     for col in df.columns:
