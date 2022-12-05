@@ -41,6 +41,7 @@ class Base_Model:
             target: Iterable = None,
             feature_df: pd.DataFrame = None,
             tb: bool = True,
+            tb_logdir: str = 'tb/MLP/'
     ):
         """
         Base_Model constructor.
@@ -49,6 +50,7 @@ class Base_Model:
             target: Label of the feature to predict from the dataframe
             feature_df: Feature dataframe of which to train and predict
             tb: Option to record model progress and results in Tensorboard
+            tb_logdir: Folder path for tb logging, i.e. tb/MLP/
         """
         self.model = None
         self.main_df = feature_df
@@ -58,6 +60,7 @@ class Base_Model:
         self._tb = tb
         self._run_name = None
         self.params = {}
+        self._tb_log_dir = tb_logdir
 
         if self.target is None:
             raise AttributeError('There is no TARGET attribute set.')
@@ -197,7 +200,8 @@ class Base_Model:
 
         return _test_score
 
-    def initialise_model(self, verbose=1, **params) -> KerasRegressor:
+    def initialise_model(self, verbose=1, **params) -> Any:
+        self._run_name = f'{self._tb_log_dir}MLP'
         pass
 
     def _cv_model(
@@ -476,11 +480,11 @@ class MLP_Model(Base_Model):
 
         """
         no_features = pd.DataFrame.to_numpy(self.train_data[0]).shape[1]
+
         # tensorboard set-up
-        if self._run_name is None:
-            logdir = 'tb/MLP/'
-            self._run_name = f'{logdir}MLP-E-{epochs}-B-{batch_size}-L{np.full(no_layers, no_nodes)}-D-{dropout}' \
-                             f'-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
+        logdir = self._tb_log_dir
+        self._run_name = f'{logdir}MLP-E-{epochs}-B-{batch_size}-L{np.full(no_layers, no_nodes)}-D-{dropout}' \
+                         f'-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
 
         if callbacks is None:
             callbacks = []
@@ -671,9 +675,11 @@ if __name__ == "__main__":
     main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop([0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
 
+    # MLP MODEL
     # mlp_reg = MLP_Model(feature_df=main_df,
     #                     target='Mean radius',
     #                     tb=False,
+    #                     tb_logdir='tb/MLP/',
     #                     params={'loss': 'mse',
     #                             'epochs': 100,
     #                             'no_layers': 2,
@@ -684,6 +690,7 @@ if __name__ == "__main__":
     # mlp_reg.fit(validation_split=0.2, verbose=0)
     # mlp_reg.score()
 
+    # MULTIPLE LINEAR MODEL
     lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
     lin_reg.fit()
     lin_reg.score(plot_fig=False)
@@ -692,5 +699,4 @@ if __name__ == "__main__":
 # todo change tensorboard output to show scores next to each other
 # todo try loss of r2 instead of MAE or MSE
 # todo add usage of repeated kfold cross validation instead of just kfold
-# todo include way to specifying the tb log dir
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
