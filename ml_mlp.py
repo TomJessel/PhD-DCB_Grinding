@@ -29,7 +29,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Dropout
 from scikeras.wrappers import KerasRegressor
 import pandas as pd
-from sklearn.model_selection import train_test_split, KFold
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
 import resources
@@ -269,22 +269,37 @@ class Base_Model:
         return self._cv_model(*args)
 
     def cv(self,
-           n_splits: int = 5
+           n_splits: int = 5,
+           n_repeats: int = None,
+           random_state: Any = None,
            ) -> Dict:
         """
-        Cross validate a ML model with Kfolds
+        Cross validate a ML model with either Kfold or Repeated Kfold
 
+        If no input given to n_repeats, Kfold is used, if n_repeats is an int Repeated Kfold is used instead
         Args:
-            n_splits: No splits in the kfolds system
+            n_splits: No splits in the CV
+            n_repeats: No repeats to do with Repeated Kfold CV
+            random_state: Random state of the CV, if no input random
 
         Returns:
             Dict of cv scores including mean values and stds
 
         """
-        cv = KFold(n_splits=n_splits,
-                   shuffle=True,
-                   # random_state=10,
-                   )
+
+        from sklearn.model_selection import KFold, RepeatedKFold
+        # Use Kfold or Repeated Kfold
+        if n_repeats is None:
+            cv = KFold(n_splits=n_splits,
+                       shuffle=True,
+                       random_state=random_state,
+                       )
+        else:
+            cv = RepeatedKFold(n_splits=n_splits,
+                               n_repeats=n_repeats,
+                               random_state=random_state,
+                               )
+
         cv_items = [(i, train, test) for i, (train, test) in enumerate(cv.split(self.train_data[0].values))]
 
         with multiprocessing.Pool() as pool:
@@ -707,7 +722,7 @@ if __name__ == "__main__":
     # MLP MODEL
     mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
-                        tb=True,
+                        tb=False,
                         tb_logdir='',
                         params={'loss': 'mse',
                                 'epochs': 100,
@@ -715,7 +730,7 @@ if __name__ == "__main__":
                                 },
                         )
 
-    mlp_reg.cv(n_splits=10)
+    mlp_reg.cv(n_splits=10, n_repeats=10)
     mlp_reg.fit(validation_split=0.2, verbose=0)
     mlp_reg.score()
 
@@ -725,7 +740,5 @@ if __name__ == "__main__":
     # lin_reg.score(plot_fig=False)
 
 # todo add MLP-window and LSTM classes
-# todo change tensorboard output to show scores next to each other
 # todo try loss of r2 instead of MAE or MSE
-# todo add usage of repeated kfold cross validation instead of just kfold
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
