@@ -41,7 +41,7 @@ class Base_Model:
             target: Iterable = None,
             feature_df: pd.DataFrame = None,
             tb: bool = True,
-            tb_logdir: str = 'tb/MLP/'
+            tb_logdir: str = r'tb/MLP/'
     ):
         """
         Base_Model constructor.
