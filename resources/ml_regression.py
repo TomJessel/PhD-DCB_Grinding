@@ -11,7 +11,7 @@
 """
 import os
 import time
-from typing import Dict, Any, Union
+from typing import Dict, Any, List, Union
 import logging
 
 import matplotlib.pyplot as plt

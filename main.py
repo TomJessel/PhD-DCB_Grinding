@@ -54,41 +54,6 @@ def corr_pairplot(df: pd.DataFrame, save_fig: bool = True):
     plt.show()
 
 
-def ae_hits(exp: object, s: np.array):
-    """
-    Convert AE signal into hit data
-    :param exp: object: experiement object
-    :param s: ndarray: AE signal
-    """
-
-    def dbtov(db):
-        v_ref = 1E-4
-        v = [(10 ** (d / 20)) * v_ref for d in db]
-        return v
-
-    # THRESHOLD
-    th = 91
-    # hit time definition parameters from AEwin
-    HDT = 800E-6
-    PDT = 200E-6
-    HLT = 1000E-6
-    MAXD = 1000E-3
-    fs = exp.test_info.acquisition[0]
-    th_v = dbtov([th])
-
-    abs_sig = np.abs(s)
-    th_ind = abs_sig > th_v
-
-    fig, ax = plt.subplots()
-    ax.plot(np.arange(0, len(s)) * (1 / fs), s)
-    ax.axhline(y=th_v[0], color='r')
-    ax.axhline(y=(-1 * th_v[0]), color='r')
-    mplcursors.cursor(multiple=True)
-    plt.show()
-    # todo finish ae hits attempt
-    pass
-
-
 if __name__ == '__main__':
     exp = resources.load(file='Test 5')
     dataframe = exp.features.drop(columns=['Runout', 'Form error']).drop([0, 1, 23, 24])

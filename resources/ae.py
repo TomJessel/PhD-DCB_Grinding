@@ -124,7 +124,7 @@ class AE:
             pre_amp: Any,
             testinfo: Any,
             fs: float,
-            ) -> None:
+    ) -> None:
         """
         AE class.
 
@@ -239,14 +239,14 @@ class AE:
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
         mpl.use("Qt5Agg")
-        plt.figure()
-        plt.plot(t, signal, linewidth=1)
-        plt.title(filename)
-        plt.autoscale(enable=True, axis='x', tight=True)
-        plt.xlabel('Time (s)')
-        plt.ylabel('Voltage (V)')
+        fig, ax = plt.subplots()
+        ax.plot(t, signal, linewidth=1)
+        ax.set_title(filename)
+        ax.autoscale(enable=True, axis='x', tight=True)
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Voltage (V)')
         mplcursors.cursor(multiple=True)
-        plt.show()
+        fig.show()
 
     def plotfft(self, fno: int, freqres: float = 1000) -> None:
         """
@@ -266,15 +266,15 @@ class AE:
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
         mpl.use('Qt5Agg')
-        plt.figure()
-        plt.plot(f / 1000, p)
-        plt.title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
-        plt.autoscale(enable=True, axis='x', tight=True)
-        plt.xlabel('Frequency (kHz)')
-        plt.ylabel('Amplitude (dB)')
-        plt.grid()
+        fig, ax = plt.subplots()
+        ax.plot(f / 1000, p)
+        ax.set_title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
+        ax.autoscale(enable=True, axis='x', tight=True)
+        ax.set_xlabel('Frequency (kHz)')
+        ax.set_ylabel('Amplitude (dB)')
+        ax.grid()
         mplcursors.cursor(hover=True)
-        plt.show()
+        fig.show()
 
     def process(self, trigger: bool = True, FFT: bool = False) -> None:
         """
@@ -288,7 +288,7 @@ class AE:
             FFT: Option to calculate the 1kHz fft for each signal.
 
         """
-        with multiprocessing.Pool() as pool:
+        with multiprocessing.Pool(processes=20) as pool:
             if self.trig_points.empty and trigger:
                 trigs = list(tqdm(pool.imap(self._triggers, range(len(self._files))),
                                   total=len(self._files),
@@ -302,7 +302,15 @@ class AE:
                                 desc='AE features'))
 
             results = np.array(results)
-            if 1000 not in self.fft or FFT:
+        pool.close()
+
+        self.kurt = results[:, 0]
+        self.rms = results[:, 1]
+        self.amplitude = results[:, 2]
+        self.skewness = results[:, 3]
+
+        if 1000 not in self.fft or FFT:
+            with multiprocessing.Pool(processes=20) as pool:
                 # print('Calculating FFT with 1kHz bins...')
                 fft = list(tqdm(pool.imap(partial(self._fftcalc, freqres=1000), range(len(self._files))),
                                 total=len(self._files),
@@ -310,11 +318,6 @@ class AE:
                 p = self.volt2db(np.array(fft))
                 self.fft[1000] = p
         pool.close()
-
-        self.kurt = results[:, 0]
-        self.rms = results[:, 1]
-        self.amplitude = results[:, 2]
-        self.skewness = results[:, 3]
 
     def _calc(self, fno: int) -> [np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -372,7 +375,7 @@ class AE:
             self,
             freqres: float = 1000,
             freqlim: Union[None, list] = None
-            ) -> None:
+    ) -> None:
         """
         Plot a 3D surface of the fft of each AE signal in the experiment.
 
