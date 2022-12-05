@@ -8,6 +8,7 @@
 26/10/2022 10:01   tomhj      1.0         Script to contain all code relating to MLP models
 """
 import multiprocessing
+import os.path
 import time
 import warnings
 from textwrap import dedent
@@ -15,7 +16,6 @@ from typing import Union, Iterable, Dict, Any
 
 import numpy as np
 from matplotlib import pyplot as plt
-# from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from tqdm.auto import tqdm
 
@@ -41,7 +41,6 @@ class Base_Model:
             target: Iterable = None,
             feature_df: pd.DataFrame = None,
             tb: bool = True,
-            tb_logdir: str = r'tb/MLP/'
     ):
         """
         Base_Model constructor.
@@ -50,7 +49,6 @@ class Base_Model:
             target: Label of the feature to predict from the dataframe
             feature_df: Feature dataframe of which to train and predict
             tb: Option to record model progress and results in Tensorboard
-            tb_logdir: Folder path for tb logging, i.e. tb/MLP/
         """
         self.model = None
         self.main_df = feature_df
@@ -60,12 +58,36 @@ class Base_Model:
         self._tb = tb
         self._run_name = None
         self.params = {}
-        self._tb_log_dir = tb_logdir
+
+        # Tensorboard filename
+        dirname = self.get_file_dir()
+        self._tb_log_dir = os.path.join(dirname, 'Tensorboard')
 
         if self.target is None:
             raise AttributeError('There is no TARGET attribute set.')
         if self.main_df is None:
             raise AttributeError('There is no MAIN_DF attribute.')
+
+    @staticmethod
+    def get_file_dir():
+        """
+        Get path to the AE file in OneDrive folder
+
+        Returns:
+            file path to AE folder
+
+        """
+        import os
+        import re
+
+        dirname = os.path.dirname(__file__)
+
+        regex_folder = re.compile("(OneDrive - Cardiff University)")
+        result = regex_folder.search(dirname)
+
+        filename = dirname[:result.end()] + r"\Documents\PhD\AE"
+        filename = os.path.abspath(filename)
+        return filename
 
     def pre_process(self):
         raise AttributeError('No assigned function to pre-process data for Base_Model')
@@ -201,7 +223,7 @@ class Base_Model:
         return _test_score
 
     def initialise_model(self, verbose=1, **params) -> Any:
-        self._run_name = f'{self._tb_log_dir}MLP'
+        self._run_name = f'{self._tb_log_dir}\\Base-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
         pass
 
     def _cv_model(
@@ -333,6 +355,7 @@ class MLP_Model(Base_Model):
     def __init__(
             self,
             params: Dict = None,
+            tb_logdir: str = '',
             **kwargs,
     ):
         """
@@ -342,12 +365,17 @@ class MLP_Model(Base_Model):
 
         Args:
             params: Dict of mlp model parameters passed to self.initialise_model
+            tb_logdir: Folder path for tb logging, i.e. "CV" -> "Tensorboard\\MLP\\CV"
             **kwargs: Inputs for Base_Model init
         """
+
         super().__init__(**kwargs)
         if params is None:
             params = {}
         self.params = params
+
+        self._tb_log_dir = os.path.join(self._tb_log_dir, 'MLP', tb_logdir)
+
         if self.main_df is not None:
             self.pre_process()
             self.model = self.initialise_model(**params)
@@ -483,8 +511,9 @@ class MLP_Model(Base_Model):
 
         # tensorboard set-up
         logdir = self._tb_log_dir
-        self._run_name = f'{logdir}MLP-E-{epochs}-B-{batch_size}-L{np.full(no_layers, no_nodes)}-D-{dropout}' \
-                         f'-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
+        self._run_name = os.path.join(logdir,
+                                      f'MLP-E-{epochs}-B-{batch_size}-L{np.full(no_layers, no_nodes)}-D-{dropout}'
+                                      f'-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}')
 
         if callbacks is None:
             callbacks = []
@@ -676,24 +705,24 @@ if __name__ == "__main__":
     main_df.reset_index(drop=True, inplace=True)
 
     # MLP MODEL
-    # mlp_reg = MLP_Model(feature_df=main_df,
-    #                     target='Mean radius',
-    #                     tb=False,
-    #                     tb_logdir='tb/MLP/',
-    #                     params={'loss': 'mse',
-    #                             'epochs': 100,
-    #                             'no_layers': 2,
-    #                             },
-    #                     )
-    #
-    # mlp_reg.cv(n_splits=10)
-    # mlp_reg.fit(validation_split=0.2, verbose=0)
-    # mlp_reg.score()
+    mlp_reg = MLP_Model(feature_df=main_df,
+                        target='Mean radius',
+                        tb=True,
+                        tb_logdir='',
+                        params={'loss': 'mse',
+                                'epochs': 100,
+                                'no_layers': 2,
+                                },
+                        )
 
-    # MULTIPLE LINEAR MODEL
-    lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
-    lin_reg.fit()
-    lin_reg.score(plot_fig=False)
+    mlp_reg.cv(n_splits=10)
+    mlp_reg.fit(validation_split=0.2, verbose=0)
+    mlp_reg.score()
+
+    # # MULTIPLE LINEAR MODEL
+    # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
+    # lin_reg.fit()
+    # lin_reg.score(plot_fig=False)
 
 # todo add MLP-window and LSTM classes
 # todo change tensorboard output to show scores next to each other
