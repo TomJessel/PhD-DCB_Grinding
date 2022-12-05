@@ -2,6 +2,6 @@
 /ml-results
 /Figures
 reference/Test obj locations.txt
-/tb
+/tb/
 .ipynb_checkpoints
 ml_testing.ipynb
