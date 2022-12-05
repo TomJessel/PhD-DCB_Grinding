@@ -108,9 +108,15 @@ class Base_Model:
             **kwargs: Additional inputs for keras fit method.
         """
         if X is None:
-            X = self.train_data[0].values
+            try:
+                X = self.train_data[0].values
+            except AttributeError:
+                X = self.train_data[0]
         if y is None:
-            y = self.train_data[1].values
+            try:
+                y = self.train_data[1].values
+            except AttributeError:
+                y = self.train_data[1]
 
         self.model.fit(X=X, y=y, **kwargs)
 
@@ -178,9 +184,15 @@ class Base_Model:
         if model is None:
             model = self.model
         if X is None:
-            X = self.val_data[0].values
+            try:
+                X = self.val_data[0].values
+            except AttributeError:
+                X = self.val_data[0]
         if y is None:
-            y = self.val_data[1].values
+            try:
+                y = self.val_data[1].values
+            except AttributeError:
+                y = self.val_data[1]
 
         # noinspection PyTypeChecker
         y_pred = model.predict(X, verbose=0)
@@ -248,15 +260,23 @@ class Base_Model:
         model = self.initialise_model(verbose=0, **self.params)
         model.callbacks = None
         self._tb = False
+
+        try:
+            X = self.train_data[0].values
+            y = self.train_data[1].values
+        except AttributeError:
+            X = self.train_data[0]
+            y = self.train_data[1]
+
         model.fit(
-            X=self.train_data[0].values[tr_index],
-            y=self.train_data[1].values[tr_index],
+            X=X[tr_index],
+            y=y[tr_index],
             # validation_data=(self.train_data[0].values[tr_index], self.train_data[1].values[tr_index])
         )
         score = self.score(
             model=model,
-            X=self.train_data[0].values[te_index],
-            y=self.train_data[1].values[te_index],
+            X=X[te_index],
+            y=y[te_index],
             print_score=False,
         )
         self._tb = True
@@ -301,7 +321,12 @@ class Base_Model:
                                random_state=random_state,
                                )
 
-        cv_items = [(i, train, test) for i, (train, test) in enumerate(cv.split(self.train_data[0].values))]
+        try:
+            X = self.train_data[0].values
+        except AttributeError:
+            X = self.train_data[0]
+
+        cv_items = [(i, train, test) for i, (train, test) in enumerate(cv.split(X))]
 
         with multiprocessing.Pool(processes=20) as pool:
             outputs = list(tqdm(pool.imap(self._cv_model_star, cv_items),
@@ -365,6 +390,7 @@ class Base_Model:
             with tb_writer.as_default():
                 tf.summary.text('Model Info', md_scores, step=3)
         return _cv_score
+
 
 class MLP_Model(Base_Model):
     def __init__(
@@ -559,6 +585,7 @@ class MLP_Model(Base_Model):
         )
         return model
 
+
 class Linear_Model(Base_Model):
     def __init__(
             self,
@@ -705,6 +732,7 @@ class Linear_Model(Base_Model):
             plt.show()
         return _test_score
 
+
 class MLP_Win_Model(Base_Model):
     def __init__(
             self,
@@ -774,7 +802,7 @@ class MLP_Win_Model(Base_Model):
             prev_points = deque(maxlen=seq_len)
 
             for i in d:
-                prev_points.append([n for n in i[:-1]]) # todo change this to adapt if multiple targets
+                prev_points.append([n for n in i[:-1]])  # todo change this to adapt if multiple targets
                 if len(prev_points) == seq_len:
                     seq_data.append([np.array(prev_points), i[-1]])
             return seq_data
@@ -817,9 +845,93 @@ class MLP_Win_Model(Base_Model):
         test_X = np.asarray(test_X)
         test_y = np.asarray(test_y)
 
-        self.train_data = (train_X, train_y)
-        self.val_data = (test_X, test_y)
+        self.train_data = [train_X, train_y]
+        self.val_data = [test_X, test_y]
+        self._no_features = self.train_data[0].shape[1] * self.train_data[0].shape[2]
+        self.train_data[0] = self.train_data[0].reshape((self.train_data[0].shape[0], self._no_features))
+        self.val_data[0] = self.val_data[0].reshape((self.val_data[0].shape[0], self._no_features))
         return self.train_data, self.val_data
+
+    def initialise_model(
+            self,
+            dropout: float = 0.1,
+            activation: str = 'relu',
+            no_nodes: int = 32,
+            no_layers: int = 2,
+            init_mode: str = 'glorot_normal',
+            epochs: int = 500,
+            batch_size: int = 10,
+            loss: str = 'mae',
+            metrics: Union[list, tuple] = ('MSE', 'MAE', KerasRegressor.r_squared),
+            optimizer: str = 'adam',
+            learning_rate: float = 0.001,
+            decay: float = 1e-6,
+            verbose: int = 1,
+            callbacks: list[tf.keras.callbacks] = None,
+            **params,
+    ) -> KerasRegressor:
+        """
+        Initialise a SciKeras Regression model with the given hyperparameters
+
+        Uses the specified parameters to create a Scikeras KerasRegressor. Allowing a Keras model to be produced easily
+        with all the inputted parameters.
+
+        Args:
+            dropout: Dropout rate of each dropout layer
+            activation: Activation function for the neurons'
+            no_nodes: No neurons in each Dense layer
+            no_layers: No of Dense and Dropout layers to create the model with
+            init_mode: Initialisation method for the weights of each neuron
+            epochs: No of epochs to train the model with
+            batch_size: No of samples for the model to train with before updating weights
+            loss: Metric to optimise the model for.
+            metrics: Metrics to track during training of the model
+            optimizer: Optimizer function used to allow model to learn
+            learning_rate: Learning rate of the optimizer
+            decay: Decay rate of the optimizer
+            verbose: Output type for the console
+            callbacks: Callbacks to add into the Keras model.
+
+        Returns: A KerasRegressor into the model attribute
+
+        """
+
+        # tensorboard set-up
+        logdir = self._tb_log_dir
+        self._run_name = os.path.join(logdir,
+                                      f'MLP_Win-WLEN-{self.seq_len}-E-{epochs}-B-{batch_size}-L-'
+                                      f'{np.full(no_layers, no_nodes)}-D-{dropout}-'
+                                      f'{time.strftime("%Y%m%d-%H%M%S", time.localtime())}')
+
+        if callbacks is None:
+            callbacks = []
+        # Add in TQDM progress bar for fitting
+        callbacks.append(tfa.callbacks.TQDMProgressBar(show_epoch_progress=False))
+
+        if self._tb:
+            # Add in tensorboard logging
+            callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=self._run_name, histogram_freq=1))
+
+        model = KerasRegressor(
+            model=MLP_Model.build_mod,
+            model__no_features=self._no_features,
+            model__dropout=dropout,
+            model__activation=activation,
+            model__no_nodes=no_nodes,
+            model__no_layers=no_layers,
+            model__init_mode=init_mode,
+            epochs=epochs,
+            batch_size=batch_size,
+            loss=loss,
+            metrics=metrics,
+            optimizer=optimizer,
+            optimizer__learning_rate=learning_rate,
+            optimizer__decay=decay,
+            verbose=verbose,
+            callbacks=callbacks,
+        )
+        return model
+
 
 if __name__ == "__main__":
     __spec__ = None
@@ -844,7 +956,7 @@ if __name__ == "__main__":
     #                             },
     #                     )
     #
-    # mlp_reg.cv(n_splits=10, n_repeats=10)
+    # mlp_reg.cv(n_splits=10)
     # mlp_reg.fit(validation_split=0.2, verbose=0)
     # mlp_reg.score()
 
@@ -853,11 +965,15 @@ if __name__ == "__main__":
                                 target='Mean radius',
                                 tb=False,
                                 tb_logdir='',
-                                params={'loss': 'mse',
-                                        'epochs': 100,
-                                        'no_layers': 2,
+                                params={'loss': 'mae',
+                                        'epochs': 1000,
+                                        'no_layers': 3,
                                         },
-    )
+                                )
+    mlp_win_reg.cv(n_splits=10)
+    mlp_win_reg.fit(validation_split=0.2, verbose=0)
+    mlp_win_reg.score()
+
     # # MULTIPLE LINEAR MODEL
     # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
     # lin_reg.fit()
@@ -865,8 +981,7 @@ if __name__ == "__main__":
 
     print('END')
 
-# todo add MLP-window and LSTM classes
+# todo add LSTM classes
 # todo try loss of r2 instead of MAE or MSE
 # todo add logger compatibility to log progress and scores incase of TensorBoard failure
-# todo create initialisation for MLP window model (finished only pre-process)
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
