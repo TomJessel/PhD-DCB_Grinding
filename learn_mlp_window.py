@@ -28,7 +28,7 @@ main_df = exp.features.drop(columns=['Runout', 'Form error'])
 
 
 def pre_process(df):
-    tr_x, v_x, tr_y, v_y = train_test_split(df.iloc[:, :-1], df.iloc[:, -1], test_size=0.2)
+    tr_x, v_x, tr_y, v_y = train_test_split(df.iloc[:, :-1], df.iloc[:, -1], test_size=0.2, shuffle=False)
 
     scaler = MinMaxScaler()
     tr_x = scaler.fit_transform(tr_x)

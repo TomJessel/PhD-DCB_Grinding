@@ -9,6 +9,7 @@
 """
 import multiprocessing
 import os.path
+import random
 import time
 import warnings
 from textwrap import dedent
@@ -302,7 +303,7 @@ class Base_Model:
 
         cv_items = [(i, train, test) for i, (train, test) in enumerate(cv.split(self.train_data[0].values))]
 
-        with multiprocessing.Pool() as pool:
+        with multiprocessing.Pool(processes=20) as pool:
             outputs = list(tqdm(pool.imap(self._cv_model_star, cv_items),
                                 total=len(cv_items),
                                 desc='CV Model'
@@ -353,7 +354,7 @@ class Base_Model:
             tb_writer = tf.summary.create_file_writer(self._run_name)
             md_scores = dedent(f'''
                     ### Scores - Cross-validation
-                    No splits = {n_splits}
+                    No splits = {n_splits}  No repeats = {n_repeats}
 
                      | MAE | MSE |  R2  |
                      | ---- | ---- | ---- |
@@ -364,7 +365,6 @@ class Base_Model:
             with tb_writer.as_default():
                 tf.summary.text('Model Info', md_scores, step=3)
         return _cv_score
-
 
 class MLP_Model(Base_Model):
     def __init__(
@@ -559,7 +559,6 @@ class MLP_Model(Base_Model):
         )
         return model
 
-
 class Linear_Model(Base_Model):
     def __init__(
             self,
@@ -706,6 +705,121 @@ class Linear_Model(Base_Model):
             plt.show()
         return _test_score
 
+class MLP_Win_Model(Base_Model):
+    def __init__(
+            self,
+            params: Dict = None,
+            tb_logdir: str = '',
+            **kwargs,
+    ):
+        """
+        MLP_Win_Model constructor.
+
+        Passes the params dict to the creation of the mlp win model. And passes **kwargs to class creation
+
+        Args:
+            params: Dict of mlp model parameters passed to self.initialise_model
+            tb_logdir: Folder path for tb logging, i.e. "CV" -> "Tensorboard\\MLP\\CV"
+            **kwargs: Inputs for Base_Model init
+        """
+
+        super().__init__(**kwargs)
+
+        if params is None:
+            params = {}
+        # get sequnce len for window from param dict
+        self.seq_len = params.pop('seqlen', 10)
+        self.params = params
+
+        self._tb_log_dir = os.path.join(self._tb_log_dir, 'MLP_WIN', tb_logdir)
+
+        if self.main_df is not None:
+            self.pre_process()
+            self.model = self.initialise_model(**params)
+        else:
+            print('Choose data file to import as main_df with ".load_testdata()')
+
+    def pre_process(
+            self: Base_Model,
+            val_frac: float = 0.2,
+    ) -> [np.ndarray, np.ndarray]:
+        """
+        Pre-process the data for training an MLP Win model
+
+            Split the data for the test into a training and validation set. Then scale the data using a MinMax scaler,
+            based off the training data index. Then window the data, to preserve time. Then split the data based on the
+            saved indicies.
+
+        Args:
+            val_frac: Fraction of data points used within the validation set
+
+        Returns:
+            Two tuples which contain dataframes of the features and results for the training and validation sets.
+
+        """
+
+        from collections import deque
+        def sequence_data(d: np.ndarray):
+            """
+            Applies window effect to change feature to include previous self.seq_len features
+
+            Args:
+                d: array of features and targets
+
+            Returns:
+                tuple containing the windowed data and answer
+            """
+            seq_data = []
+            seq_len = self.seq_len
+            prev_points = deque(maxlen=seq_len)
+
+            for i in d:
+                prev_points.append([n for n in i[:-1]]) # todo change this to adapt if multiple targets
+                if len(prev_points) == seq_len:
+                    seq_data.append([np.array(prev_points), i[-1]])
+            return seq_data
+
+        indx = np.arange(len(self.main_df) - (self.seq_len - 1))
+        # save index and pos of the train test split
+        train_i, test_i = train_test_split(indx, test_size=val_frac, shuffle=True)
+
+        scaler = MinMaxScaler()
+        main_df = self.main_df
+
+        # scale the data transforming only on the training data and fitting on test data
+        for col in self.main_df.columns:
+            if col not in self.target:
+                main_df[col][train_i] = scaler.fit_transform(main_df[col][train_i].values.reshape(-1, 1)).squeeze()
+                main_df[col][test_i] = scaler.transform(main_df[col][test_i].values.reshape(-1, 1)).squeeze()
+
+        # window the dataset
+        main_df = sequence_data(main_df.values)
+        # separate the train and test datasets
+        train = [main_df[j] for j in train_i]
+        test = [main_df[j] for j in test_i]
+
+        train_X = []
+        train_y = []
+
+        for X, y in train:
+            train_X.append(X)
+            train_y.append(y)
+
+        test_X = []
+        test_y = []
+
+        for X, y in test:
+            test_X.append(X)
+            test_y.append(y)
+
+        train_X = np.asarray(train_X)
+        train_y = np.asarray(train_y)
+        test_X = np.asarray(test_X)
+        test_y = np.asarray(test_y)
+
+        self.train_data = (train_X, train_y)
+        self.val_data = (test_X, test_y)
+        return self.train_data, self.val_data
 
 if __name__ == "__main__":
     __spec__ = None
@@ -719,26 +833,40 @@ if __name__ == "__main__":
     main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop([0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
 
-    # MLP MODEL
-    mlp_reg = MLP_Model(feature_df=main_df,
-                        target='Mean radius',
-                        tb=False,
-                        tb_logdir='',
-                        params={'loss': 'mse',
-                                'epochs': 100,
-                                'no_layers': 2,
-                                },
-                        )
+    # # MLP MODEL
+    # mlp_reg = MLP_Model(feature_df=main_df,
+    #                     target='Mean radius',
+    #                     tb=False,
+    #                     tb_logdir='',
+    #                     params={'loss': 'mse',
+    #                             'epochs': 100,
+    #                             'no_layers': 2,
+    #                             },
+    #                     )
+    #
+    # mlp_reg.cv(n_splits=10, n_repeats=10)
+    # mlp_reg.fit(validation_split=0.2, verbose=0)
+    # mlp_reg.score()
 
-    mlp_reg.cv(n_splits=10, n_repeats=10)
-    mlp_reg.fit(validation_split=0.2, verbose=0)
-    mlp_reg.score()
-
+    # MLP WINDOW MODEL
+    mlp_win_reg = MLP_Win_Model(feature_df=main_df,
+                                target='Mean radius',
+                                tb=False,
+                                tb_logdir='',
+                                params={'loss': 'mse',
+                                        'epochs': 100,
+                                        'no_layers': 2,
+                                        },
+    )
     # # MULTIPLE LINEAR MODEL
     # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
     # lin_reg.fit()
     # lin_reg.score(plot_fig=False)
 
+    print('END')
+
 # todo add MLP-window and LSTM classes
 # todo try loss of r2 instead of MAE or MSE
+# todo add logger compatibility to log progress and scores incase of TensorBoard failure
+# todo create initialisation for MLP window model (finished only pre-process)
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
