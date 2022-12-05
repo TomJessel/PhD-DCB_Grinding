@@ -1,4 +1,10 @@
-/ML.log
+ML.log
 /ml-results/
 /Figures/
 /.ipynb_checkpoints/
+/tb/
+/__pycache__
+/.idea
+*.pyc
+*.xml
+*.iml
