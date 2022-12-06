@@ -945,27 +945,28 @@ if __name__ == "__main__":
     main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop([0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
 
-    # # MLP MODEL
-    # mlp_reg = MLP_Model(feature_df=main_df,
-    #                     target='Mean radius',
-    #                     tb=False,
-    #                     tb_logdir='',
-    #                     params={'loss': 'mse',
-    #                             'epochs': 100,
-    #                             'no_layers': 2,
-    #                             },
-    #                     )
-    #
-    # mlp_reg.cv(n_splits=10)
-    # mlp_reg.fit(validation_split=0.2, verbose=0)
-    # mlp_reg.score()
+    # MLP MODEL
+    mlp_reg = MLP_Model(feature_df=main_df,
+                        target='Mean radius',
+                        tb=False,
+                        tb_logdir='',
+                        params={'loss': 'mse',
+                                'epochs': 100,
+                                'no_layers': 2,
+                                },
+                        )
+
+    mlp_reg.cv(n_splits=10)
+    mlp_reg.fit(validation_split=0.2, verbose=0)
+    mlp_reg.score()
 
     # MLP WINDOW MODEL
     mlp_win_reg = MLP_Win_Model(feature_df=main_df,
                                 target='Mean radius',
                                 tb=False,
                                 tb_logdir='',
-                                params={'loss': 'mae',
+                                params={'seq_len': 10,
+                                        'loss': 'mae',
                                         'epochs': 1000,
                                         'no_layers': 3,
                                         },
@@ -974,10 +975,10 @@ if __name__ == "__main__":
     mlp_win_reg.fit(validation_split=0.2, verbose=0)
     mlp_win_reg.score()
 
-    # # MULTIPLE LINEAR MODEL
-    # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
-    # lin_reg.fit()
-    # lin_reg.score(plot_fig=False)
+    # MULTIPLE LINEAR MODEL
+    lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
+    lin_reg.fit()
+    lin_reg.score(plot_fig=False)
 
     print('END')
 
@@ -985,4 +986,5 @@ if __name__ == "__main__":
 # todo try loss of r2 instead of MAE or MSE
 # todo add logger compatibility to log progress and scores incase of TensorBoard failure
 # todo change tb model desc for mlp-win model to include seqlen
+# todo add model identifier when printing scores
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
