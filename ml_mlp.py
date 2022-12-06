@@ -756,7 +756,7 @@ class MLP_Win_Model(Base_Model):
         if params is None:
             params = {}
         # get sequnce len for window from param dict
-        self.seq_len = params.pop('seqlen', 10)
+        self.seq_len = params.pop('seq_len', 10)
         self.params = params
 
         self._tb_log_dir = os.path.join(self._tb_log_dir, 'MLP_WIN', tb_logdir)
@@ -984,4 +984,5 @@ if __name__ == "__main__":
 # todo add LSTM classes
 # todo try loss of r2 instead of MAE or MSE
 # todo add logger compatibility to log progress and scores incase of TensorBoard failure
+# todo change tb model desc for mlp-win model to include seqlen
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
