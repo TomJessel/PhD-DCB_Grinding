@@ -807,7 +807,8 @@ class MLP_Win_Model(Base_Model):
                     seq_data.append([np.array(prev_points), i[-1]])
             return seq_data
 
-        indx = np.arange(len(self.main_df) - (self.seq_len - 1))
+        # 4* seqlen for removing overlap
+        indx = np.arange(len(self.main_df))
         # save index and pos of the train test split
         train_i, test_i = train_test_split(indx, test_size=val_frac, shuffle=True)
 
@@ -822,9 +823,23 @@ class MLP_Win_Model(Base_Model):
 
         # window the dataset
         main_df = sequence_data(main_df.values)
+
+        # index position of the end of each dataframe need to change to get automatically
+        df_ends = [211, 374, 550, 708]
+
+        # try to remove overlapping
+        # indicies of data to remove from model
+        del_indx = list(range(0, self.seq_len)) + list(range(df_ends[0], (df_ends[0] + self.seq_len))) + list(
+            range(df_ends[1], (df_ends[1] + self.seq_len))) + list(range(df_ends[2], (df_ends[2] + self.seq_len)))
+        indx = np.delete(indx, del_indx)
+
+        # split data set indicies into train and test
+        temp_train_i = [element for element in train_i if element not in del_indx]
+        temp_test_i = [element for element in test_i if element not in del_indx]
+
         # separate the train and test datasets
-        train = [main_df[j] for j in train_i]
-        test = [main_df[j] for j in test_i]
+        train = [main_df[np.where(indx == j)[0][0]] for j in temp_train_i]
+        test = [main_df[np.where(indx == j)[0][0]] for j in temp_test_i]
 
         train_X = []
         train_y = []
@@ -847,6 +862,7 @@ class MLP_Win_Model(Base_Model):
 
         self.train_data = [train_X, train_y]
         self.val_data = [test_X, test_y]
+        # reshape feature data for MLP win model input
         self._no_features = self.train_data[0].shape[1] * self.train_data[0].shape[2]
         self.train_data[0] = self.train_data[0].reshape((self.train_data[0].shape[0], self._no_features))
         self.val_data[0] = self.val_data[0].reshape((self.val_data[0].shape[0], self._no_features))
@@ -939,8 +955,9 @@ if __name__ == "__main__":
     exp5 = resources.load('Test 5')
     exp7 = resources.load('Test 7')
     exp8 = resources.load('Test 8')
+    exp9 = resources.load('Test 9')
 
-    dfs = [exp5.features.drop([23, 24]), exp7.features, exp8.features]
+    dfs = [exp5.features.drop([23, 24]), exp7.features, exp8.features, exp9.features]
     main_df = pd.concat(dfs)
     main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop([0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
@@ -969,6 +986,7 @@ if __name__ == "__main__":
                                         'loss': 'mae',
                                         'epochs': 1000,
                                         'no_layers': 3,
+                                        'no_nodes': 128,
                                         },
                                 )
     mlp_win_reg.cv(n_splits=10)
@@ -987,4 +1005,5 @@ if __name__ == "__main__":
 # todo add logger compatibility to log progress and scores incase of TensorBoard failure
 # todo change tb model desc for mlp-win model to include seqlen
 # todo add model identifier when printing scores
+# todo mlp_window for removing overlap needs to get positions of overlaps to work from end index of dfs
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
