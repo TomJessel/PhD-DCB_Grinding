@@ -1006,4 +1006,5 @@ if __name__ == "__main__":
 # todo change tb model desc for mlp-win model to include seqlen
 # todo add model identifier when printing scores
 # todo mlp_window for removing overlap needs to get positions of overlaps to work from end index of dfs
+# todo add random state for pre-process and cv
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
