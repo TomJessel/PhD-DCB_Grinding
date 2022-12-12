@@ -28,7 +28,7 @@ import mplcursors
 import pickle
 import pandas as pd
 
-mpl.use("Qt5Agg")
+# mpl.use("Qt5Agg")
 
 
 def compute_shift(zipped: tuple[Any, Any]) -> int:
@@ -186,7 +186,7 @@ class NC4:
         """
         Plot NC4 features for each measurement.
         """
-        mpl.use("Qt5Agg")
+        # mpl.use("Qt5Agg")
         path = f'{self._testinfo.dataloc}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.png'
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.pickle'
@@ -230,7 +230,7 @@ class NC4:
             fno: Tuple of start and stop indices for slice of files to plot.
 
         """
-        mpl.use('Qt5Agg')
+        # mpl.use('Qt5Agg')
         path = f'{self._testinfo.dataloc}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 XY Plot.png'
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 XY Plot.pickle'
@@ -287,7 +287,7 @@ class NC4:
         Plot surface of DCB radius over measurements in time.
 
         """
-        mpl.use('Qt5Agg')
+        # mpl.use('Qt5Agg')
         path = f'{self._testinfo.dataloc}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Radius Surf.png'
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 Radius Surf.pickle'
