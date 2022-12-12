@@ -30,12 +30,16 @@ tf.config.set_visible_devices([], 'GPU')
 tf.get_logger().setLevel('ERROR')
 from keras.models import Sequential
 from keras.layers import Dense, Dropout
+from keras.optimizers import Adam
 from scikeras.wrappers import KerasRegressor
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
 import resources
+import platform
+
+PLATFORM = platform.system()
 
 
 class Base_Model:
@@ -85,10 +89,12 @@ class Base_Model:
 
         dirname = os.path.dirname(__file__)
 
-        regex_folder = re.compile("(OneDrive - Cardiff University)")
+        regex_folder = re.compile("(tomje)")
         result = regex_folder.search(dirname)
-
-        filename = dirname[:result.end()] + r"\Documents\PhD\AE"
+        if PLATFORM == 'Windows':
+            filename = dirname[:result.end()] + r"\Documents\PhD\AE"
+        elif PLATFORM == 'Linux':
+            filename = dirname[:result.end()] + r"/ml/tensorboard"
         filename = os.path.abspath(filename)
         return filename
 
@@ -248,7 +254,7 @@ class Base_Model:
             te_index,
     ) -> [Dict, KerasRegressor]:
         """
-        Multiprocessing worker function to cross validate one instance of the model
+        multiprocessing worker function to cross validate one instance of the model
 
         Args:
             run_no: Iteration of the cv model
@@ -335,9 +341,14 @@ class Base_Model:
                                 total=len(cv_items),
                                 desc='CV Model'
                                 ))
+            pool.close()
+            pool.join()
+
+        # with multiprocessing.Pool(processes=20) as pool:
+        #     outputs = pool.starmap(self._cv_model, cv_items)
 
         # outputs = []
-        # for cv_item in cv_items:
+        # for cv_item in tqdm(cv_items):
         #     outputs.append(self._cv_model_star(cv_item))
 
         scores = [output[0] for output in outputs]
@@ -518,7 +529,7 @@ class MLP_Model(Base_Model):
             batch_size: int = 10,
             loss: str = 'mae',
             metrics: Union[list, tuple] = ('MSE', 'MAE', KerasRegressor.r_squared),
-            optimizer: str = 'adam',
+            optimizer: str = Adam,
             learning_rate: float = 0.001,
             decay: float = 1e-6,
             verbose: int = 1,
@@ -881,7 +892,7 @@ class MLP_Win_Model(Base_Model):
             batch_size: int = 10,
             loss: str = 'mae',
             metrics: Union[list, tuple] = ('MSE', 'MAE', KerasRegressor.r_squared),
-            optimizer: str = 'adam',
+            optimizer: str = Adam,
             learning_rate: float = 0.001,
             decay: float = 1e-6,
             verbose: int = 1,
@@ -953,6 +964,8 @@ class MLP_Win_Model(Base_Model):
 
 if __name__ == "__main__":
     __spec__ = None
+    multiprocessing.set_start_method("spawn")
+
     print('START')
     exp5 = resources.load('Test 5')
     exp7 = resources.load('Test 7')
@@ -977,7 +990,7 @@ if __name__ == "__main__":
 
     mlp_reg.cv(n_splits=10)
     mlp_reg.fit(validation_split=0.2, verbose=0)
-    mlp_reg.score()
+    mlp_reg.score(plot_fig=False)
 
     # MLP WINDOW MODEL
     mlp_win_reg = MLP_Win_Model(feature_df=main_df,
@@ -986,19 +999,19 @@ if __name__ == "__main__":
                                 tb_logdir='',
                                 params={'seq_len': 10,
                                         'loss': 'mae',
-                                        'epochs': 1000,
+                                        'epochs': 100,
                                         'no_layers': 3,
                                         'no_nodes': 128,
                                         },
                                 )
     mlp_win_reg.cv(n_splits=10)
     mlp_win_reg.fit(validation_split=0.2, verbose=0)
-    mlp_win_reg.score()
+    mlp_win_reg.score(plot_fig=False)
 
     # MULTIPLE LINEAR MODEL
-    lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
-    lin_reg.fit()
-    lin_reg.score(plot_fig=False)
+    # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
+    # lin_reg.fit()
+    # lin_reg.score()
 
     print('END')
 
