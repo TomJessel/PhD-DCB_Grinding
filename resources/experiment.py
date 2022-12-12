@@ -262,7 +262,7 @@ class Experiment:
 
         freq = 1000
 
-        mpl.use('Qt5Agg')
+        # mpl.use('Qt5Agg')
         path = f'{self.test_info.dataloc}/Figures'
         png_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.png'
         pic_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.pickle'
@@ -351,7 +351,7 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
     else:
         f_locs = pd.read_csv(r"reference//Test obj locations.txt", sep=',', index_col=0)
         f_locs = f_locs.to_dict()['Obj location']
-        f_locs = {k: "..\\..\\" + str(v) for k, v in f_locs.items()}
+        f_locs = {k: "../../" + str(v) for k, v in f_locs.items()}
         try:
             file_path = f_locs[file.lower().replace(' ', '')]
             with open(file_path, 'rb') as f:

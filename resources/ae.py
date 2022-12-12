@@ -238,7 +238,7 @@ class AE:
         t = np.arange(0, n) * ts
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        mpl.use("Qt5Agg")
+        # mpl.use("Qt5Agg")
         fig, ax = plt.subplots()
         ax.plot(t, signal, linewidth=1)
         ax.set_title(filename)
@@ -265,7 +265,7 @@ class AE:
 
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        mpl.use('Qt5Agg')
+        # mpl.use('Qt5Agg')
         fig, ax = plt.subplots()
         ax.plot(f / 1000, p)
         ax.set_title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
@@ -462,7 +462,7 @@ class AE:
             v_rms = calc_roll_rms(fno)
             n = v_rms.size
             t = np.arange(0, n) * ts
-            mpl.use('Qt5Agg')
+            # mpl.use('Qt5Agg')
             fig, ax = plt.subplots()
             ax.plot(t, v_rms, linewidth=0.75)
             ax.set_xlabel('Time (s)')
