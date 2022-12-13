@@ -94,7 +94,7 @@ class Base_Model:
         if PLATFORM == 'Windows':
             filename = dirname[:result.end()] + r"\Documents\PhD\AE"
         elif PLATFORM == 'Linux':
-            filename = dirname[:result.end()] + r"/ml/tensorboard"
+            filename = dirname[:result.end()] + r"/ml"
         filename = os.path.abspath(filename)
         return filename
 
@@ -980,8 +980,8 @@ if __name__ == "__main__":
     # MLP MODEL
     mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
-                        tb=False,
-                        tb_logdir='',
+                        tb=True,
+                        tb_logdir='log test',
                         params={'loss': 'mse',
                                 'epochs': 100,
                                 'no_layers': 2,
@@ -993,20 +993,20 @@ if __name__ == "__main__":
     mlp_reg.score(plot_fig=False)
 
     # MLP WINDOW MODEL
-    mlp_win_reg = MLP_Win_Model(feature_df=main_df,
-                                target='Mean radius',
-                                tb=False,
-                                tb_logdir='',
-                                params={'seq_len': 10,
-                                        'loss': 'mae',
-                                        'epochs': 100,
-                                        'no_layers': 3,
-                                        'no_nodes': 128,
-                                        },
-                                )
-    mlp_win_reg.cv(n_splits=10)
-    mlp_win_reg.fit(validation_split=0.2, verbose=0)
-    mlp_win_reg.score(plot_fig=False)
+    # mlp_win_reg = MLP_Win_Model(feature_df=main_df,
+    #                             target='Mean radius',
+    #                             tb=False,
+    #                             tb_logdir='',
+    #                             params={'seq_len': 10,
+    #                                     'loss': 'mae',
+    #                                     'epochs': 100,
+    #                                     'no_layers': 3,
+    #                                     'no_nodes': 128,
+    #                                     },
+    #                             )
+    # mlp_win_reg.cv(n_splits=10)
+    # mlp_win_reg.fit(validation_split=0.2, verbose=0)
+    # mlp_win_reg.score(plot_fig=False)
 
     # MULTIPLE LINEAR MODEL
     # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
