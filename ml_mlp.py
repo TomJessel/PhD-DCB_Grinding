@@ -210,7 +210,8 @@ class Base_Model:
         }
         if print_score:
             print('-' * 65)
-            print(f'Model Validation Scores:')
+            print(f'{self._run_name.split(self._tb_log_dir)[1][1:]}')
+            print(f'Validation Scores:')
             print('-' * 65)
             print(f'MAE = {np.abs(_test_score["MAE"]) * 1000:.3f} um')
             print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
@@ -371,7 +372,8 @@ class Base_Model:
         std_r2 = np.std([score['r2'] for score in scores])
 
         print('-' * 65)
-        print(f'CV Training Scores:')
+        print(f'{self._run_name.split(self._tb_log_dir)[1][1:]}')
+        print(f'CV Scores:')
         print('-' * 65)
         print(f'MAE: {mean_MAE * 1_000:.3f} (\u00B1{std_MAE * 1_000: .3f}) \u00B5m')
         print(f'MSE: {mean_MSE * 1_000_000:.3f} (\u00B1{std_MSE * 1_000_000: .3f}) \u00B5m\u00B2')
@@ -686,6 +688,9 @@ class Linear_Model(Base_Model):
         """
         from sklearn.model_selection import cross_validate, RepeatedKFold
 
+        self._run_name = os.path.join(self._tb_log_dir,
+                                      f'Lin_Reg-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}')    
+
         if model is None:
             model = self.model
         if X is None:
@@ -710,7 +715,8 @@ class Linear_Model(Base_Model):
 
         if print_score:
             print('-' * 65)
-            print(f'Model Validation Scores:')
+            print(f'{self._run_name.split(self._tb_log_dir)[1][1:]}')
+            print(f'Validation Scores:')
             print('-' * 65)
             print(f'MAE = {np.abs(_test_score["test_MAE"].mean()) * 1000:.3f} um')
             print(f'MSE = {np.abs(_test_score["test_MSE"].mean()) * 1_000_000:.3f} um^2')
@@ -1022,14 +1028,14 @@ if __name__ == "__main__":
                                 },
                         )
 
-    # mlp_reg.cv(n_splits=10)
-    # mlp_reg.fit(validation_split=0.2, verbose=0)
-    # mlp_reg.score(plot_fig=False)
+    mlp_reg.cv(n_splits=10)
+    mlp_reg.fit(validation_split=0.2, verbose=0)
+    mlp_reg.score(plot_fig=False)
 
     # MLP WINDOW MODEL
     mlp_win_reg = MLP_Win_Model(feature_df=main_df,
                                 target='Mean radius',
-                                tb=True,
+                                tb=False,
                                 tb_logdir='feature test',
                                 params={'seq_len': 15,
                                         'loss': 'mae',
@@ -1043,16 +1049,15 @@ if __name__ == "__main__":
     mlp_win_reg.score(plot_fig=False)
 
     # MULTIPLE LINEAR MODEL
-    # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
-    # lin_reg.fit()
-    # lin_reg.score()
+    lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
+    lin_reg.fit()
+    lin_reg.score()
 
     print('END')
 
 # todo add LSTM classes
 # todo try loss of r2 instead of MAE or MSE
 # todo add logger compatibility to log progress and scores incase of TensorBoard failure
-# todo add model identifier when printing scores
 # todo mlp_window for removing overlap needs to get positions of overlaps to work from end index of dfs
 # todo add random state for pre-process and cv
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
