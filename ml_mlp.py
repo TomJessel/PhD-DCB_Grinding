@@ -251,7 +251,7 @@ class Base_Model:
             run_no,
             tr_index,
             te_index,
-    ) -> List[Dict, KerasRegressor]:
+    ) -> List[Union[Dict, KerasRegressor]]:
         """
         multiprocessing worker function to cross validate one instance of the model
 
@@ -438,7 +438,7 @@ class MLP_Model(Base_Model):
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
-    ) -> List[pd.DataFrame, pd.DataFrame]:
+    ) -> List[Union[pd.DataFrame, pd.DataFrame]]:
         """
         Pre-process the data for training an MLP model
 
@@ -628,7 +628,7 @@ class Linear_Model(Base_Model):
     def pre_process(
             self,
             val_frac: float = 0.2,
-    ) -> List[pd.DataFrame, pd.DataFrame]:
+    ) -> List[Union[pd.DataFrame, pd.DataFrame]]:
         """
         Function to pre-process the data for a linear model
 
@@ -782,7 +782,7 @@ class MLP_Win_Model(Base_Model):
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
-    ) -> List[np.ndarray, np.ndarray]:
+    ) -> List[Union[np.ndarray, np.ndarray]]:
         """
         Pre-process the data for training an MLP Win model
 
@@ -960,6 +960,41 @@ class MLP_Win_Model(Base_Model):
         )
         return model
 
+    def tb_model_desc(self, tb_wr):
+        # Model.summary()
+        lines = []
+        self.model.model_.summary(print_fn=lines.append)
+        
+        dropout = self.model.model_.layers[1].get_config()['rate']
+        layers = self.model.model_.get_config()['layers']
+        nodes = [layer['config']['units'] for layer in layers if layer['class_name'] in ('Dense', 'LSTM')]
+        no_layers = len(nodes) - 1
+        activation = layers[1]['config']['activation']
+        opt = self.model.model_.optimizer.get_config()
+        optimiser = opt['name']
+        learning_rate = opt['learning_rate']
+        decay = opt['decay']
+
+        hp = dedent(f"""       
+            ### Parameters:   
+            ___
+
+            |Seq Len| Epochs | Batch Size | No Layers | No Neurons | Init Mode | Activation | Dropout | Loss |\
+             Optimiser | Learning rate | Decay |
+            |--------|--------|------------|-----------|------------|-----------|------------|---------|------|\
+            -----------|---------------|-------|
+            |{self.seq_len}|{self.model.epochs}|{self.model.batch_size}|{no_layers}|{nodes[:-1]}|\
+            {self.model.model__init_mode}|{activation}|{dropout:.3f}|{self.model.loss}|{optimiser}|\
+            {learning_rate:.3E}|{decay:.3E}|
+
+            """)
+
+        with tb_wr.as_default():
+            # Code to ouput Tensorboard model.summary
+            # lines = '    ' + '\n    '.join(lines)
+            # tf.summary.text('Model Info', lines, step=0)
+            # Code to output Tensorboard hyperparams
+            tf.summary.text('Model Info', hp, step=1)
 
 if __name__ == "__main__":
     __spec__ = None
@@ -987,20 +1022,20 @@ if __name__ == "__main__":
                                 },
                         )
 
-    mlp_reg.cv(n_splits=10)
-    mlp_reg.fit(validation_split=0.2, verbose=0)
-    mlp_reg.score(plot_fig=False)
+    # mlp_reg.cv(n_splits=10)
+    # mlp_reg.fit(validation_split=0.2, verbose=0)
+    # mlp_reg.score(plot_fig=False)
 
     # MLP WINDOW MODEL
     mlp_win_reg = MLP_Win_Model(feature_df=main_df,
                                 target='Mean radius',
-                                tb=False,
-                                tb_logdir='',
-                                params={'seq_len': 10,
+                                tb=True,
+                                tb_logdir='feature test',
+                                params={'seq_len': 15,
                                         'loss': 'mae',
                                         'epochs': 100,
                                         'no_layers': 3,
-                                        'no_nodes': 128,
+                                        'no_nodes': 64,
                                         },
                                 )
     mlp_win_reg.cv(n_splits=10)
@@ -1008,16 +1043,15 @@ if __name__ == "__main__":
     mlp_win_reg.score(plot_fig=False)
 
     # MULTIPLE LINEAR MODEL
-    lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
-    lin_reg.fit()
-    lin_reg.score()
+    # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
+    # lin_reg.fit()
+    # lin_reg.score()
 
     print('END')
 
 # todo add LSTM classes
 # todo try loss of r2 instead of MAE or MSE
 # todo add logger compatibility to log progress and scores incase of TensorBoard failure
-# todo change tb model desc for mlp-win model to include seqlen
 # todo add model identifier when printing scores
 # todo mlp_window for removing overlap needs to get positions of overlaps to work from end index of dfs
 # todo add random state for pre-process and cv
