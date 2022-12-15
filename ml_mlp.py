@@ -8,12 +8,11 @@
 26/10/2022 10:01   tomhj      1.0         Script to contain all code relating to MLP models
 """
 import multiprocessing
-import os.path
 import random
 import time
 import warnings
 from textwrap import dedent
-from typing import Union, Iterable, Dict, Any
+from typing import List, Union, Iterable, Dict, Any
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -252,7 +251,7 @@ class Base_Model:
             run_no,
             tr_index,
             te_index,
-    ) -> [Dict, KerasRegressor]:
+    ) -> List[Dict, KerasRegressor]:
         """
         multiprocessing worker function to cross validate one instance of the model
 
@@ -439,7 +438,7 @@ class MLP_Model(Base_Model):
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
-    ) -> [pd.DataFrame, pd.DataFrame]:
+    ) -> List[pd.DataFrame, pd.DataFrame]:
         """
         Pre-process the data for training an MLP model
 
@@ -533,7 +532,7 @@ class MLP_Model(Base_Model):
             learning_rate: float = 0.001,
             decay: float = 1e-6,
             verbose: int = 1,
-            callbacks: list[tf.keras.callbacks] = None,
+            callbacks: List[Any] = None,
             **params,
     ) -> KerasRegressor:
         """
@@ -629,7 +628,7 @@ class Linear_Model(Base_Model):
     def pre_process(
             self,
             val_frac: float = 0.2,
-    ) -> [pd.DataFrame, pd.DataFrame]:
+    ) -> List[pd.DataFrame, pd.DataFrame]:
         """
         Function to pre-process the data for a linear model
 
@@ -783,7 +782,7 @@ class MLP_Win_Model(Base_Model):
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
-    ) -> [np.ndarray, np.ndarray]:
+    ) -> List[np.ndarray, np.ndarray]:
         """
         Pre-process the data for training an MLP Win model
 
@@ -896,7 +895,7 @@ class MLP_Win_Model(Base_Model):
             learning_rate: float = 0.001,
             decay: float = 1e-6,
             verbose: int = 1,
-            callbacks: list[tf.keras.callbacks] = None,
+            callbacks: List[Any] = None,
             **params,
     ) -> KerasRegressor:
         """
