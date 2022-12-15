@@ -149,7 +149,7 @@ class Base_Model:
 
         hp = dedent(f"""
                     ### Parameters:
-            ### Parameters:   
+            ### Parameters:
                     ### Parameters:
             ___
 
