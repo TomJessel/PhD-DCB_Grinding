@@ -8,3 +8,4 @@ ML.log
 *.pyc
 *.xml
 *.iml
+/.vscode/
