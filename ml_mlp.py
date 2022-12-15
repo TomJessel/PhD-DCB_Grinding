@@ -5,38 +5,37 @@
 
 @Creation Time    @Author    @Version    @Description
 ------------      -------    --------    -----------
-26/10/2022 10:01   tomhj      1.0         Script to contain all code relating to MLP models
+26/10/2022 10:01   tomhj      1.0        ML classes for architectures
 """
 import multiprocessing
-import random
+import os
+import platform
 import time
 import warnings
 from textwrap import dedent
-from typing import List, Union, Iterable, Dict, Any
+from typing import Any, Dict, Iterable, List, Union
 
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
+from scikeras.wrappers import KerasRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
 from tqdm.auto import tqdm
 
-import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 warnings.simplefilter(action='ignore', category=FutureWarning)
-import tensorflow as tf
-import tensorflow_addons as tfa
+import tensorflow as tf  # noqa: E402
+import tensorflow_addons as tfa  # noqa: E402
 
 tf.config.set_visible_devices([], 'GPU')
 tf.get_logger().setLevel('ERROR')
-from keras.models import Sequential
-from keras.layers import Dense, Dropout
-from keras.optimizers import Adam
-from scikeras.wrappers import KerasRegressor
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
+from keras.layers import Dense, Dropout  # noqa: E402
+from keras.models import Sequential  # noqa: E402
+from keras.optimizers import Adam  # noqa: E402
 
-import resources
-import platform
+import resources  # noqa: E402
 
 PLATFORM = platform.system()
 
@@ -98,7 +97,8 @@ class Base_Model:
         return filename
 
     def pre_process(self):
-        raise AttributeError('No assigned function to pre-process data for Base_Model')
+        raise AttributeError('No assigned function to pre-process \
+                            data for Base_Model')
 
     def fit(
             self,
@@ -138,7 +138,8 @@ class Base_Model:
 
         dropout = self.model.model_.layers[1].get_config()['rate']
         layers = self.model.model_.get_config()['layers']
-        nodes = [layer['config']['units'] for layer in layers if layer['class_name'] in ('Dense', 'LSTM')]
+        nodes = [layer['config']['units'] for layer in layers if
+                 layer['class_name'] in ('Dense', 'LSTM')]
         no_layers = len(nodes) - 1
         activation = layers[1]['config']['activation']
         opt = self.model.model_.optimizer.get_config()
@@ -146,14 +147,16 @@ class Base_Model:
         learning_rate = opt['learning_rate']
         decay = opt['decay']
 
-        hp = dedent(f"""       
+        hp = dedent(f"""
+                    ### Parameters:
             ### Parameters:   
+                    ### Parameters:
             ___
 
-            | Epochs | Batch Size | No Layers | No Neurons | Init Mode | Activation | Dropout | Loss | Optimiser |\
-             Learning rate | Decay |
-            |--------|------------|-----------|------------|-----------|------------|---------|------|-----------|\
-            ---------------|-------|
+            | Epochs | Batch Size | No Layers | No Neurons | Init Mode |\
+             Activation | Dropout | Loss | Optimiser | Learning rate | Decay |
+            |--------|------------|-----------|------------|-----------|\
+            ------------|---------|------|-----------|---------------|-------|
             |{self.model.epochs}|{self.model.batch_size}|{no_layers}|{nodes[:-1]}|{self.model.model__init_mode}|\
             {activation}|{dropout:.3f}|{self.model.loss}|{optimiser}|{learning_rate:.3E}|{decay:.3E}|
 
@@ -177,7 +180,8 @@ class Base_Model:
         """
         Score the mlp regression model on unseen data.
 
-        Use trained model to predict results on unseen validation data, and then calc metrics for scoring.
+        Use trained model to predict results on unseen validation data,
+        and then calc metrics for scoring.
         Args:
             model: ML model to score
             X: Inputs for predictions from unseen validation data set
@@ -211,7 +215,7 @@ class Base_Model:
         if print_score:
             print('-' * 65)
             print(f'{self._run_name.split(self._tb_log_dir)[1][1:]}')
-            print(f'Validation Scores:')
+            print('Validation Scores:')
             print('-' * 65)
             print(f'MAE = {np.abs(_test_score["MAE"]) * 1000:.3f} um')
             print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
@@ -235,7 +239,9 @@ class Base_Model:
 
                      | MAE | MSE |  R2  |
                      | ---- | ---- | ---- |
-                     | {_test_score['MAE'] * 1e3:.3f} | {_test_score['MSE'] * 1e6:.3f} | {_test_score['r2']:.3f} |  
+                     | {_test_score['MAE'] * 1e3:.3f} |\
+                         {_test_score['MSE'] * 1e6:.3f} |\
+                             {_test_score['r2']:.3f} |
 
                     ''')
             with tb_writer.as_default():
@@ -244,7 +250,8 @@ class Base_Model:
         return _test_score
 
     def initialise_model(self, verbose=1, **params) -> Any:
-        self._run_name = f'{self._tb_log_dir}\\Base-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
+        self._run_name = f'{self._tb_log_dir}\\Base-\
+        {time.strftime("%Y%m%d-%H%M%S",time.localtime())}'
         pass
 
     def _cv_model(
@@ -254,7 +261,8 @@ class Base_Model:
             te_index,
     ) -> List[Union[Dict, KerasRegressor]]:
         """
-        multiprocessing worker function to cross validate one instance of the model
+        Multiprocessing worker function to cross validate \
+         one instance of the model.
 
         Args:
             run_no: Iteration of the cv model
@@ -279,7 +287,8 @@ class Base_Model:
         model.fit(
             X=X[tr_index],
             y=y[tr_index],
-            # validation_data=(self.train_data[0].values[tr_index], self.train_data[1].values[tr_index])
+            # validation_data=(self.train_data[0].values[tr_index],\
+            #  self.train_data[1].values[tr_index])
         )
         score = self.score(
             model=model,
@@ -305,7 +314,9 @@ class Base_Model:
         """
         Cross validate a ML model with either Kfold or Repeated Kfold
 
-        If no input given to n_repeats, Kfold is used, if n_repeats is an int Repeated Kfold is used instead
+        If no input given to n_repeats, Kfold is used, if n_repeats is an int \
+            Repeated Kfold is used instead
+
         Args:
             n_splits: No splits in the CV
             n_repeats: No repeats to do with Repeated Kfold CV
@@ -317,6 +328,7 @@ class Base_Model:
         """
 
         from sklearn.model_selection import KFold, RepeatedKFold
+
         # Use Kfold or Repeated Kfold
         if n_repeats is None:
             cv = KFold(n_splits=n_splits,
@@ -334,7 +346,8 @@ class Base_Model:
         except AttributeError:
             X = self.train_data[0]
 
-        cv_items = [(i, train, test) for i, (train, test) in enumerate(cv.split(X))]
+        cv_items = [(i, train, test) for i, (train, test) in
+                    enumerate(cv.split(X))]
 
         with multiprocessing.Pool(processes=20) as pool:
             outputs = list(tqdm(pool.imap(self._cv_model_star, cv_items),
@@ -357,7 +370,8 @@ class Base_Model:
         # bmod_r2 = max(scores, key=lambda x: x['r2'])['run_no']
         # bmod_MAE = min(scores, key=lambda x: x['MAE'])['run_no']
         # bmod_MSE = min(scores, key=lambda x: x['MSE'])['run_no']
-        # # Whichever score is first is list will be default if no best over more than one score
+        # # Whichever score is first is list will be default if no best over \
+        # more than one score
         # bmod = [bmod_MAE, bmod_MSE, bmod_r2]
         #
         # model = models[max(bmod, key=bmod.count, default=None)]
@@ -373,10 +387,12 @@ class Base_Model:
 
         print('-' * 65)
         print(f'{self._run_name.split(self._tb_log_dir)[1][1:]}')
-        print(f'CV Scores:')
+        print('CV Scores:')
         print('-' * 65)
-        print(f'MAE: {mean_MAE * 1_000:.3f} (\u00B1{std_MAE * 1_000: .3f}) \u00B5m')
-        print(f'MSE: {mean_MSE * 1_000_000:.3f} (\u00B1{std_MSE * 1_000_000: .3f}) \u00B5m\u00B2')
+        print(f'MAE: {mean_MAE * 1_000:.3f} (\u00B1{std_MAE * 1_000: .3f})\
+         \u00B5m')
+        print(f'MSE: {mean_MSE * 1_000_000:.3f} (\u00B1{std_MSE * 1_000_000:\
+             .3f}) \u00B5m\u00B2')
         print(f'R^2: {mean_r2:.3f} (\u00B1{std_r2: .3f})')
         print('-' * 65)
 
@@ -397,9 +413,12 @@ class Base_Model:
 
                      | MAE | MSE |  R2  |
                      | ---- | ---- | ---- |
-                     | {mean_MAE * 1e3:.3f} | {mean_MSE * 1e6:.3f} | {mean_r2:.3f}  | 
-                     | (\u00B1{std_MAE * 1_000: .3f}) | (\u00B1{std_MSE * 1_000_000: .3f}) | (\u00B1{std_r2: .3f}) |
-                     
+                     | {mean_MAE * 1e3:.3f} | {mean_MSE * 1e6:.3f} |\
+                         {mean_r2:.3f}  |
+                     | (\u00B1{std_MAE * 1_000: .3f}) |\
+                         (\u00B1{std_MSE * 1_000_000: .3f}) |\
+                             (\u00B1{std_r2: .3f}
+
                     ''')
             with tb_writer.as_default():
                 tf.summary.text('Model Info', md_scores, step=3)
@@ -416,11 +435,14 @@ class MLP_Model(Base_Model):
         """
         MLP_Model constructor.
 
-        Passes the params dict to the creation of the mlp model. And passes **kwargs to class creation
+        Passes the params dict to the creation of the mlp model. And passes\
+             **kwargs to class creation
 
         Args:
-            params: Dict of mlp model parameters passed to self.initialise_model
-            tb_logdir: Folder path for tb logging, i.e. "CV" -> "Tensorboard\\MLP\\CV"
+            params: Dict of mlp model parameters passed to \
+                self.initialise_model
+            tb_logdir: Folder path for tb logging, i.e. "CV" -> \
+                "Tensorboard\\MLP\\CV"
             **kwargs: Inputs for Base_Model init
         """
 
@@ -435,7 +457,7 @@ class MLP_Model(Base_Model):
             self.pre_process()
             self.model = self.initialise_model(**params)
         else:
-            print('Choose data file to import as main_df with ".load_testdata()')
+            print('Choose data file to import as main_df')
 
     def pre_process(
             self: Base_Model,
@@ -444,15 +466,17 @@ class MLP_Model(Base_Model):
         """
         Pre-process the data for training an MLP model
 
-            Split the data for the test into a training and validation set. Then scale the data using a MinMax scaler,
-            based off the training data. Then save the splits into a tuple which contains the features and results
-            separately.
+            Split the data for the test into a training and validation set\
+                 Then scale the data using a MinMax scaler, based off the\
+                     training data. Then save the splits into a tuple which\
+                         contains the features and results separately.
 
         Args:
             val_frac: Fraction of data points used within the validation set
 
         Returns:
-            Two tuples which contain dataframes of the features and results for the training and validation sets.
+            Two tuples which contain dataframes of the features and results \
+                for the training and validation sets.
 
         """
         scaler = MinMaxScaler()
@@ -466,8 +490,10 @@ class MLP_Model(Base_Model):
         train.dropna(inplace=True)
         test.dropna(inplace=True)
 
-        self.train_data = (train.drop(columns=self.target), train[[self.target]])
-        self.val_data = (test.drop(columns=self.target), test[[self.target]])
+        self.train_data = (train.drop(columns=self.target),
+                           train[[self.target]])
+        self.val_data = (test.drop(columns=self.target),
+                         test[[self.target]])
         return self.train_data, self.val_data
 
     @staticmethod
@@ -482,8 +508,9 @@ class MLP_Model(Base_Model):
         """
         Creates a vanilla MLP Keras Sequential Model.
 
-        Returns a simple MLP model consisting of Dense and Dropout layers, the number of which and sizes can be
-        determined via function inputs.
+        Returns a simple MLP model consisting of Dense and Dropout layers,\
+             the number of which and sizes can be determined via function\
+             inputs.
 
         Args:
             no_features: No of input features calc from train data
@@ -529,7 +556,10 @@ class MLP_Model(Base_Model):
             epochs: int = 500,
             batch_size: int = 10,
             loss: str = 'mae',
-            metrics: Union[list, tuple] = ('MSE', 'MAE', KerasRegressor.r_squared),
+            metrics: Union[list, tuple] = ('MSE',
+                                           'MAE',
+                                           KerasRegressor.r_squared
+                                           ),
             optimizer: str = Adam,
             learning_rate: float = 0.001,
             decay: float = 1e-6,
@@ -540,8 +570,9 @@ class MLP_Model(Base_Model):
         """
         Initialise a SciKeras Regression model with the given hyperparameters
 
-        Uses the specified parameters to create a Scikeras KerasRegressor. Allowing a Keras model to be produced easily
-        with all the inputted parameters.
+        Uses the specified parameters to create a Scikeras KerasRegressor.\
+        Allowing a Keras model to be produced easily with all the inputted\
+        parameters.
 
         Args:
             dropout: Dropout rate of each dropout layer
@@ -550,7 +581,8 @@ class MLP_Model(Base_Model):
             no_layers: No of Dense and Dropout layers to create the model with
             init_mode: Initialisation method for the weights of each neuron
             epochs: No of epochs to train the model with
-            batch_size: No of samples for the model to train with before updating weights
+            batch_size: No of samples for the model to train with before\
+                 updating weights
             loss: Metric to optimise the model for.
             metrics: Metrics to track during training of the model
             optimizer: Optimizer function used to allow model to learn
@@ -566,18 +598,23 @@ class MLP_Model(Base_Model):
 
         # tensorboard set-up
         logdir = self._tb_log_dir
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         self._run_name = os.path.join(logdir,
-                                      f'MLP-E-{epochs}-B-{batch_size}-L{np.full(no_layers, no_nodes)}-D-{dropout}'
-                                      f'-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}')
+                                      f'MLP-E-{epochs}-B-{batch_size}-'
+                                      f'L{np.full(no_layers, no_nodes)}-'
+                                      f'D-{dropout}'
+                                      f'-{t}')
 
         if callbacks is None:
             callbacks = []
         # Add in TQDM progress bar for fitting
-        callbacks.append(tfa.callbacks.TQDMProgressBar(show_epoch_progress=False))
+        callbacks.append(tfa.callbacks.TQDMProgressBar(
+            show_epoch_progress=False))
 
         if self._tb:
             # Add in tensorboard logging
-            callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=self._run_name, histogram_freq=1))
+            callbacks.append(tf.keras.callbacks.TensorBoard(
+                log_dir=self._run_name, histogram_freq=1))
 
         model = KerasRegressor(
             model=self.build_mod,
@@ -609,10 +646,12 @@ class Linear_Model(Base_Model):
         """
         Linear_Model constructor.
 
-        Passes the params dict to the creation of the linear model. And passes **kwargs to class creation
+        Passes the params dict to the creation of the linear model. And passes\
+         **kwargs to class creation
 
         Args:
-            params: Dict of linear model parameters passed to self.initialise_model
+            params: Dict of linear model parameters passed to \
+            self.initialise_model
             **kwargs: Inputs for Base_Model init
         """
         super().__init__(**kwargs)
@@ -624,7 +663,7 @@ class Linear_Model(Base_Model):
             self.pre_process()
             self.model = self.initialise_model(**params)
         else:
-            print('Choose data file to import as main_df with ".load_testdata()')
+            print('Choose data file to import as main_df')
         self._tb = False
 
     def pre_process(
@@ -640,7 +679,8 @@ class Linear_Model(Base_Model):
             val_frac: Fraction of data points used within the validation set
 
         Returns:
-            Two tuples which contain dataframes of the features and results for the training and validation sets.
+            Two tuples which contain dataframes of the features and results \
+            for the training and validation sets.
 
         """
         func = MLP_Model.pre_process
@@ -674,8 +714,10 @@ class Linear_Model(Base_Model):
         """
         Score the linear regression model on unseen data.
 
-        Use trained model to predict results on unseen validation data, and then calc metrics for scoring. And plot
-        visualisation of the predictions and feature impacts.
+        Use trained model to predict results on unseen validation data, \
+        and then calc metrics for scoring. And plot visualisation of the \
+        predictions and feature impacts.
+
         Args:
             model: ML model to score
             X: Inputs for predictions from unseen validation data set
@@ -686,10 +728,11 @@ class Linear_Model(Base_Model):
         Returns:
             Dict containing the calculated scores
         """
-        from sklearn.model_selection import cross_validate, RepeatedKFold
+        from sklearn.model_selection import RepeatedKFold, cross_validate
 
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         self._run_name = os.path.join(self._tb_log_dir,
-                                      f'Lin_Reg-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}')    
+                                      f'Lin_Reg-{t}')
 
         if model is None:
             model = self.model
@@ -716,10 +759,12 @@ class Linear_Model(Base_Model):
         if print_score:
             print('-' * 65)
             print(f'{self._run_name.split(self._tb_log_dir)[1][1:]}')
-            print(f'Validation Scores:')
+            print('Validation Scores:')
             print('-' * 65)
-            print(f'MAE = {np.abs(_test_score["test_MAE"].mean()) * 1000:.3f} um')
-            print(f'MSE = {np.abs(_test_score["test_MSE"].mean()) * 1_000_000:.3f} um^2')
+            print(f'MAE = \
+                {np.abs(_test_score["test_MAE"].mean()) * 1000:.3f} um')
+            print(f'MSE = \
+                {np.abs(_test_score["test_MSE"].mean()) * 1_000_000:.3f} um^2')
             print(f'R^2 = {np.mean(_test_score["test_r2"].mean()):.3f}')
             print('-' * 65)
 
@@ -761,11 +806,14 @@ class MLP_Win_Model(Base_Model):
         """
         MLP_Win_Model constructor.
 
-        Passes the params dict to the creation of the mlp win model. And passes **kwargs to class creation
+        Passes the params dict to the creation of the mlp win model. \
+        And passes **kwargs to class creation
 
         Args:
-            params: Dict of mlp model parameters passed to self.initialise_model
-            tb_logdir: Folder path for tb logging, i.e. "CV" -> "Tensorboard\\MLP\\CV"
+            params: Dict of mlp model parameters passed to \
+                self.initialise_model
+            tb_logdir: Folder path for tb logging, i.e. "CV" -> \
+                "Tensorboard\\MLP\\CV"
             **kwargs: Inputs for Base_Model init
         """
 
@@ -783,7 +831,7 @@ class MLP_Win_Model(Base_Model):
             self.pre_process()
             self.model = self.initialise_model(**params)
         else:
-            print('Choose data file to import as main_df with ".load_testdata()')
+            print('Choose data file to import as main_df')
 
     def pre_process(
             self: Base_Model,
@@ -792,22 +840,26 @@ class MLP_Win_Model(Base_Model):
         """
         Pre-process the data for training an MLP Win model
 
-            Split the data for the test into a training and validation set. Then scale the data using a MinMax scaler,
-            based off the training data index. Then window the data, to preserve time. Then split the data based on the
-            saved indicies.
+            Split the data for the test into a training and validation set. \
+            Then scale the data using a MinMax scaler, based off the training \
+            data index. Then window the data, to preserve time. Then split the\
+             data based on the saved indicies.
 
         Args:
             val_frac: Fraction of data points used within the validation set
 
         Returns:
-            Two tuples which contain dataframes of the features and results for the training and validation sets.
+            Two tuples which contain dataframes of the features and results \
+            for the training and validation sets.
 
         """
 
         from collections import deque
+
         def sequence_data(d: np.ndarray):
             """
-            Applies window effect to change feature to include previous self.seq_len features
+            Applies window effect to change feature to include previous \
+            self.seq_len features
 
             Args:
                 d: array of features and targets
@@ -820,7 +872,8 @@ class MLP_Win_Model(Base_Model):
             prev_points = deque(maxlen=seq_len)
 
             for i in d:
-                prev_points.append([n for n in i[:-1]])  # todo change this to adapt if multiple targets
+                # todo change this to adapt if multiple targets
+                prev_points.append([n for n in i[:-1]])
                 if len(prev_points) == seq_len:
                     seq_data.append([np.array(prev_points), i[-1]])
             return seq_data
@@ -828,32 +881,43 @@ class MLP_Win_Model(Base_Model):
         # 4* seqlen for removing overlap
         indx = np.arange(len(self.main_df))
         # save index and pos of the train test split
-        train_i, test_i = train_test_split(indx, test_size=val_frac, shuffle=True)
+        train_i, test_i = train_test_split(indx,
+                                           test_size=val_frac,
+                                           shuffle=True
+                                           )
 
         scaler = MinMaxScaler()
         main_df = self.main_df
 
-        # scale the data transforming only on the training data and fitting on test data
+        # scale the data transforming only on the training data and fitting \
+        # on test data
         for col in self.main_df.columns:
             if col not in self.target:
-                main_df[col][train_i] = scaler.fit_transform(main_df[col][train_i].values.reshape(-1, 1)).squeeze()
-                main_df[col][test_i] = scaler.transform(main_df[col][test_i].values.reshape(-1, 1)).squeeze()
+                main_df[col][train_i] = scaler.fit_transform(
+                    main_df[col][train_i].values.reshape(-1, 1)).squeeze()
+                main_df[col][test_i] = scaler.transform(
+                    main_df[col][test_i].values.reshape(-1, 1)).squeeze()
 
         # window the dataset
         main_df = sequence_data(main_df.values)
 
-        # index position of the end of each dataframe need to change to get automatically
+        # index position of the end of each dataframe
+        # todo need to change to get automatically
         df_ends = [211, 374, 550, 708]
 
         # try to remove overlapping
         # indicies of data to remove from model
-        del_indx = list(range(0, self.seq_len)) + list(range(df_ends[0], (df_ends[0] + self.seq_len))) + list(
-            range(df_ends[1], (df_ends[1] + self.seq_len))) + list(range(df_ends[2], (df_ends[2] + self.seq_len)))
+        del_indx = list(range(0, self.seq_len)) + \
+            list(range(df_ends[0], (df_ends[0] + self.seq_len))) + \
+            list(range(df_ends[1], (df_ends[1] + self.seq_len))) + \
+            list(range(df_ends[2], (df_ends[2] + self.seq_len)))
         indx = np.delete(indx, del_indx)
 
         # split data set indicies into train and test
-        temp_train_i = [element for element in train_i if element not in del_indx]
-        temp_test_i = [element for element in test_i if element not in del_indx]
+        temp_train_i = [element for element in train_i
+                        if element not in del_indx]
+        temp_test_i = [element for element in test_i
+                       if element not in del_indx]
 
         # separate the train and test datasets
         train = [main_df[np.where(indx == j)[0][0]] for j in temp_train_i]
@@ -881,9 +945,12 @@ class MLP_Win_Model(Base_Model):
         self.train_data = [train_X, train_y]
         self.val_data = [test_X, test_y]
         # reshape feature data for MLP win model input
-        self._no_features = self.train_data[0].shape[1] * self.train_data[0].shape[2]
-        self.train_data[0] = self.train_data[0].reshape((self.train_data[0].shape[0], self._no_features))
-        self.val_data[0] = self.val_data[0].reshape((self.val_data[0].shape[0], self._no_features))
+        self._no_features = (self.train_data[0].shape[1] *
+                             self.train_data[0].shape[2])
+        self.train_data[0] = self.train_data[0].reshape(
+            (self.train_data[0].shape[0], self._no_features))
+        self.val_data[0] = self.val_data[0].reshape(
+            (self.val_data[0].shape[0], self._no_features))
         return self.train_data, self.val_data
 
     def initialise_model(
@@ -896,7 +963,10 @@ class MLP_Win_Model(Base_Model):
             epochs: int = 500,
             batch_size: int = 10,
             loss: str = 'mae',
-            metrics: Union[list, tuple] = ('MSE', 'MAE', KerasRegressor.r_squared),
+            metrics: Union[list, tuple] = ('MSE',
+                                           'MAE',
+                                           KerasRegressor.r_squared
+                                           ),
             optimizer: str = Adam,
             learning_rate: float = 0.001,
             decay: float = 1e-6,
@@ -907,8 +977,9 @@ class MLP_Win_Model(Base_Model):
         """
         Initialise a SciKeras Regression model with the given hyperparameters
 
-        Uses the specified parameters to create a Scikeras KerasRegressor. Allowing a Keras model to be produced easily
-        with all the inputted parameters.
+        Uses the specified parameters to create a Scikeras KerasRegressor. \
+        Allowing a Keras model to be produced easily with all the \
+        inputted parameters.
 
         Args:
             dropout: Dropout rate of each dropout layer
@@ -917,7 +988,8 @@ class MLP_Win_Model(Base_Model):
             no_layers: No of Dense and Dropout layers to create the model with
             init_mode: Initialisation method for the weights of each neuron
             epochs: No of epochs to train the model with
-            batch_size: No of samples for the model to train with before updating weights
+            batch_size: No of samples for the model to train with before \
+                updating weights
             loss: Metric to optimise the model for.
             metrics: Metrics to track during training of the model
             optimizer: Optimizer function used to allow model to learn
@@ -932,19 +1004,25 @@ class MLP_Win_Model(Base_Model):
 
         # tensorboard set-up
         logdir = self._tb_log_dir
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         self._run_name = os.path.join(logdir,
-                                      f'MLP_Win-WLEN-{self.seq_len}-E-{epochs}-B-{batch_size}-L-'
-                                      f'{np.full(no_layers, no_nodes)}-D-{dropout}-'
-                                      f'{time.strftime("%Y%m%d-%H%M%S", time.localtime())}')
+                                      f'MLP_Win-WLEN-{self.seq_len}-'
+                                      f'E-{epochs}-'
+                                      f'B-{batch_size}-'
+                                      f'L-{np.full(no_layers, no_nodes)}-'
+                                      f'D-{dropout}-'
+                                      f'{t}')
 
         if callbacks is None:
             callbacks = []
         # Add in TQDM progress bar for fitting
-        callbacks.append(tfa.callbacks.TQDMProgressBar(show_epoch_progress=False))
+        callbacks.append(tfa.callbacks.TQDMProgressBar(
+            show_epoch_progress=False))
 
         if self._tb:
             # Add in tensorboard logging
-            callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=self._run_name, histogram_freq=1))
+            callbacks.append(tf.keras.callbacks.TensorBoard(
+                log_dir=self._run_name, histogram_freq=1))
 
         model = KerasRegressor(
             model=MLP_Model.build_mod,
@@ -970,10 +1048,11 @@ class MLP_Win_Model(Base_Model):
         # Model.summary()
         lines = []
         self.model.model_.summary(print_fn=lines.append)
-        
+
         dropout = self.model.model_.layers[1].get_config()['rate']
         layers = self.model.model_.get_config()['layers']
-        nodes = [layer['config']['units'] for layer in layers if layer['class_name'] in ('Dense', 'LSTM')]
+        nodes = [layer['config']['units'] for layer in layers
+                 if layer['class_name'] in ('Dense', 'LSTM')]
         no_layers = len(nodes) - 1
         activation = layers[1]['config']['activation']
         opt = self.model.model_.optimizer.get_config()
@@ -981,14 +1060,16 @@ class MLP_Win_Model(Base_Model):
         learning_rate = opt['learning_rate']
         decay = opt['decay']
 
-        hp = dedent(f"""       
-            ### Parameters:   
+        hp = dedent(f"""
+            ### Parameters:
             ___
 
-            |Seq Len| Epochs | Batch Size | No Layers | No Neurons | Init Mode | Activation | Dropout | Loss |\
-             Optimiser | Learning rate | Decay |
-            |--------|--------|------------|-----------|------------|-----------|------------|---------|------|\
-            -----------|---------------|-------|
+            |Seq Len| Epochs | Batch Size | No Layers | No Neurons | \
+            Init Mode | Activation | Dropout | Loss | \
+            Optimiser | Learning rate | Decay |
+            |--------|--------|------------|-----------|------------|\
+            -----------|------------|---------|------|-----------|\
+            ---------------|-------|
             |{self.seq_len}|{self.model.epochs}|{self.model.batch_size}|{no_layers}|{nodes[:-1]}|\
             {self.model.model__init_mode}|{activation}|{dropout:.3f}|{self.model.loss}|{optimiser}|\
             {learning_rate:.3E}|{decay:.3E}|
@@ -1002,6 +1083,7 @@ class MLP_Win_Model(Base_Model):
             # Code to output Tensorboard hyperparams
             tf.summary.text('Model Info', hp, step=1)
 
+
 if __name__ == "__main__":
     __spec__ = None
     multiprocessing.set_start_method("spawn")
@@ -1012,9 +1094,16 @@ if __name__ == "__main__":
     exp8 = resources.load('Test 8')
     exp9 = resources.load('Test 9')
 
-    dfs = [exp5.features.drop([23, 24]), exp7.features, exp8.features, exp9.features]
+    dfs = [exp5.features.drop([23, 24]),
+           exp7.features,
+           exp8.features,
+           exp9.features
+           ]
+
     main_df = pd.concat(dfs)
-    main_df = main_df.drop(columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop([0, 1, 2, 3])
+    main_df = main_df.drop(
+        columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop(
+            [0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
 
     # MLP MODEL
@@ -1057,7 +1146,8 @@ if __name__ == "__main__":
 
 # todo add LSTM classes
 # todo try loss of r2 instead of MAE or MSE
-# todo add logger compatibility to log progress and scores incase of TensorBoard failure
-# todo mlp_window for removing overlap needs to get positions of overlaps to work from end index of dfs
+# todo add logger compatibility to log progress and scores
+# todo mlp_window for removing overlap needs to get positions of overlaps to
+# work from end index of dfs so it is automatic
 # todo add random state for pre-process and cv
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
