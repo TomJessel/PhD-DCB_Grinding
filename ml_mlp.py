@@ -8,12 +8,11 @@
 26/10/2022 10:01   tomhj      1.0         Script to contain all code relating to MLP models
 """
 import multiprocessing
-import os.path
 import random
 import time
 import warnings
 from textwrap import dedent
-from typing import Union, Iterable, Dict, Any
+from typing import List, Union, Iterable, Dict, Any
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -94,7 +93,7 @@ class Base_Model:
         if PLATFORM == 'Windows':
             filename = dirname[:result.end()] + r"\Documents\PhD\AE"
         elif PLATFORM == 'Linux':
-            filename = dirname[:result.end()] + r"/ml/tensorboard"
+            filename = dirname[:result.end()] + r"/ml"
         filename = os.path.abspath(filename)
         return filename
 
@@ -252,7 +251,7 @@ class Base_Model:
             run_no,
             tr_index,
             te_index,
-    ) -> [Dict, KerasRegressor]:
+    ) -> List[Dict, KerasRegressor]:
         """
         multiprocessing worker function to cross validate one instance of the model
 
@@ -439,7 +438,7 @@ class MLP_Model(Base_Model):
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
-    ) -> [pd.DataFrame, pd.DataFrame]:
+    ) -> List[pd.DataFrame, pd.DataFrame]:
         """
         Pre-process the data for training an MLP model
 
@@ -533,7 +532,7 @@ class MLP_Model(Base_Model):
             learning_rate: float = 0.001,
             decay: float = 1e-6,
             verbose: int = 1,
-            callbacks: list[tf.keras.callbacks] = None,
+            callbacks: List[Any] = None,
             **params,
     ) -> KerasRegressor:
         """
@@ -629,7 +628,7 @@ class Linear_Model(Base_Model):
     def pre_process(
             self,
             val_frac: float = 0.2,
-    ) -> [pd.DataFrame, pd.DataFrame]:
+    ) -> List[pd.DataFrame, pd.DataFrame]:
         """
         Function to pre-process the data for a linear model
 
@@ -783,7 +782,7 @@ class MLP_Win_Model(Base_Model):
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
-    ) -> [np.ndarray, np.ndarray]:
+    ) -> List[np.ndarray, np.ndarray]:
         """
         Pre-process the data for training an MLP Win model
 
@@ -896,7 +895,7 @@ class MLP_Win_Model(Base_Model):
             learning_rate: float = 0.001,
             decay: float = 1e-6,
             verbose: int = 1,
-            callbacks: list[tf.keras.callbacks] = None,
+            callbacks: List[Any] = None,
             **params,
     ) -> KerasRegressor:
         """
@@ -980,8 +979,8 @@ if __name__ == "__main__":
     # MLP MODEL
     mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
-                        tb=False,
-                        tb_logdir='',
+                        tb=True,
+                        tb_logdir='log test',
                         params={'loss': 'mse',
                                 'epochs': 100,
                                 'no_layers': 2,
@@ -993,20 +992,20 @@ if __name__ == "__main__":
     mlp_reg.score(plot_fig=False)
 
     # MLP WINDOW MODEL
-    mlp_win_reg = MLP_Win_Model(feature_df=main_df,
-                                target='Mean radius',
-                                tb=False,
-                                tb_logdir='',
-                                params={'seq_len': 10,
-                                        'loss': 'mae',
-                                        'epochs': 100,
-                                        'no_layers': 3,
-                                        'no_nodes': 128,
-                                        },
-                                )
-    mlp_win_reg.cv(n_splits=10)
-    mlp_win_reg.fit(validation_split=0.2, verbose=0)
-    mlp_win_reg.score(plot_fig=False)
+    # mlp_win_reg = MLP_Win_Model(feature_df=main_df,
+    #                             target='Mean radius',
+    #                             tb=False,
+    #                             tb_logdir='',
+    #                             params={'seq_len': 10,
+    #                                     'loss': 'mae',
+    #                                     'epochs': 100,
+    #                                     'no_layers': 3,
+    #                                     'no_nodes': 128,
+    #                                     },
+    #                             )
+    # mlp_win_reg.cv(n_splits=10)
+    # mlp_win_reg.fit(validation_split=0.2, verbose=0)
+    # mlp_win_reg.score(plot_fig=False)
 
     # MULTIPLE LINEAR MODEL
     # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
