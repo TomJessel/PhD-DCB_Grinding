@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 """
-@File    :   ml_reg_tb.py   
+@File    :   ml_reg_tb.py
 @Author  :   Tom Jessel
 @Contact :   jesselt@cardiff.ac.uk
- 
+
 @Modify Time      @Author    @Version    @Desciption
 ------------      -------    --------    -----------
 13/10/2022 14:25   tomhj      1.0         None
@@ -15,7 +15,6 @@ from typing import Union, Dict, Any
 import numpy as np
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import KFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler
 import tensorflow as tf
@@ -137,7 +136,7 @@ def score_test(
     }
 
     print('-' * 65)
-    print(f'Model Test Scores:')
+    print('Model Test Scores:')
     print('-' * 65)
     print(f'MAE = {np.abs(_test_score["MAE"]) * 1000:.3f} um')
     print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
@@ -146,11 +145,12 @@ def score_test(
     if tb_wr is not None:
         md_scores = dedent(f'''
         ### Scores - Test Data
-    
-         | MAE | MSE |  R2  |
-         | ---- | ---- | ---- |
-         | {_test_score['MAE'] * 1e3:.3f} | {_test_score['MSE'] * 1e6:.3f} | {_test_score['r2']:.3f} |  
-    
+
+        | MAE | MSE |  R2  |
+        | ---- | ---- | ---- |
+        | {_test_score['MAE'] * 1e3:.3f} | {_test_score['MSE'] * 1e6:.3f} | \
+        {_test_score['r2']:.3f} |
+
         ''')
 
         with tb_wr.as_default():
@@ -176,7 +176,8 @@ def tb_model_desc(model, tb_wr):
 
     dropout = model.model_.layers[1].get_config()['rate']
     layers = model.model_.get_config()['layers']
-    nodes = [layer['config']['units'] for layer in layers if layer['class_name'] in ('Dense', 'LSTM')]
+    nodes = [layer['config']['units'] for layer in layers
+             if layer['class_name'] in ('Dense', 'LSTM')]
     no_layers = len(nodes) - 1
     activation = layers[1]['config']['activation']
     opt = model.model_.optimizer.get_config()
@@ -184,16 +185,18 @@ def tb_model_desc(model, tb_wr):
     learning_rate = opt['learning_rate']
     decay = opt['decay']
 
-    hp = dedent(f"""       
-        ### Parameters:   
+    hp = dedent(f"""
+        ### Parameters:
         ___
 
-        | Epochs | Batch Size | No Layers | No Neurons | Init Mode | Activation | Dropout | Loss | Optimiser |\
-         Learning rate | Decay |
-        |--------|------------|-----------|------------|-----------|------------|---------|------|-----------|\
-        ---------------|-------|
-        |{model.epochs}|{model.batch_size}|{no_layers}|{nodes[:-1]}|{model.model__init_mode}|\
-        {activation}|{dropout:.3f}|{model.loss}|{optimiser}|{learning_rate:.3f}|{decay:.3f}|
+        | Epochs | Batch Size | No Layers | No Neurons | Init Mode | \
+        Activation | Dropout | Loss | Optimiser | Learning rate | \
+        Decay |
+        |--------|------------|-----------|------------|-----------|\
+        ------------|---------|------|-----------|---------------|-------|
+        |{model.epochs}|{model.batch_size}|{no_layers}|{nodes[:-1]}|\
+        {model.model__init_mode}|{activation}|{dropout:.3f}|{model.loss}|\
+        {optimiser}|{learning_rate:.3f}|{decay:.3f}|
 
         """)
 
@@ -220,7 +223,8 @@ if __name__ == '__main__':
     print(main_df.keys())
 
     logdir = 'ml-results/logs/MLP/Features/'
-    run_name = f'{logdir}MLP-E-{EPOCHS}-B-{BATCH_SIZE}-L{np.full(NO_LAYERS, NO_NODES)}-D-{DROPOUT}' \
+    run_name = f'{logdir}MLP-E-{EPOCHS}-B-{BATCH_SIZE}-' + \
+               f'L{np.full(NO_LAYERS, NO_NODES)}-D-{DROPOUT}' + \
                f'-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
     tb_writer = tf.summary.create_file_writer(run_name)
 
@@ -239,7 +243,8 @@ if __name__ == '__main__':
         optimizer__learning_rate=0.001,
         optimizer__decay=1e-6,
         verbose=1,
-        callbacks=[tf.keras.callbacks.TensorBoard(log_dir=run_name, histogram_freq=1)],
+        callbacks=[tf.keras.callbacks.TensorBoard(
+            log_dir=run_name, histogram_freq=1)],
     )
 
     # lstm_reg = KerasRegressor(
@@ -257,7 +262,8 @@ if __name__ == '__main__':
     #     # optimizer__learning_rate=0.001,
     #     # optimizer__decay=1e-6,
     #     verbose=1,
-    #     # callbacks=[tf.keras.callbacks.TensorBoard(log_dir=run_name, histogram_freq=1)],
+    #     # callbacks=[tf.keras.callbacks.TensorBoard(
+    #        log_dir=run_name, histogram_freq=1)],
     # )
 
     mlp_reg.fit(X_train, y_train, validation_split=0.2)

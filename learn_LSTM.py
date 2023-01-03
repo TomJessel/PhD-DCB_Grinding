@@ -88,7 +88,6 @@ if __name__ == '__main__':
         metrics=['MSE', 'MAE']
     )
 
-
     logdir = f'ml-results/logs/LSTM/{NAME}'
     file_writer = tf.summary.create_file_writer(logdir)
     tensorboard = TensorBoard(log_dir=logdir)
@@ -99,9 +98,8 @@ if __name__ == '__main__':
         batch_size=BATCH_SIZE,
         epochs=EPOCHS,
         validation_data=(val_X, val_y),
-        callbacks=[tensorboard],
+        # callbacks=[tensorboard],
     )
-
 
     score = model.evaluate(val_X, val_y, verbose=0)
     print('Test MSE:', score[1])
