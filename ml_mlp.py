@@ -7,11 +7,12 @@
 ------------      -------    --------    -----------
 26/10/2022 10:01   tomhj      1.0        ML classes for architectures
 """
-import multiprocessing
+
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import multiprocessing
 import platform
 import time
-import warnings
 from textwrap import dedent
 from typing import Any, Dict, Iterable, List, Union, Tuple
 
@@ -24,19 +25,18 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from tqdm.auto import tqdm
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-warnings.simplefilter(action='ignore', category=FutureWarning)
-import tensorflow as tf  # noqa: E402
+import tensorflow as tf # noqa: E402
 import tensorflow_addons as tfa  # noqa: E402
 
 tf.config.set_visible_devices([], 'GPU')
-tf.get_logger().setLevel('ERROR')
-from keras.layers import Dense, Dropout, LSTM  # noqa: E402
+from absl import logging
+logging.set_verbosity(logging.ERROR)
+
+from keras.layers import Dense, Dropout, LSTM # noqa: E402
 from keras.models import Sequential  # noqa: E402
 from keras.optimizers import Adam  # noqa: E402
 
 import resources  # noqa: E402
-
 
 
 class Base_Model:
@@ -1471,8 +1471,8 @@ if __name__ == "__main__":
     # MLP MODEL
     mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
-                        tb=False,
-                        tb_logdir='log test',
+                        tb=True,
+                        tb_logdir='hparam test',
                         params={'loss': 'mse',
                                 'epochs': 100,
                                 'no_layers': 2,
@@ -1487,7 +1487,7 @@ if __name__ == "__main__":
     mlp_win_reg = MLP_Win_Model(feature_df=main_df,
                                 target='Mean radius',
                                 tb=True,
-                                tb_logdir='feature test',
+                                tb_logdir='hparam test',
                                 params={'seq_len': 15,
                                         'loss': 'mae',
                                         'epochs': 100,
@@ -1503,11 +1503,11 @@ if __name__ == "__main__":
     lstm_reg = LSTM_Model(feature_df=main_df,
                           target='Mean radius',
                           tb=True,
-                          tb_logdir='feature test',
+                          tb_logdir='hparam test',
                           params={'seq_len': 10,
                                   'loss': 'mae',
                                   'epochs': 100,
-                                  'no_layers': 3,
+                                  'no_layers': 2,
                                   'no_dense': 1,
                                   'no_nodes': 64,
                                   },
