@@ -27,6 +27,7 @@ from tqdm.auto import tqdm
 
 import tensorflow as tf # noqa: E402
 import tensorflow_addons as tfa  # noqa: E402
+import tensorboard.plugins.hparams.api as hp
 
 tf.config.set_visible_devices([], 'GPU')
 from absl import logging
@@ -45,6 +46,7 @@ class Base_Model:
             target: Iterable = None,
             feature_df: pd.DataFrame = None,
             tb: bool = True,
+            params: Dict = None
     ):
         """
         Base_Model constructor.
@@ -63,16 +65,19 @@ class Base_Model:
         self.val_data = pd.DataFrame
         self._tb = tb
         self._run_name = None
-        self.params = {}
 
         # Tensorboard filename
         dirname = self.get_file_dir()
-        self._tb_log_dir = os.path.join(dirname, 'Tensorboard')
+        self.tb_log_dir = os.path.join(dirname, 'Tensorboard')
 
         if self.target is None:
             raise AttributeError('There is no TARGET attribute set.')
         if self.main_df is None:
             raise AttributeError('There is no MAIN_DF attribute.')
+
+        if params is None:
+            params = {}
+        self.params = params
 
     @staticmethod
     def get_file_dir():
@@ -129,6 +134,9 @@ class Base_Model:
             except AttributeError:
                 y = self.train_data[1]
 
+        print('-' * 65)
+        print(f'{self._run_name.split(self.tb_log_dir)[1][1:]}')
+
         self.model.fit(X=X, y=y, **kwargs)
 
         if self._tb:
@@ -152,9 +160,7 @@ class Base_Model:
         decay = opt['decay']
 
         hp = dedent(f"""
-                    ### Parameters:
             ### Parameters:
-                    ### Parameters:
             ___
 
             | Epochs | Batch Size | No Layers | No Neurons | Init Mode |\
@@ -218,13 +224,13 @@ class Base_Model:
         }
         if print_score:
             print('-' * 65)
-            print(f'{self._run_name.split(self._tb_log_dir)[1][1:]}')
+            # print(f'{self._run_name.split(self.tb_log_dir)[1][1:]}')
             print('Validation Scores:')
             print('-' * 65)
             print(f'MAE = {np.abs(_test_score["MAE"]) * 1000:.3f} um')
             print(f'MSE = {np.abs(_test_score["MSE"]) * 1_000_000:.3f} um^2')
             print(f'R^2 = {np.mean(_test_score["r2"]):.3f}')
-            print('-' * 65)
+            # print('-' * 65)
 
         if plot_fig:
             fig, ax = plt.subplots()
@@ -250,11 +256,14 @@ class Base_Model:
                     ''')
             with tb_writer.as_default():
                 tf.summary.text('Model Info', md_scores, step=2)
+                tf.summary.scalar('Val MSE (\u00B5m\u00B2)', (np.abs(_test_score["MSE"]) * 1_000_000), step=1)
+                tf.summary.scalar('Val MAE (\u00B5m)', (np.abs(_test_score["MAE"]) * 1000), step=1)
+                tf.summary.scalar('Val R\u00B2', (np.mean(_test_score['r2'])), step=1)
 
         return _test_score
 
     def initialise_model(self, verbose=1, **params) -> Any:
-        self._run_name = f'{self._tb_log_dir}\\Base-\
+        self._run_name = f'{self.tb_log_dir}\\Base-\
         {time.strftime("%Y%m%d-%H%M%S",time.localtime())}'
         pass
 
@@ -277,9 +286,9 @@ class Base_Model:
             Dict containing models scores
             Model that was scored on
         """
+        self._tb = False
         model = self.initialise_model(verbose=0, **self.params)
         model.callbacks = None
-        self._tb = False
 
         try:
             X = self.train_data[0].values
@@ -332,6 +341,9 @@ class Base_Model:
         """
 
         from sklearn.model_selection import KFold, RepeatedKFold
+
+        print('-' * 65)
+        print(f'{self._run_name.split(self.tb_log_dir)[1][1:]}')
 
         # Use Kfold or Repeated Kfold
         if n_repeats is None:
@@ -390,7 +402,7 @@ class Base_Model:
         std_r2 = np.std([score['r2'] for score in scores])
 
         print('-' * 65)
-        print(f'{self._run_name.split(self._tb_log_dir)[1][1:]}')
+        # print(f'{self._run_name.split(self.tb_log_dir)[1][1:]}')
         print('CV Scores:')
         print('-' * 65)
         print(dedent(f'MAE: {mean_MAE * 1_000:.3f} (\u00B1'
@@ -398,7 +410,7 @@ class Base_Model:
         print(dedent(f'MSE: {mean_MSE * 1_000_000:.3f} (\u00B1'
                      f'{std_MSE * 1_000_000:.3f}) \u00B5m\u00B2'))
         print(f'R^2: {mean_r2:.3f} (\u00B1{std_r2: .3f})')
-        print('-' * 65)
+        # print('-' * 65)
 
         _cv_score = {
             'MAE': mean_MAE,
@@ -421,18 +433,24 @@ class Base_Model:
                          {mean_r2:.3f}  |
                      | (\u00B1{std_MAE * 1_000: .3f}) |\
                          (\u00B1{std_MSE * 1_000_000: .3f}) |\
-                             (\u00B1{std_r2: .3f}
+                             (\u00B1{std_r2: .3f})
 
                     ''')
             with tb_writer.as_default():
                 tf.summary.text('Model Info', md_scores, step=3)
+                tf.summary.scalar('CV MSE (\u00B5m\u00B2)', (mean_MAE * 1e3), step=1)
+                tf.summary.scalar('CV MAE (\u00B5m)', (mean_MSE * 1e6), step=1)
+                tf.summary.scalar('CV R\u00B2', mean_r2, step=1)
+                tf.summary.scalar('CV Std MSE (\u00B1 \u00B5m\u00B2)', (std_MAE * 1e3), step=1)
+                tf.summary.scalar('CV Std MAE (\u00B1 \u00B5m)', (std_MSE * 1e6), step=1)
+                tf.summary.scalar('CV Std R\u00B2 (\u00B1)', std_r2, step=1)
         return _cv_score
 
 
 class MLP_Model(Base_Model):
     def __init__(
             self,
-            params: Dict = None,
+            # params: Dict = None,
             tb_logdir: str = '',
             **kwargs,
     ):
@@ -451,15 +469,15 @@ class MLP_Model(Base_Model):
         """
 
         super().__init__(**kwargs)
-        if params is None:
-            params = {}
-        self.params = params
+        # if params is None:
+        #     params = {}
+        # self.params = params
 
-        self._tb_log_dir = os.path.join(self._tb_log_dir, 'MLP', tb_logdir)
+        self.tb_log_dir = os.path.join(self.tb_log_dir, 'MLP', tb_logdir)
 
         if self.main_df is not None:
             self.pre_process()
-            self.model = self.initialise_model(**params)
+            self.model = self.initialise_model(**self.params)
         else:
             print('Choose data file to import as main_df')
 
@@ -601,7 +619,7 @@ class MLP_Model(Base_Model):
         no_features = pd.DataFrame.to_numpy(self.train_data[0]).shape[1]
 
         # tensorboard set-up
-        logdir = self._tb_log_dir
+        logdir = self.tb_log_dir
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         self._run_name = os.path.join(logdir,
                                       f'MLP-E-{epochs}-B-{batch_size}-'
@@ -619,6 +637,14 @@ class MLP_Model(Base_Model):
             # Add in tensorboard logging
             callbacks.append(tf.keras.callbacks.TensorBoard(
                 log_dir=self._run_name, histogram_freq=1))
+            tb_writer = tf.summary.create_file_writer(self._run_name)
+            with tb_writer.as_default():
+                hp_params = self.params
+                hp.hparams(
+                    hp_params,
+                    trial_id=self._run_name.split(self.tb_log_dir)[1][1:]
+                )
+            # callbacks.append(hp.KerasCallback(self._run_name, hp_params, self._run_name))
 
         model = KerasRegressor(
             model=self.build_mod,
@@ -644,7 +670,7 @@ class MLP_Model(Base_Model):
 class Linear_Model(Base_Model):
     def __init__(
             self,
-            params: Dict = None,
+            # params: Dict = None,
             **kwargs,
     ):
         """
@@ -659,13 +685,13 @@ class Linear_Model(Base_Model):
             **kwargs: Inputs for Base_Model init
         """
         super().__init__(**kwargs)
-        if params is None:
-            params = {}
-        self.params = params
+        # if params is None:
+        #     params = {}
+        # self.params = params
 
         if self.main_df is not None:
             self.pre_process()
-            self.model = self.initialise_model(**params)
+            self.model = self.initialise_model(**self.params)
         else:
             print('Choose data file to import as main_df')
         self._tb = False
@@ -706,6 +732,8 @@ class Linear_Model(Base_Model):
         """
         from sklearn.linear_model import LinearRegression
         model = LinearRegression(**params)
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        self._run_name = os.path.join(self.tb_log_dir,f'Lin_Reg-{t}')
         return model
 
     def score(
@@ -735,10 +763,6 @@ class Linear_Model(Base_Model):
         """
         from sklearn.model_selection import RepeatedKFold, cross_validate
 
-        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        self._run_name = os.path.join(self._tb_log_dir,
-                                      f'Lin_Reg-{t}')
-
         if model is None:
             model = self.model
         if X is None:
@@ -763,15 +787,13 @@ class Linear_Model(Base_Model):
 
         if print_score:
             print('-' * 65)
-            print(f'{self._run_name.split(self._tb_log_dir)[1][1:]}')
+            print(f'{self._run_name.split(self.tb_log_dir)[1][1:]}')
             print('Validation Scores:')
             print('-' * 65)
-            print(f'MAE = \
-                {np.abs(_test_score["test_MAE"].mean()) * 1000:.3f} um')
-            print(f'MSE = \
-                {np.abs(_test_score["test_MSE"].mean()) * 1_000_000:.3f} um^2')
+            print(f'MAE = {np.abs(_test_score["test_MAE"].mean()) * 1000:.3f} um')
+            print(f'MSE = {np.abs(_test_score["test_MSE"].mean()) * 1_000_000:.3f} um^2')
             print(f'R^2 = {np.mean(_test_score["test_r2"].mean()):.3f}')
-            print('-' * 65)
+            # print('-' * 65)
 
         if plot_fig:
             model.fit(X, y)
@@ -800,11 +822,37 @@ class Linear_Model(Base_Model):
             plt.show()
         return _test_score
 
+    def fit(
+            self,
+            X: np.ndarray = None,
+            y: np.ndarray = None,
+            **kwargs,
+    ):
+        """
+        Fit the model with the keras fit method.
+
+        Args:
+            X: Input training data for model to learn from.
+            y: Corresponding output for model to train with.
+            **kwargs: Additional inputs for keras fit method.
+        """
+        if X is None:
+            try:
+                X = self.train_data[0].values
+            except AttributeError:
+                X = self.train_data[0]
+        if y is None:
+            try:
+                y = self.train_data[1].values
+            except AttributeError:
+                y = self.train_data[1]
+
+        self.model.fit(X=X, y=y, **kwargs)
 
 class MLP_Win_Model(Base_Model):
     def __init__(
             self,
-            params: Dict = None,
+            # params: Dict = None,
             tb_logdir: str = '',
             **kwargs,
     ):
@@ -824,17 +872,17 @@ class MLP_Win_Model(Base_Model):
 
         super().__init__(**kwargs)
 
-        if params is None:
-            params = {}
+        # if params is None:
+        #     params = {}
+        # self.params = params
         # get sequnce len for window from param dict
-        self.seq_len = params.pop('seq_len', 10)
-        self.params = params
+        self.seq_len = self.params.pop('seq_len', 10)
 
-        self._tb_log_dir = os.path.join(self._tb_log_dir, 'MLP_WIN', tb_logdir)
+        self.tb_log_dir = os.path.join(self.tb_log_dir, 'MLP_WIN', tb_logdir)
 
         if self.main_df is not None:
             self.pre_process()
-            self.model = self.initialise_model(**params)
+            self.model = self.initialise_model(**self.params)
         else:
             print('Choose data file to import as main_df')
 
@@ -1008,7 +1056,7 @@ class MLP_Win_Model(Base_Model):
         """
 
         # tensorboard set-up
-        logdir = self._tb_log_dir
+        logdir = self.tb_log_dir
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         self._run_name = os.path.join(logdir,
                                       f'MLP_Win-WLEN-{self.seq_len}-'
@@ -1028,6 +1076,14 @@ class MLP_Win_Model(Base_Model):
             # Add in tensorboard logging
             callbacks.append(tf.keras.callbacks.TensorBoard(
                 log_dir=self._run_name, histogram_freq=1))
+            tb_writer = tf.summary.create_file_writer(self._run_name)
+            with tb_writer.as_default():
+                hp_params = self.params
+                hp_params['seq_len'] = self.seq_len
+                hp.hparams(
+                    hp_params,
+                    trial_id=self._run_name.split(self.tb_log_dir)[1][1:]
+                )
 
         model = KerasRegressor(
             model=MLP_Model.build_mod,
@@ -1092,7 +1148,7 @@ class MLP_Win_Model(Base_Model):
 class LSTM_Model(Base_Model):
     def __init__(
             self,
-            params: Dict = None,
+            # params: Dict = None,
             tb_logdir: str = '',
             **kwargs,
     ):
@@ -1110,17 +1166,16 @@ class LSTM_Model(Base_Model):
             **kwargs: Inputs for Base_Model init
         """
         super().__init__(**kwargs)
-        if params is None:
-            params = {}
+        # if params is None:
+        #     params = {}
+        # self.params = params
+        self.seq_len = self.params.pop('seq_len', 10)
 
-        self.seq_len = params.pop('seq_len', 10)
-        self.params = params
-
-        self._tb_log_dir = os.path.join(self._tb_log_dir, 'LSTM', tb_logdir)
+        self.tb_log_dir = os.path.join(self.tb_log_dir, 'LSTM', tb_logdir)
 
         if self.main_df is not None:
             self.pre_process()
-            self.model = self.initialise_model(**params)
+            self.model = self.initialise_model(**self.params)
         else:
             print('Choose data file to import as main_df')
 
@@ -1235,8 +1290,8 @@ class LSTM_Model(Base_Model):
 
         self.train_data = [train_X, train_y]
         self.val_data = [test_X, test_y]
-        print(f'Train data shape:\t{train_X.shape}')
-        print(f'Test data shape:\t{test_X.shape}')
+        # print(f'Train data shape:\t{train_X.shape}')
+        # print(f'Test data shape:\t{test_X.shape}')
         self._no_features = (self.train_data[0].shape[1:])
         return self.train_data, self.val_data
     @staticmethod
@@ -1355,7 +1410,7 @@ class LSTM_Model(Base_Model):
         """
 
         # tensorboard set-up
-        logdir = self._tb_log_dir
+        logdir = self.tb_log_dir
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         layers = (no_layers + no_dense)
         self._run_name = os.path.join(logdir,
@@ -1376,6 +1431,14 @@ class LSTM_Model(Base_Model):
             # Add in tensorboard logging
             callbacks.append(tf.keras.callbacks.TensorBoard(
                 log_dir=self._run_name, histogram_freq=1))
+            tb_writer = tf.summary.create_file_writer(self._run_name)
+            with tb_writer.as_default():
+                hp_params = self.params
+                hp_params['seq_len'] = self.seq_len
+                hp.hparams(
+                    hp_params,
+                    trial_id=self._run_name.split(self.tb_log_dir)[1][1:]
+                )
 
         model = KerasRegressor(
             model=self.build_mod,
@@ -1468,20 +1531,64 @@ if __name__ == "__main__":
             [0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
 
+# HPARAM ATTEMPT
+
+    # EPOCHS = [50, 100, 150]
+    # NO_NODES = [16, 32, 64]
+    #
+    # epochs = hp.HParam('epochs', hp.Discrete(EPOCHS), display_name='Epochs')
+    # no_nodes= hp.HParam('no_nodes', hp.Discrete(NO_NODES), display_name='No Nodes')
+    #
+    # # METRIC_MAE = hp.Metric('epoch_mean_absolute_error', group='validation', display_name='MAE (\u00B5m)')
+    # # METRIC_MSE = hp.Metric('epoch_mean_squared_error', group='validation', display_name='MSE (\u00B5m\u00B2)')
+    # # METRIC_R2 = hp.Metric('epoch_r_squared', group='validation', display_name='R\u00B2')
+    #
+    # METRIC_VAL_MAE = hp.Metric('val_mae', display_name='Val MAE (\u00B5m)')
+    # METRIC_VAL_MSE = hp.Metric('val_mse', display_name='Val MSE (\u00B5m\u00B2)')
+    # METRIC_VAL_R2 = hp.Metric('val_r_squared', display_name='Val R\u00B2')
+    #
+    # METRIC_CV_MEAN_MAE = hp.Metric('cv_mean_mae', display_name='CV MAE (\u00B5m)')
+    # METRIC_CV_MEAN_MSE = hp.Metric('cv_mean_mse', display_name='CV MSE (\u00B5m\u00B2)')
+    # METRIC_CV_MEAN_R2 = hp.Metric('cv_mean_r_squared', display_name='CV R\u00B2')
+    #
+    # METRIC_CV_STD_MAE = hp.Metric('cv_std_mae', display_name='CV Std MAE (\u00B1 \u00B5m)')
+    # METRIC_CV_STD_MSE = hp.Metric('cv_std_mse', display_name='CV Std MSE (\u00B1 \u00B5m\u00B2)')
+    # METRIC_CV_STD_R2 = hp.Metric('cv_std_r_squared', display_name='CV Std R\u00B2 (\u00B1)')
+    #
+    #
+    # file_writer_hp = tf.summary.create_file_writer('/home/tomje/ml/Tensorboard/MLP/hparam_test')
+    # with file_writer_hp.as_default():
+    #     hp.hparams_config(
+    #         hparams=[epochs, no_nodes],
+    #         # hparams=[],
+    #         metrics=[
+    #             METRIC_VAL_MSE,
+    #             METRIC_VAL_MAE,
+    #             METRIC_VAL_R2,
+    #             METRIC_CV_MEAN_MSE,
+    #             METRIC_CV_STD_MSE,
+    #             METRIC_CV_MEAN_MAE,
+    #             METRIC_CV_STD_MAE,
+    #             METRIC_CV_MEAN_R2,
+    #             METRIC_CV_STD_R2,
+    #         ]
+    #     )
+
     # MLP MODEL
     mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
                         tb=True,
-                        tb_logdir='hparam test',
-                        params={'loss': 'mse',
-                                'epochs': 100,
-                                'no_layers': 2,
+                        tb_logdir='hparam_test',
+                        params={'epochs': 100,
+                                'no_nodes': 64,
+                                'dropout': 0.5,
+                                'loss': 'mse'
                                 },
                         )
 
     mlp_reg.cv(n_splits=10)
     mlp_reg.fit(validation_split=0.2, verbose=0)
-    mlp_reg.score(plot_fig=True)
+    mlp_reg.score(plot_fig=False)
 
     # MLP WINDOW MODEL
     mlp_win_reg = MLP_Win_Model(feature_df=main_df,
@@ -1497,7 +1604,7 @@ if __name__ == "__main__":
                                 )
     mlp_win_reg.cv(n_splits=10)
     mlp_win_reg.fit(validation_split=0.2, verbose=0)
-    mlp_win_reg.score(plot_fig=True)
+    mlp_win_reg.score(plot_fig=False)
 
     # LSTM MODEL
     lstm_reg = LSTM_Model(feature_df=main_df,
@@ -1514,16 +1621,17 @@ if __name__ == "__main__":
                           )
     lstm_reg.cv(n_splits=10)
     lstm_reg.fit(validation_split=0.2, verbose=0)
-    lstm_reg.score(plot_fig=True)
+    lstm_reg.score(plot_fig=False)
 
     # MULTIPLE LINEAR MODEL
     lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
     lin_reg.fit()
     lin_reg.score()
 
+    print('-' * 65)
     print('END')
 
-# todo add LSTM classes
+#TODOS
 # todo try loss of r2 instead of MAE or MSE
 # todo add logger compatibility to log progress and scores
 # todo mlp_window for removing overlap needs to get positions of overlaps to
