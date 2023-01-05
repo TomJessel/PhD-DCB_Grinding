@@ -1535,44 +1535,6 @@ if __name__ == "__main__":
 
     # EPOCHS = [50, 100, 150]
     # NO_NODES = [16, 32, 64]
-    #
-    # epochs = hp.HParam('epochs', hp.Discrete(EPOCHS), display_name='Epochs')
-    # no_nodes= hp.HParam('no_nodes', hp.Discrete(NO_NODES), display_name='No Nodes')
-    #
-    # # METRIC_MAE = hp.Metric('epoch_mean_absolute_error', group='validation', display_name='MAE (\u00B5m)')
-    # # METRIC_MSE = hp.Metric('epoch_mean_squared_error', group='validation', display_name='MSE (\u00B5m\u00B2)')
-    # # METRIC_R2 = hp.Metric('epoch_r_squared', group='validation', display_name='R\u00B2')
-    #
-    # METRIC_VAL_MAE = hp.Metric('val_mae', display_name='Val MAE (\u00B5m)')
-    # METRIC_VAL_MSE = hp.Metric('val_mse', display_name='Val MSE (\u00B5m\u00B2)')
-    # METRIC_VAL_R2 = hp.Metric('val_r_squared', display_name='Val R\u00B2')
-    #
-    # METRIC_CV_MEAN_MAE = hp.Metric('cv_mean_mae', display_name='CV MAE (\u00B5m)')
-    # METRIC_CV_MEAN_MSE = hp.Metric('cv_mean_mse', display_name='CV MSE (\u00B5m\u00B2)')
-    # METRIC_CV_MEAN_R2 = hp.Metric('cv_mean_r_squared', display_name='CV R\u00B2')
-    #
-    # METRIC_CV_STD_MAE = hp.Metric('cv_std_mae', display_name='CV Std MAE (\u00B1 \u00B5m)')
-    # METRIC_CV_STD_MSE = hp.Metric('cv_std_mse', display_name='CV Std MSE (\u00B1 \u00B5m\u00B2)')
-    # METRIC_CV_STD_R2 = hp.Metric('cv_std_r_squared', display_name='CV Std R\u00B2 (\u00B1)')
-    #
-    #
-    # file_writer_hp = tf.summary.create_file_writer('/home/tomje/ml/Tensorboard/MLP/hparam_test')
-    # with file_writer_hp.as_default():
-    #     hp.hparams_config(
-    #         hparams=[epochs, no_nodes],
-    #         # hparams=[],
-    #         metrics=[
-    #             METRIC_VAL_MSE,
-    #             METRIC_VAL_MAE,
-    #             METRIC_VAL_R2,
-    #             METRIC_CV_MEAN_MSE,
-    #             METRIC_CV_STD_MSE,
-    #             METRIC_CV_MEAN_MAE,
-    #             METRIC_CV_STD_MAE,
-    #             METRIC_CV_MEAN_R2,
-    #             METRIC_CV_STD_R2,
-    #         ]
-    #     )
 
     # MLP MODEL
     mlp_reg = MLP_Model(feature_df=main_df,
