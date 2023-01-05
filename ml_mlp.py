@@ -256,9 +256,13 @@ class Base_Model:
                     ''')
             with tb_writer.as_default():
                 tf.summary.text('Model Info', md_scores, step=2)
-                tf.summary.scalar('Val MSE (\u00B5m\u00B2)', (np.abs(_test_score["MSE"]) * 1_000_000), step=1)
-                tf.summary.scalar('Val MAE (\u00B5m)', (np.abs(_test_score["MAE"]) * 1000), step=1)
-                tf.summary.scalar('Val R\u00B2', (np.mean(_test_score['r2'])), step=1)
+                tf.summary.scalar('Val MSE (\u00B5m\u00B2)',
+                                  (np.abs(_test_score["MSE"]) * 1_000_000),
+                                  step=1)
+                tf.summary.scalar('Val MAE (\u00B5m)',
+                                  (np.abs(_test_score["MAE"]) * 1000), step=1)
+                tf.summary.scalar('Val R\u00B2',
+                                  (np.mean(_test_score['r2'])), step=1)
 
         return _test_score
 
@@ -438,11 +442,14 @@ class Base_Model:
                     ''')
             with tb_writer.as_default():
                 tf.summary.text('Model Info', md_scores, step=3)
-                tf.summary.scalar('CV MSE (\u00B5m\u00B2)', (mean_MAE * 1e3), step=1)
-                tf.summary.scalar('CV MAE (\u00B5m)', (mean_MSE * 1e6), step=1)
+                tf.summary.scalar('CV MSE (\u00B5m\u00B2)',
+                                  (mean_MSE * 1e6), step=1)
+                tf.summary.scalar('CV MAE (\u00B5m)', (mean_MAE * 1e3), step=1)
                 tf.summary.scalar('CV R\u00B2', mean_r2, step=1)
-                tf.summary.scalar('CV Std MSE (\u00B1 \u00B5m\u00B2)', (std_MAE * 1e3), step=1)
-                tf.summary.scalar('CV Std MAE (\u00B1 \u00B5m)', (std_MSE * 1e6), step=1)
+                tf.summary.scalar('CV Std MSE (\u00B1 \u00B5m\u00B2)',
+                                  (std_MSE * 1e6), step=1)
+                tf.summary.scalar('CV Std MAE (\u00B1 \u00B5m)',
+                                  (std_MAE * 1e3), step=1)
                 tf.summary.scalar('CV Std R\u00B2 (\u00B1)', std_r2, step=1)
         return _cv_score
 
