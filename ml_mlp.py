@@ -377,25 +377,12 @@ class Base_Model:
             pool.close()
             pool.join()
 
-        # with multiprocessing.Pool(processes=20) as pool:
-        #     outputs = pool.starmap(self._cv_model, cv_items)
-
         # outputs = []
         # for cv_item in tqdm(cv_items):
         #     outputs.append(self._cv_model_star(cv_item))
 
         scores = [output[0] for output in outputs]
         # models = [output[1] for output in outputs]
-
-        # bmod_r2 = max(scores, key=lambda x: x['r2'])['run_no']
-        # bmod_MAE = min(scores, key=lambda x: x['MAE'])['run_no']
-        # bmod_MSE = min(scores, key=lambda x: x['MSE'])['run_no']
-        # # Whichever score is first is list will be default if no best over \
-        # more than one score
-        # bmod = [bmod_MAE, bmod_MSE, bmod_r2]
-        #
-        # model = models[max(bmod, key=bmod.count, default=None)]
-        # self.model = model
 
         mean_MAE = np.mean([score['MAE'] for score in scores])
         mean_MSE = np.mean([score['MSE'] for score in scores])
@@ -451,6 +438,12 @@ class Base_Model:
                 tf.summary.scalar('CV Std MAE (\u00B1 \u00B5m)',
                                   (std_MAE * 1e3), step=1)
                 tf.summary.scalar('CV Std R\u00B2 (\u00B1)', std_r2, step=1)
+                step = 0
+                for score in scores:
+                    tf.summary.scalar('cv_iter/mae',score['MAE'],step=step)
+                    tf.summary.scalar('cv_iter/mse',score['MSE'],step=step)
+                    tf.summary.scalar('cv_iter/r2',score['r2'],step=step)
+                    step += 1
         return _cv_score
 
 
@@ -1547,7 +1540,7 @@ if __name__ == "__main__":
     mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
                         tb=True,
-                        tb_logdir='hparam_test',
+                        tb_logdir='cv_test',
                         params={'epochs': 100,
                                 'no_nodes': 64,
                                 'dropout': 0.5,
