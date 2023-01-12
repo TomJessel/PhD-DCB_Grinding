@@ -439,6 +439,7 @@ class Base_Model:
                                   (std_MAE * 1e3), step=1)
                 tf.summary.scalar('CV Std R\u00B2 (\u00B1)', std_r2, step=1)
                 step = 0
+                step = tf.convert_to_tensor(step, dtype=tf.int64)
                 for score in scores:
                     tf.summary.scalar('cv_iter/mae',score['MAE'],step=step)
                     tf.summary.scalar('cv_iter/mse',score['MSE'],step=step)
@@ -1540,11 +1541,13 @@ if __name__ == "__main__":
     mlp_reg = MLP_Model(feature_df=main_df,
                         target='Mean radius',
                         tb=True,
-                        tb_logdir='cv_test',
-                        params={'epochs': 100,
-                                'no_nodes': 64,
-                                'dropout': 0.5,
-                                'loss': 'mse'
+                        tb_logdir='func_test',
+                        params={'epochs': 1000,
+                                'no_nodes': 128,
+                                'dropout': 0.01,
+                                'loss': 'mse',
+                                'init_mode': 'he_normal',
+                                'no_layers': 3,
                                 },
                         )
 
@@ -1552,43 +1555,43 @@ if __name__ == "__main__":
     mlp_reg.fit(validation_split=0.2, verbose=0)
     mlp_reg.score(plot_fig=False)
 
-    # MLP WINDOW MODEL
-    mlp_win_reg = MLP_Win_Model(feature_df=main_df,
-                                target='Mean radius',
-                                tb=True,
-                                tb_logdir='hparam test',
-                                params={'seq_len': 15,
-                                        'loss': 'mae',
-                                        'epochs': 100,
-                                        'no_layers': 3,
-                                        'no_nodes': 64,
-                                        },
-                                )
-    mlp_win_reg.cv(n_splits=10)
-    mlp_win_reg.fit(validation_split=0.2, verbose=0)
-    mlp_win_reg.score(plot_fig=False)
-
-    # LSTM MODEL
-    lstm_reg = LSTM_Model(feature_df=main_df,
-                          target='Mean radius',
-                          tb=True,
-                          tb_logdir='hparam test',
-                          params={'seq_len': 10,
-                                  'loss': 'mae',
-                                  'epochs': 100,
-                                  'no_layers': 2,
-                                  'no_dense': 1,
-                                  'no_nodes': 64,
-                                  },
-                          )
-    lstm_reg.cv(n_splits=10)
-    lstm_reg.fit(validation_split=0.2, verbose=0)
-    lstm_reg.score(plot_fig=False)
-
-    # MULTIPLE LINEAR MODEL
-    lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
-    lin_reg.fit()
-    lin_reg.score()
+    # # MLP WINDOW MODEL
+    # mlp_win_reg = MLP_Win_Model(feature_df=main_df,
+    #                             target='Mean radius',
+    #                             tb=True,
+    #                             tb_logdir='hparam test',
+    #                             params={'seq_len': 15,
+    #                                     'loss': 'mae',
+    #                                     'epochs': 100,
+    #                                     'no_layers': 3,
+    #                                     'no_nodes': 64,
+    #                                     },
+    #                             )
+    # mlp_win_reg.cv(n_splits=10)
+    # mlp_win_reg.fit(validation_split=0.2, verbose=0)
+    # mlp_win_reg.score(plot_fig=False)
+    #
+    # # LSTM MODEL
+    # lstm_reg = LSTM_Model(feature_df=main_df,
+    #                       target='Mean radius',
+    #                       tb=True,
+    #                       tb_logdir='hparam test',
+    #                       params={'seq_len': 10,
+    #                               'loss': 'mae',
+    #                               'epochs': 100,
+    #                               'no_layers': 2,
+    #                               'no_dense': 1,
+    #                               'no_nodes': 64,
+    #                               },
+    #                       )
+    # lstm_reg.cv(n_splits=10)
+    # lstm_reg.fit(validation_split=0.2, verbose=0)
+    # lstm_reg.score(plot_fig=False)
+    #
+    # # MULTIPLE LINEAR MODEL
+    # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
+    # lin_reg.fit()
+    # lin_reg.score()
 
     print('-' * 65)
     print('END')
