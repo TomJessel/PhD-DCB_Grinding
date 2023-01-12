@@ -1596,10 +1596,12 @@ if __name__ == "__main__":
     print('-' * 65)
     print('END')
 
-#TODOS
+# TODOS
 # todo try loss of r2 instead of MAE or MSE
 # todo add logger compatibility to log progress and scores
 # todo mlp_window for removing overlap needs to get positions of overlaps to
 # work from end index of dfs so it is automatic
 # todo add random state for pre-process and cv
+# todo add reduceLROnPlateau callback
+# todo add early stopping callback
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
