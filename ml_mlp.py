@@ -369,8 +369,12 @@ class Base_Model:
         cv_items = [(i, train, test) for i, (train, test) in
                     enumerate(cv.split(X))]
 
-        with multiprocessing.Pool(processes=20) as pool:
-            outputs = list(tqdm(pool.imap(self._cv_model_star, cv_items),
+        with multiprocessing.Pool(processes=20, maxtasksperchild=1) as pool:
+            outputs = list(tqdm(pool.imap(
+                                    self._cv_model_star, 
+                                    cv_items,
+                                    chunksize=1,
+                                    ),
                                 total=len(cv_items),
                                 desc='CV Model'
                                 ))
