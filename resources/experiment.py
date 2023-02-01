@@ -262,7 +262,7 @@ class Experiment:
 
         freq = 1000
 
-        # mpl.use('Qt5Agg')
+        mpl.use('TkAgg')
         path = f'{self.test_info.dataloc}/Figures'
         png_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.png'
         pic_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.pickle'
