@@ -16,19 +16,23 @@ import pandas as pd
 import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
 import multiprocessing
-try:
-    multiprocessing.set_start_method('spawn')
-except RuntimeError:
-    pass
+# try:
+#     multiprocessing.set_start_method('spawn')
+# except RuntimeError:
+#     pass
 
 def opt_model_score(mod):
     mod.cv(n_splits=10, n_repeats=10)
     mod.fit(validation_split=0.1, verbose=0)
     mod.score(plot_fig=False)
-    del mod
 
 
 if __name__ == "__main__":
+    try:
+        multiprocessing.set_start_method('spawn')
+    except RuntimeError:
+        pass
+
     exp5 = resources.load('Test 5')
     exp7 = resources.load('Test 7')
     exp8 = resources.load('Test 8')
@@ -47,7 +51,7 @@ if __name__ == "__main__":
     LOSS = ['mse']
     NO_NODES = [64, 128]
     DROPOUT = [0.01, 0.1, 0.2, 0.5]
-    BATCH_SIZE = [15]
+    BATCH_SIZE = [5, 10, 20]
     SEQ_LEN = [5, 10, 15]
     NO_LAYERS = [1, 2, 3, 4]
     INIT_MODE = [
@@ -58,22 +62,25 @@ if __name__ == "__main__":
         'random_normal'
     ]
 
-    for epoch in EPOCHS:
-        for loss in LOSS:
-            for no_nodes in NO_NODES:
-                for seq_len in SEQ_LEN:
+    for dropout in DROPOUT:
+        for batch_size in BATCH_SIZE:
+            for no_layers in NO_LAYERS:
+                for init_mode in INIT_MODE:
                     hparams = {
-                        'epochs': epoch,
-                        'loss': loss,
-                        'no_nodes': no_nodes,
-                        'seq_len': seq_len,
+                        'epochs': 1500,
+                        'loss': 'mse',
+                        'no_nodes': 128,
+                        'seq_len': 5,
+                        'dropout':dropout,
+                        'batch_size': batch_size,
+                        'no_layers': no_layers,
+                        'init_mode': init_mode,
                     }
-                    lstm_reg = LSTM_Model(feature_df=main_df,
+                    ml_win_reg = MLP_Win_Model(feature_df=main_df,
                                           target='Mean radius',
                                           tb=True,
-                                          tb_logdir='hparam_test_4',
+                                          tb_logdir='hparam_test_2',
                                           params=hparams
                                           )
-                    opt_model_score(lstm_reg)
-                    del lstm_reg
+                    opt_model_score(ml_win_reg)
                     gc.collect()
