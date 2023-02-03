@@ -28,6 +28,7 @@ from tqdm.auto import tqdm
 import tensorflow as tf # noqa: E402
 import tensorflow_addons as tfa  # noqa: E402
 import tensorboard.plugins.hparams.api as hp
+from tensorboard.backend.event_processing import event_accumulator
 
 tf.config.set_visible_devices([], 'GPU')
 from absl import logging
@@ -39,6 +40,33 @@ from keras.optimizers import Adam  # noqa: E402
 
 import resources  # noqa: E402
 
+def parse_tensorboard(path: str, scalars: list[str]):
+    """
+    Creates a Dict of dataframes for each requested scalar from the folder path
+
+    Args:
+       path: Path containing TB files
+       scalars: List of scalars in the TB logs
+    
+    Returns:
+
+    """
+    ea = event_accumulator.EventAccumulator(
+        path,
+        size_guidance={'tensors': 0},
+    )
+    _absorb_print = ea.Reload()
+    # make sure the scalars are in the event accumulator tags
+    assert all(
+        s in ea.Tags()["tensors"] for s in scalars
+    ), "some scalars were not found in the event accumulator"
+
+    results = {scalar: pd.DataFrame(
+        [(s, tf.make_ndarray(t)) for _, s, t in ea.Tensors(
+            scalar)], dtype='float32', columns=['step', scalar]).set_index(
+        'step')
+        for scalar in scalars}
+    return pd.concat(results.values(), axis=1)
 
 class Base_Model:
     def __init__(
@@ -853,6 +881,7 @@ class Linear_Model(Base_Model):
                 y = self.train_data[1]
 
         self.model.fit(X=X, y=y, **kwargs)
+
 
 class MLP_Win_Model(Base_Model):
     def __init__(

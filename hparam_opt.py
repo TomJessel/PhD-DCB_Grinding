@@ -8,7 +8,7 @@
 16/01/2023 10:03   tomhj      1.0         N/A
 """
 
-from ml_mlp import MLP_Model, MLP_Win_Model, LSTM_Model
+from resources.ml_mlp import MLP_Win_Model
 import resources
 
 import gc
