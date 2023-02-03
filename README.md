@@ -30,8 +30,9 @@ gridsearch with given hparams.\
 [`hparam_results.ipynb`](ml/hparam_results.ipynb) visualises the 
 `hparam_opt.py` results from the tensorboard log files.\
 
-### [`testing_main.py`](testing_main.py)
-`testing_main.py` has simple functions for checking acquired data during 
+### [testing_main](testing_main.py)
+[`testing_main.py`](testing_main.py) has simple functions for checking 
+acquired data during 
 tool life tests. 
 
 ### [reference](reference)
