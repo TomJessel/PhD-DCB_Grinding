@@ -1,49 +1,42 @@
 # Acoustic-Emission
-***
- Acoustic-Emission is a library to analyse and process acoustic emission and NC4 wear
-measurement data.  
-Making use of traditional AE processing techniques as well as machine learning.
+Acoustic-Emission is a repo for my PhD work.\
+It includes code for processing and displaying AE and NC4 data. As well as 
+using ML for tool condition monitoring.
 
-## Library Layout
-***
-1) [`main.py`](main.py)
-2) [resources](resources)
+## Repo Layout
+1) [resources](resources)
    - [`experiment.py`](resources/experiment.py)
    - [`ae.py`](resources/ae.py)
    - [`nc4.py`](resources/nc4.py)
-   - [`ml_regression.py`](resources/ml_regression.py)
-3) [reference](reference)
-4) [figures](Figures)
+   - [`ml_mlp.py`](resources/ml_mlp.py)
+   - [`surf_meas.py`](resources/surf_meas.py)
+2) [ml](ml) 
+3) [`testing_main.py`](testing_main.py)
+4) [reference](reference)
 
 
 ## Usage
-***
+### [resources](resources)
+Resources contains all the main files for processing experiment AE and NC4 
+data. As well as classes for ML and Surface measurements.
 
-### [main.py](main.py) 
-`main.py` contains the main code to use the library and any functions that aren't finished.
+### [ml](ml)
+ML has .py and .ipynb files to use and display ML classes for the AE and 
+NC4 data.\
+[`ml_testing.ipynb`](ml/ml_testing.ipynb) creates and scores ML models via 
+CV and validation sets.\
+[`hparam_opt.py`](ml/hparam_opt.py) optimises a single architecture with 
+gridsearch with given hparams.\
+[`hparam_results.ipynb`](ml/hparam_results.ipynb) visualises the 
+`hparam_opt.py` results from the tensorboard log files.\
 
-### [experiment.py](resources/experiment.py)
-`experiment.py` contains the code to create Experiment classes from the test data folder.  
-It also includes functions to load and save the class, as well as generate correlation plots.
-
-### [ae.py](resources/ae.py)
-`ae.py` contains the code to create AE classes from the AE TDMS files stored in the data folder.  
-It also includes methods to process the AE data into useful features and plot graphs of the data.
-
-### [nc4.py](resources/nc4.py)
-`nc4.py` contains the code to create NC4 classes from the NC4 TDMS files stored in the data folder.  
-It also includes methods to process the NC4 data into radius data and extract useful wear features.
-
-### [ml_regression.py](resources/ml_regression.py)
-`ml_regression.py` contains the code to generate a Keras ANN within an ML pipeline using SciKeras.  
-It also includes methods to evaluate models with cross-validation, and conduct gridsearch for  
-optimising hyperparameter selection.
+### [`testing_main.py`](testing_main.py)
+`testing_main.py` has simple functions for checking acquired data during 
+tool life tests. 
 
 ### [reference](reference)
-`referenc`e is a folder containing reference files for some fo the code to run properly.
-
-### [figures](Figures)
-`Figures` is a folder to store graphs and figures produced with the library.
+Reference contains constant files for operation of other scripts. Including 
+a .txt file for locating the experiment obj save locations.
 
 ## Useful Code Examples
 ***
@@ -147,8 +140,3 @@ exp.nc4.plot_xy(fno=[0, 100])
 # Plot NC4 radius surface of every measuremnt
 exp.nc4.plot_surf()
 ```
-### Scores - Test Data
-
-| MAE | MSE | R2  |
-| --- | --- |-----|
-| 0.5 | 0.9 | 1   |
