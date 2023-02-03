@@ -16,10 +16,6 @@ import pandas as pd
 import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
 import multiprocessing
-# try:
-#     multiprocessing.set_start_method('spawn')
-# except RuntimeError:
-#     pass
 
 def opt_model_score(mod):
     mod.cv(n_splits=10, n_repeats=10)
