@@ -9,9 +9,6 @@
 """
 
 import os
-
-import mplcursors
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from typing import Union, Any
 import multiprocessing as mp
@@ -242,11 +239,11 @@ if __name__ == "__main__":
     LC = 1250
 
     exp5 = resources.load('Test 5')
-    # exp7 = resources.load('Test 7')
-    # exp8 = resources.load('Test 8')
-    # exp9 = resources.load('Test 9')
+    exp7 = resources.load('Test 7')
+    exp8 = resources.load('Test 8')
+    exp9 = resources.load('Test 9')
 
     surf5 = SurfMeasurements(exp5.nc4.radius, ls=LS, lc=LC)
-    # surf7 = SurfMeasurements(exp7.nc4.radius, ls=LS, lc=LC)
-    # surf8 = SurfMeasurements(exp8.nc4.radius, ls=LS, lc=LC)
-    # surf9 = SurfMeasurements(exp9.nc4.radius, ls=LS, lc=LC)
+    surf7 = SurfMeasurements(exp7.nc4.radius, ls=LS, lc=LC)
+    surf8 = SurfMeasurements(exp8.nc4.radius, ls=LS, lc=LC)
+    surf9 = SurfMeasurements(exp9.nc4.radius, ls=LS, lc=LC)
