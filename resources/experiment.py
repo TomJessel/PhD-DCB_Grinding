@@ -15,6 +15,7 @@ import fnmatch
 import glob
 import os
 import re
+from pathlib import PureWindowsPath
 from tkinter.filedialog import askdirectory, askopenfilename
 import tkinter as tk
 import pickle
@@ -23,6 +24,7 @@ from typing import Union
 import numpy as np
 import mplcursors
 import matplotlib as mpl
+mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -219,7 +221,7 @@ class Experiment:
             print(f'No. Files: AE-{no_ae} NC4-{no_nc4}')
             self.save()
 
-    def correlation(self, plotfig: bool = True) -> None:
+    def correlation(self, plotfig: bool = True):
         """
         Corerlation between each freq bin and NC4 measurements
 
@@ -263,7 +265,8 @@ class Experiment:
         freq = 1000
 
         mpl.use('TkAgg')
-        path = f'{self.test_info.dataloc}/Figures'
+        dataloc = PureWindowsPath(self.test_info.dataloc)
+        path = f'{dataloc.as_posix()}/Figures/'
         png_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.png'
         pic_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.pickle'
         if not os.path.isdir(path) or not os.path.exists(path):
@@ -271,12 +274,12 @@ class Experiment:
         r = np.stack([self.nc4.mean_radius, self.nc4.peak_radius, self.nc4.runout, self.nc4.form_error])
         f = np.array(self.ae.fft[freq])
         f = f.transpose()
-        coeff = np.corrcoef(f, r[-np.shape(f)[1]:])[:-4, -4:]
+        coeff = np.corrcoef(f, r[:,-np.shape(f)[1]:])[:-4, -4:]
+        fig = []
         if plotfig:
             freq = np.arange(0, self.test_info.acquisition[0] / 2, freq, dtype=int) / 1000
             fig = plot(freq, coeff)
             mplcursors.cursor(multiple=True)
-            fig.show()
             try:
                 open(png_name)
             except IOError:
@@ -286,7 +289,7 @@ class Experiment:
             except IOError:
                 with open(pic_name, 'wb') as f:
                     pickle.dump(fig, f)
-        return coeff
+        return fig, coeff
 
     # todo same thing but for AE features other than FFT
     def create_feat_df(self) -> pd.DataFrame:
