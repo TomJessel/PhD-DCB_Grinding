@@ -15,6 +15,7 @@ import fnmatch
 import glob
 import os
 import re
+from pathlib import PureWindowsPath, Path
 from tkinter.filedialog import askdirectory, askopenfilename
 import tkinter as tk
 import pickle
@@ -23,6 +24,7 @@ from typing import Union
 import numpy as np
 import mplcursors
 import matplotlib as mpl
+mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -219,7 +221,7 @@ class Experiment:
             print(f'No. Files: AE-{no_ae} NC4-{no_nc4}')
             self.save()
 
-    def correlation(self, plotfig: bool = True) -> None:
+    def correlation(self, plotfig: bool = True):
         """
         Corerlation between each freq bin and NC4 measurements
 
@@ -262,8 +264,9 @@ class Experiment:
 
         freq = 1000
 
-        # mpl.use('Qt5Agg')
-        path = f'{self.test_info.dataloc}/Figures'
+        mpl.use('TkAgg')
+        dataloc = PureWindowsPath(self.test_info.dataloc)
+        path = f'{dataloc.as_posix()}/Figures/'
         png_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.png'
         pic_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.pickle'
         if not os.path.isdir(path) or not os.path.exists(path):
@@ -271,12 +274,12 @@ class Experiment:
         r = np.stack([self.nc4.mean_radius, self.nc4.peak_radius, self.nc4.runout, self.nc4.form_error])
         f = np.array(self.ae.fft[freq])
         f = f.transpose()
-        coeff = np.corrcoef(f, r[-np.shape(f)[1]:])[:-4, -4:]
+        coeff = np.corrcoef(f, r[:,-np.shape(f)[1]:])[:-4, -4:]
+        fig = []
         if plotfig:
             freq = np.arange(0, self.test_info.acquisition[0] / 2, freq, dtype=int) / 1000
             fig = plot(freq, coeff)
             mplcursors.cursor(multiple=True)
-            fig.show()
             try:
                 open(png_name)
             except IOError:
@@ -286,7 +289,7 @@ class Experiment:
             except IOError:
                 with open(pic_name, 'wb') as f:
                     pickle.dump(fig, f)
-        return coeff
+        return fig, coeff
 
     # todo same thing but for AE features other than FFT
     def create_feat_df(self) -> pd.DataFrame:
@@ -349,7 +352,10 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
             print('No existing exp file selected!')
             raise NotADirectoryError('No existing exp file selected to load!')
     else:
-        f_locs = pd.read_csv(r"reference//Test obj locations.txt", sep=',', index_col=0)
+        path = Path(__file__).parent.resolve()
+        f_locs = pd.read_csv(fr"{path}/reference/Test obj locations.txt",
+                             sep=',',
+                             index_col=0)
         f_locs = f_locs.to_dict()['Obj location']
         f_locs = {k: "../../" + str(v) for k, v in f_locs.items()}
         try:

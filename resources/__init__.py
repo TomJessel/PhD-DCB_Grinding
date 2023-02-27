@@ -15,6 +15,8 @@ import resources.ae
 import resources.nc4
 import resources.ml_regression
 import resources.experiment
+import resources.surf_meas
+import resources.ml_mlp
 
 from .experiment import load
-from .ml_regression import create_pipeline, get_regression, split_dataset, score_test, score_train, train_history
+from .ml_mlp import MLP_Model, MLP_Win_Model, LSTM_Model, Linear_Model

@@ -12,9 +12,11 @@
 
 import multiprocessing
 from functools import partial
+from pathlib import PureWindowsPath
 from typing import Tuple, Any, Union
 
 import matplotlib as mpl
+mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import mplcursors
 import numpy as np
@@ -24,6 +26,7 @@ from scipy.stats import kurtosis
 from scipy.stats import skew
 from tqdm import tqdm
 from scipy.signal import hilbert, butter, filtfilt
+# mpl.use('TkAgg')
 
 
 def butter_filter(
@@ -210,7 +213,8 @@ class AE:
             data: AE data from the TDMS file.
 
         """
-        test = TdmsFile.read(self._files[fno])
+        filepath = PureWindowsPath(self._files[fno])
+        test = TdmsFile.read(filepath.as_posix())
         prop = test.properties
         data = []
         for group in test.groups():
@@ -238,7 +242,7 @@ class AE:
         t = np.arange(0, n) * ts
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        # mpl.use("Qt5Agg")
+        # mpl.use("TkAgg")
         fig, ax = plt.subplots()
         ax.plot(t, signal, linewidth=1)
         ax.set_title(filename)
@@ -265,7 +269,7 @@ class AE:
 
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        # mpl.use('Qt5Agg')
+        # mpl.use('TkAgg')
         fig, ax = plt.subplots()
         ax.plot(f / 1000, p)
         ax.set_title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
@@ -408,11 +412,31 @@ class AE:
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
         ax.plot_surface(x, y, p, cmap='jet')
-        ax.set_xlabel('Frequency (Hz)')
+        ax.set_xlabel('Frequency (kHz)')
         ax.set_ylabel('Measurement Number')
         ax.set_zlabel('Amplitude (dB)')
         ax.set_title(f'Test No: {self._testinfo.testno} - FFT')
         fig.show()
+    
+    def fft_2d_surf(self, freqlim: Union[None, list] = None):
+        p = np.array(self.fft[1000])
+        if freqlim is None:
+            freqlim = {'lowlim': int(0 / 1000), 'uplim': int(self._fs / (2 * 1000))}
+        else:
+            freqlim = {'lowlim': int(freqlim[0] / 1000), 'uplim': int(freqlim[1] / 1000)}
+        p = p[:, freqlim['lowlim']:freqlim['uplim']]
+
+        fig, ax = plt.subplots()
+        im = ax.imshow(p, origin='lower', interpolation='bilinear', aspect='auto', cmap='jet')
+        fig.colorbar(im, ax=ax, label='Amplitude (dB)') 
+        ax.set_xlabel('Frequency (kHz)')
+        ax.set_ylabel('Measurement No')
+        xticks = ax.get_xticks()
+        xticks_labels = [(xt + freqlim['lowlim']) for xt in xticks]
+        # ax.set_xticks(xticks)
+        ax.set_xticklabels(xticks_labels)
+        return fig
+
 
     def rolling_rms(self, fno: Union[int, tuple]) -> Union[np.ndarray, None]:
         """
@@ -462,7 +486,7 @@ class AE:
             v_rms = calc_roll_rms(fno)
             n = v_rms.size
             t = np.arange(0, n) * ts
-            # mpl.use('Qt5Agg')
+            # mpl.use('TkAgg')
             fig, ax = plt.subplots()
             ax.plot(t, v_rms, linewidth=0.75)
             ax.set_xlabel('Time (s)')
@@ -482,7 +506,9 @@ class AE:
             ax.set_ylabel('RMS (V)')
             writer = PillowWriter(fps=1)
             n = 40_000_000  # number of points to plot
-            name = f'{self._testinfo.dataloc}\\Test {self._testinfo.testno} - Rolling RMS.gif'
+            dataloc = PureWindowsPath(self._testinfo.dataloc)
+            path = f'{dataloc.as_posix()}/Figures/'
+            name = f'{path}Test {self._testinfo.testno} - Rolling RMS.gif'
             with writer.saving(fig, name, 200):
                 for no in range(fno[0], fno[1]):
                     x = np.arange(0, n) * ts
@@ -526,13 +552,14 @@ class AE:
         en_sig = envelope_hilbert(sig)
         sig = butter_filter(data=en_sig, fs=self._fs, order=3, ftype='low')
 
-        plt.figure()
-        plt.plot(t, sig, linewidth=1)
-        plt.axhline(triggers['trig y-val'], color='r', linewidth=1, alpha=0.5)
-        plt.axvline(triggers['trig st'] * ts, color='r', linewidth=1, alpha=0.5)
-        plt.axvline(triggers['trig end'] * ts, color='r', linewidth=1, alpha=0.5)
-        plt.title(filename)
-        plt.autoscale(enable=True, axis='x', tight=True)
-        plt.xlabel('Time (s)')
-        plt.ylabel('Voltage (V)')
-        plt.show()
+        fig, ax = plt.subplots()
+        ax.plot(t, sig, linewidth=1)
+        ax.axhline(triggers['trig y-val'], color='r', linewidth=1, alpha=0.5)
+        ax.axvline(triggers['trig st'] * ts, color='r', linewidth=1, alpha=0.5)
+        ax.axvline(triggers['trig end'] * ts, color='r', linewidth=1, alpha=0.5)
+        ax.set_title(filename)
+        ax.autoscale(enable=True, axis='x', tight=True)
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Voltage (V)')
+        fig.show()
+        return fig

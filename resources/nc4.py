@@ -11,6 +11,7 @@
 """
 
 import os
+from pathlib import PureWindowsPath
 from typing import Any, Union
 
 from nptdms import TdmsFile
@@ -23,12 +24,12 @@ from scipy.ndimage.filters import uniform_filter1d
 from scipy import signal
 import circle_fit
 import matplotlib as mpl
+mpl.use("TkAgg")
 import matplotlib.pyplot as plt
 import mplcursors
 import pickle
 import pandas as pd
 
-# mpl.use("Qt5Agg")
 
 
 def compute_shift(zipped: tuple[Any, Any]) -> int:
@@ -90,7 +91,8 @@ class NC4:
         Returns:
             NC4 data from the file.
         """
-        test = TdmsFile.read(self._files[fno])
+        filepath = PureWindowsPath(self._files[fno])
+        test = TdmsFile.read(filepath.as_posix())
         prop = test.properties
         data = []
         for group in test.groups():
@@ -186,8 +188,9 @@ class NC4:
         """
         Plot NC4 features for each measurement.
         """
-        # mpl.use("Qt5Agg")
-        path = f'{self._testinfo.dataloc}/Figures'
+        mpl.use("TkAgg")
+        dataloc = PureWindowsPath(self._testinfo.dataloc)
+        path = f'{dataloc.as_posix()}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.png'
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.pickle'
         if not os.path.isdir(path) or not os.path.exists(path):
@@ -221,17 +224,20 @@ class NC4:
                 pickle.dump(fig, f)
         mplcursors.cursor(hover=2)
         fig.show()
-
-    def plot_xy(self, fno: tuple[int, int] = None) -> None:
+        return fig
+    
+    def plot_xy(self, fno: tuple[int, int] = None, step:int = 1) -> None:
         """
         Plot full radius measurement around tool circumference, for a slice or all measurements.
 
         Args:
             fno: Tuple of start and stop indices for slice of files to plot.
+            step: Step between files of slice.
 
         """
-        # mpl.use('Qt5Agg')
-        path = f'{self._testinfo.dataloc}/Figures'
+        # mpl.use('TkAgg')
+        dataloc = PureWindowsPath(self._testinfo.dataloc)
+        path = f'{dataloc.as_posix()}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 XY Plot.png'
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 XY Plot.pickle'
 
@@ -258,7 +264,7 @@ class NC4:
             ax.autoscale(enable=True, axis='x', tight=True)
         else:
             fig, ax = plt.subplots()
-            slice_n = slice(fno[0], fno[1])
+            slice_n = slice(fno[0], fno[1], step)
             radius = self.radius[slice_n]
             lbl = range(len(self._files))[slice_n]
             n = 0
@@ -281,14 +287,16 @@ class NC4:
                     pickle.dump(fig, f)
         mplcursors.cursor(multiple=True)
         fig.show()
+        return fig
 
     def plot_surf(self) -> None:
         """
         Plot surface of DCB radius over measurements in time.
 
         """
-        # mpl.use('Qt5Agg')
-        path = f'{self._testinfo.dataloc}/Figures'
+        # mpl.use('TkAgg')
+        dataloc = PureWindowsPath(self._testinfo.dataloc)
+        path = f'{dataloc.as_posix()}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Radius Surf.png'
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 Radius Surf.pickle'
         if not os.path.isdir(path) or not os.path.exists(path):
