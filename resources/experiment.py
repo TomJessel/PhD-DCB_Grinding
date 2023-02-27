@@ -15,7 +15,7 @@ import fnmatch
 import glob
 import os
 import re
-from pathlib import PureWindowsPath
+from pathlib import PureWindowsPath, Path
 from tkinter.filedialog import askdirectory, askopenfilename
 import tkinter as tk
 import pickle
@@ -352,7 +352,10 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
             print('No existing exp file selected!')
             raise NotADirectoryError('No existing exp file selected to load!')
     else:
-        f_locs = pd.read_csv(r"reference//Test obj locations.txt", sep=',', index_col=0)
+        path = Path(__file__).parent.resolve()
+        f_locs = pd.read_csv(fr"{path}/reference/Test obj locations.txt",
+                             sep=',',
+                             index_col=0)
         f_locs = f_locs.to_dict()['Obj location']
         f_locs = {k: "../../" + str(v) for k, v in f_locs.items()}
         try:
