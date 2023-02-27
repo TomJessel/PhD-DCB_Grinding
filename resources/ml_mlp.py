@@ -673,6 +673,7 @@ class MLP_Model(Base_Model):
             tb_writer = tf.summary.create_file_writer(self._run_name)
             with tb_writer.as_default():
                 hp_params = self.params
+                hp_params.pop('callbacks', None)
                 hp.hparams(
                     hp_params,
                     trial_id=self._run_name.split(self.tb_log_dir)[1][1:]
