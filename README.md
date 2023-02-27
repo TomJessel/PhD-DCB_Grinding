@@ -12,7 +12,7 @@ using ML for tool condition monitoring.
    - [`surf_meas.py`](resources/surf_meas.py)
 2) [ml](ml) 
 3) [`testing_main.py`](testing_main.py)
-4) [reference](reference)
+4) [reference](resources/reference)
 
 ## Usage
 ### [resources](resources)
@@ -34,6 +34,6 @@ gridsearch with given hparams.\
 acquired data during 
 tool life tests. 
 
-### [reference](reference)
+### [reference](resources/reference)
 Reference contains constant files for operation of other scripts. Including 
 a .txt file for locating the experiment obj save locations.
