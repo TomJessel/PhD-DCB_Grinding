@@ -14,6 +14,7 @@ import datetime
 import fnmatch
 import glob
 import os
+import pathlib
 import re
 from pathlib import PureWindowsPath, Path
 from tkinter.filedialog import askdirectory, askopenfilename
@@ -352,12 +353,16 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
             print('No existing exp file selected!')
             raise NotADirectoryError('No existing exp file selected to load!')
     else:
-        path = Path(__file__).parent.resolve()
-        f_locs = pd.read_csv(fr"{path}/reference/Test obj locations.txt",
+        dirs = Path.cwd().parts
+        i = dirs.index('Acoustic-Emission')
+        path_ae = os.path.join(*dirs[:i+1])
+        path_base = Path(path_ae).parent.parent
+        path_res = pathlib.PurePath(path_ae).joinpath("resources")
+        f_locs = pd.read_csv(fr"{path_res}/reference/Test obj locations.txt",
                              sep=',',
                              index_col=0)
         f_locs = f_locs.to_dict()['Obj location']
-        f_locs = {k: "../../" + str(v) for k, v in f_locs.items()}
+        f_locs = {k: os.path.join(path_base, v) for k, v in f_locs.items()}
         try:
             file_path = f_locs[file.lower().replace(' ', '')]
             with open(file_path, 'rb') as f:

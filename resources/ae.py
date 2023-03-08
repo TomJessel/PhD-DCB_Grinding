@@ -11,8 +11,9 @@
 """
 
 import multiprocessing
+import os
 from functools import partial
-from pathlib import PureWindowsPath
+from pathlib import PureWindowsPath, Path
 from typing import Tuple, Any, Union
 
 import matplotlib as mpl
@@ -213,7 +214,10 @@ class AE:
             data: AE data from the TDMS file.
 
         """
-        filepath = PureWindowsPath(self._files[fno])
+        dirs = Path.cwd().parts
+        i = dirs.index('Acoustic-Emission')
+        path_ae = os.path.join(*dirs[:i+1])
+        filepath = PureWindowsPath(os.path.join(path_ae, self._files[fno]))
         test = TdmsFile.read(filepath.as_posix())
         prop = test.properties
         data = []
@@ -438,7 +442,8 @@ class AE:
         return fig
 
 
-    def rolling_rms(self, fno: Union[int, tuple]) -> Union[np.ndarray, None]:
+    def rolling_rms(self, fno: Union[int, tuple], plot_fig: bool = True) -> \
+            Union[np.ndarray, None]:
         """
         Produces either a figure or mp4/gif of the specified files.
 
@@ -487,14 +492,15 @@ class AE:
             n = v_rms.size
             t = np.arange(0, n) * ts
             # mpl.use('TkAgg')
-            fig, ax = plt.subplots()
-            ax.plot(t, v_rms, linewidth=0.75)
-            ax.set_xlabel('Time (s)')
-            ax.set_ylabel('RMS (s)')
-            ax.set_title(f'File {fno} - Rolling RMS')
-            ax.autoscale(enable=True, axis='x', tight=True)
-            mplcursors.cursor(multiple=True)
-            fig.show()
+            if plot_fig:
+                fig, ax = plt.subplots()
+                ax.plot(t, v_rms, linewidth=0.75)
+                ax.set_xlabel('Time (s)')
+                ax.set_ylabel('RMS (s)')
+                ax.set_title(f'File {fno} - Rolling RMS')
+                ax.autoscale(enable=True, axis='x', tight=True)
+                mplcursors.cursor(multiple=True)
+                fig.show()
             return v_rms
         elif type(fno) is tuple:
             # Code to create a gif of the RMS plots
