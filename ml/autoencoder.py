@@ -44,7 +44,7 @@ if __name__ == '__main__':
     
     # list of fnos to load in
     # fnos = range(len(exp.ae._files)
-    fnos = range(0, 160)
+    fnos = list(range(0, 160))
 
     with mp.Pool(processes=20, maxtasksperchild=1) as pool:
         rms = list(tqdm(pool.imap(
@@ -75,10 +75,10 @@ if __name__ == '__main__':
     n_inputs = x_train.shape[1]
     # define encoder
     visible = Input(shape=(n_inputs, ))
-    e = Dense(128, activation='relu')(visible)
+    e = Dense(64, activation='relu')(visible)
     e = BatchNormalization()(e)
 
-    e = Dense(128, activation='relu')(e)
+    e = Dense(64, activation='relu')(e)
     e = BatchNormalization()(e)
 
     # define bottleneck
@@ -86,10 +86,10 @@ if __name__ == '__main__':
     bottleneck = Dense(n_bottleneck, activation='relu')(e)
 
     # define decoder
-    d = Dense(128, activation='relu')(bottleneck)
+    d = Dense(64, activation='relu')(bottleneck)
     d = BatchNormalization()(d)
 
-    d = Dense(128, activation='relu')(d)
+    d = Dense(64, activation='relu')(d)
     d = BatchNormalization()(d)
 
     # output layer
@@ -122,6 +122,13 @@ if __name__ == '__main__':
     print(f'MAE: {np.mean(mae):.5f}')
     print(f'MSE: {np.mean(mse):.5f}')
     print(f'R2: {np.mean(r2):.5f}')
+   
+    # plot histograms of results
+    # fig, ax = plt.subplots(3,1)
+    # ax[0].hist(x=mae, bins=50,  label='mae')
+    # ax[1].hist(x=mse, bins=50, label='mse')
+    # ax[2].hist(x=r2, bins=50, label='r2')
+    
 
     # plot loss
     fig1, ax1 = plt.subplots()
@@ -145,28 +152,81 @@ if __name__ == '__main__':
         ax2.plot(pred_input.T, label='Real')
         ax2.plot(x_pred.T, label='Predicition')
         ax2.legend()
-        ax2.set_title(f'MSE: {mse:.4f} MAE: {mae:.4f}')
+        ax2.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
 
     pred_plot(0)
     
+    # TEST ON OTHER EXPERIMENTS
+    exp = resources.load('Test 9')
+    fnos = range(0, 150)
 
-    bad_rms = mp_rms_process(170)
-    bad_rms = bad_rms[:m]
-    bad_rms = np.array(bad_rms).reshape(-1, n_inputs)  
-    bad_rms= scaler.transform(bad_rms)
-    pred_bad = model.predict(bad_rms, verbose=0)
-    bad_mse = mean_squared_error(bad_rms, pred_bad)
-    bad_mae = mean_absolute_error(bad_rms, pred_bad)
-    print(f'\nUNSEEN BAD DATA')
-    print(f'MAE: {bad_mae:.5f} \nMSE: {bad_mse:.5f}')
+    with mp.Pool(processes=20, maxtasksperchild=1) as pool:
+        rms = list(tqdm(pool.imap(
+            mp_rms_process,
+            fnos),
+            total=len(fnos),
+            desc='RMS averaging'
+        ))
+        pool.close()
+        pool.join()
+
+    rms = [r[:m] for r in rms]
+    unseen_rms = np.array(rms)
+
+    unseen_rms = scaler.transform(unseen_rms)
+
+    # calc metrics
+    unseen_pred = model.predict(unseen_rms, verbose=0)
+    unseen_mae = mean_absolute_error(unseen_rms.T, unseen_pred.T, multioutput='raw_values')
+    unseen_mse = mean_squared_error(unseen_rms.T, unseen_pred.T, multioutput='raw_values')
+    unseen_r2 = r2_score(unseen_rms.T, unseen_pred.T, multioutput='raw_values')
+
+    print(f'\nUNSEEN EXP DATA:')
+    print(f'MAE: {np.mean(unseen_mae):.5f}')
+    print(f'MSE: {np.mean(unseen_mse):.5f}')
+    print(f'R2: {np.mean(unseen_r2):.5f}')
+
+    fig, ax = plt.subplots(1,2)
+    ax[0].scatter(x=range(len(unseen_mse)), y=unseen_mse, color='b', label='mse')
+    ax[1].scatter(x=range(len(unseen_mae)), y=unseen_mae, color='g', label='mae')
+    ax[0].legend()
+    ax[1].legend()
+
+    # unseen predict test values
+    def unseen_pred_plot(no):
+        pred_input = unseen_rms[no].reshape(-1, n_inputs)
+        x_pred = unseen_pred[no].reshape(-1, n_inputs)
+
+        pred_input = scaler.inverse_transform(pred_input)
+        x_pred = scaler.inverse_transform(x_pred)
+
+        mse = mean_squared_error(pred_input, x_pred)
+        mae = mean_absolute_error(pred_input, x_pred)
+
+        fig2, ax2 = plt.subplots()
+        ax2.plot(pred_input.T, label='Real')
+        ax2.plot(x_pred.T, label='Predicition')
+        ax2.legend()
+        ax2.set_title(f'UNSEEN DATA \nMAE: {mae:.4f} MSE: {mse:.4f}')
+
+    unseen_pred_plot(1)
+    # bad_rms = mp_rms_process(170)
+    # bad_rms = bad_rms[:m]
+    # bad_rms = np.array(bad_rms).reshape(-1, n_inputs)  
+    # bad_rms= scaler.transform(bad_rms)
+    # pred_bad = model.predict(bad_rms, verbose=0)
+    # bad_mse = mean_squared_error(bad_rms, pred_bad)
+    # bad_mae = mean_absolute_error(bad_rms, pred_bad)
+    # print(f'\nUNSEEN BAD DATA')
+    # print(f'MAE: {bad_mae:.5f} \nMSE: {bad_mse:.5f}')
     
-    x_pred = scaler.inverse_transform(pred_bad)
-    pred_input = scaler.inverse_transform(bad_rms)
-    fig3, ax3 = plt.subplots()
-    ax3.plot(pred_input.T, label='Real')
-    ax3.plot(x_pred.T, label='Predicition')
-    ax3.legend()
-    ax3.set_title(f'BAD DATA MSE: {bad_mse:.4f} MAE: {bad_mae:.4f}')
+    # x_pred = scaler.inverse_transform(pred_bad)
+    # pred_input = scaler.inverse_transform(bad_rms)
+    # fig3, ax3 = plt.subplots()
+    # ax3.plot(pred_input.T, label='Real')
+    # ax3.plot(x_pred.T, label='Predicition')
+    # ax3.legend()
+    # ax3.set_title(f'BAD DATA MAE: {bad_mae:.4f} MSE: {bad_mse:.4f}')
 
 
-    plt.show()
+    plt.show(block=False)
