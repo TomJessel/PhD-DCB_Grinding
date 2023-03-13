@@ -36,8 +36,7 @@ def mp_rms_process(fno):
     avg_sig = np.nanmean(np.pad(sig.astype(float), ((0, avg_size - sig.size%avg_size), (0,0)), mode='constant', constant_values=np.NaN).reshape(-1, avg_size), axis=1)
     return avg_sig
 
-def mp_get_rms(fnos, exp_id)
-    exp = resources.load(exp_id)
+def mp_get_rms(fnos):
     with mp.Pool(processes=20, maxtasksperchild=1) as pool:
         rms = list(tqdm(pool.imap(
             mp_rms_process,
@@ -47,10 +46,10 @@ def mp_get_rms(fnos, exp_id)
         ))
         pool.close()
         pool.join()
-    del exp
     return rms
         
 
+# TODO train the autoencoder off of the first 100 cuts from all the tests
 if __name__ == '__main__':
     #load in test file
     exp = resources.load('Test 8')
@@ -58,17 +57,9 @@ if __name__ == '__main__':
     # list of fnos to load in
     # fnos = range(len(exp.ae._files)
     fnos = list(range(0, 160))
-
-    with mp.Pool(processes=20, maxtasksperchild=1) as pool:
-        rms = list(tqdm(pool.imap(
-            mp_rms_process,
-            fnos),
-            total=len(fnos),
-            desc='RMS averaging'
-        ))
-        pool.close()
-        pool.join()
     
+    rms = mp_get_rms(fnos)
+
     m = min([r.shape[0] for r in rms])
     rms = [r[:m] for r in rms]
     rms = np.array(rms)
@@ -136,13 +127,6 @@ if __name__ == '__main__':
     print(f'MSE: {np.mean(mse):.5f}')
     print(f'R2: {np.mean(r2):.5f}')
    
-    # plot histograms of results
-    # fig, ax = plt.subplots(3,1)
-    # ax[0].hist(x=mae, bins=50,  label='mae')
-    # ax[1].hist(x=mse, bins=50, label='mse')
-    # ax[2].hist(x=r2, bins=50, label='r2')
-    
-
     # plot loss
     fig1, ax1 = plt.subplots()
     ax1.plot(history.history['loss'], label='train')
@@ -176,15 +160,7 @@ if __name__ == '__main__':
         # fnos = range(0, 150)
         fnos = range(len(exp.ae._files))
 
-        with mp.Pool(processes=20, maxtasksperchild=1) as pool:
-            rms = list(tqdm(pool.imap(
-                mp_rms_process,
-                fnos),
-                total=len(fnos),
-                desc='RMS averaging'
-            ))
-            pool.close()
-            pool.join()
+        rms = mp_get_rms(fnos)
 
         rms = [r[:m] for r in rms]
         unseen_rms = np.array(rms)
