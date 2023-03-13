@@ -51,14 +51,17 @@ def mp_get_rms(fnos):
 
 # TODO train the autoencoder off of the first 100 cuts from all the tests
 if __name__ == '__main__':
-    #load in test file
-    exp = resources.load('Test 8')
+    rms = [] 
+    for i in ['Test 5', 'Test 7', 'Test 8', 'Test 9']:
+        #load in test file
+        exp = resources.load(i)
     
-    # list of fnos to load in
-    # fnos = range(len(exp.ae._files)
-    fnos = list(range(0, 160))
+        # list of fnos to load in
+        # fnos = range(len(exp.ae._files)
+        fnos = list(range(0, 100))
     
-    rms = mp_get_rms(fnos)
+        r = mp_get_rms(fnos)
+        rms.extend(r)
 
     m = min([r.shape[0] for r in rms])
     rms = [r[:m] for r in rms]
