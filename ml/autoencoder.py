@@ -33,7 +33,12 @@ def mp_rms_process(fno):
     sig = pd.DataFrame(sig)
     sig = sig.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
     sig = np.array(sig)[500000-1:]
-    avg_sig = np.nanmean(np.pad(sig.astype(float), ((0, avg_size - sig.size%avg_size), (0,0)), mode='constant', constant_values=np.NaN).reshape(-1, avg_size), axis=1)
+    avg_sig = np.nanmean(np.pad(sig.astype(float),
+                                ((0, avg_size - sig.size%avg_size), (0,0)),
+                                mode='constant',
+                                constant_values=np.NaN
+                                )
+                         .reshape(-1, avg_size), axis=1)
     return avg_sig
 
 def mp_get_rms(fnos):
@@ -47,11 +52,61 @@ def mp_get_rms(fnos):
         pool.close()
         pool.join()
     return rms
-        
 
-# TODO train the autoencoder off of the first 100 cuts from all the tests
+def pred_and_score(mod, input_data):
+    pred = mod.predict(input_data, verbose=0)
+    mae = mean_absolute_error(input_data.T, pred.T, multioutput='raw_values')
+    mse = mean_squared_error(input_data.T, pred.T, multioutput='raw_values')
+    r2 = r2_score(input_data.T, pred.T, multioutput='raw_values')
+
+    print(f'MAE: {np.mean(mae):.5f}')
+    print(f'MSE: {np.mean(mse):.5f}')
+    print(f'R2: {np.mean(r2):.5f}')
+    return pred, (mae, mse, r2)
+
+def pred_plot(input, pred, no):
+    pred_input =input[no,:].reshape(-1, n_inputs)
+    x_pred = pred[no,:].reshape(-1, n_inputs)
+
+    pred_input = scaler.inverse_transform(pred_input)
+    x_pred = scaler.inverse_transform(x_pred)
+
+    mse = mean_squared_error(pred_input, x_pred)
+    mae = mean_absolute_error(pred_input, x_pred)
+
+    fig, ax = plt.subplots()
+    ax.plot(pred_input.T, label='Real')
+    ax.plot(x_pred.T, label='Predicition')
+    ax.legend()
+    ax.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
+    return fig, ax
+
+def scatter_scores(scores):
+    # presumes scores is a tuple with (mae, mse, r2)
+    fig, ax = plt.subplots(1, 3)
+    ax[0].scatter(x=range(len(unseen_scores[0])),
+                  y=unseen_scores[0],
+                  color='b',
+                  label='mae'
+                  )
+    ax[1].scatter(x=range(len(unseen_scores[1])),
+                  y=unseen_scores[1],
+                  color='g',
+                  label='mse'
+                  )
+    ax[2].scatter(x=range(len(unseen_scores[2])),
+                  y=unseen_scores[2],
+                  color='r',
+                  label='r2'
+                  )
+    ax[0].legend()
+    ax[1].legend()
+    ax[2].legend()
+    fig.suptitle(f'Scores')
+    return fig, ax
+
 if __name__ == '__main__':
-    rms = [] 
+    rms = []
     for i in ['Test 5', 'Test 7', 'Test 8', 'Test 9']:
         #load in test file
         exp = resources.load(i)
@@ -79,6 +134,7 @@ if __name__ == '__main__':
     x_train = scaler.transform(x_train)
     x_test = scaler.transform(x_test)
 
+    ## AUTOENCODER MODEL
     n_inputs = x_train.shape[1]
     # define encoder
     visible = Input(shape=(n_inputs, ))
@@ -121,14 +177,8 @@ if __name__ == '__main__':
                         )
 
     # calc metrics
-    pred = model.predict(x_test, verbose=0)
-    mae = mean_absolute_error(x_test.T, pred.T, multioutput='raw_values')
-    mse = mean_squared_error(x_test.T, pred.T, multioutput='raw_values')
-    r2 = r2_score(x_test.T, pred.T, multioutput='raw_values')
-
-    print(f'MAE: {np.mean(mae):.5f}')
-    print(f'MSE: {np.mean(mse):.5f}')
-    print(f'R2: {np.mean(r2):.5f}')
+    print(f'\nTraining Scores:')
+    pred, scores = pred_and_score(model, x_test)
    
     # plot loss
     fig1, ax1 = plt.subplots()
@@ -137,32 +187,16 @@ if __name__ == '__main__':
     ax1.legend()
 
     # predict test values
-    def pred_plot(no):
-        pred_input = x_test[no,:].reshape(-1, n_inputs)
-
-        x_pred = model.predict(pred_input, verbose=0)
-
-        pred_input = scaler.inverse_transform(pred_input)
-        x_pred = scaler.inverse_transform(x_pred)
-
-        mse = mean_squared_error(pred_input, x_pred)
-        mae = mean_absolute_error(pred_input, x_pred)
-
-        fig2, ax2 = plt.subplots()
-        ax2.plot(pred_input.T, label='Real')
-        ax2.plot(x_pred.T, label='Predicition')
-        ax2.legend()
-        ax2.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
-
-    pred_plot(0)
+    fig, ax = pred_plot(x_test, pred, 0)
+    ax.set_title(f'Training Dataset - {ax.get_title()}')
     
     # TEST ON OTHER EXPERIMENTS
-    
+
     for i in ['Test 5', 'Test 7', 'Test 8', 'Test 9']:
         exp = resources.load(i)
-        # fnos = range(0, 150)
         fnos = range(len(exp.ae._files))
 
+        print('\n')
         rms = mp_get_rms(fnos)
 
         rms = [r[:m] for r in rms]
@@ -171,40 +205,15 @@ if __name__ == '__main__':
         unseen_rms = scaler.transform(unseen_rms)
 
         # calc metrics
-        unseen_pred = model.predict(unseen_rms, verbose=0)
-        unseen_mae = mean_absolute_error(unseen_rms.T, unseen_pred.T, multioutput='raw_values')
-        unseen_mse = mean_squared_error(unseen_rms.T, unseen_pred.T, multioutput='raw_values')
-        unseen_r2 = r2_score(unseen_rms.T, unseen_pred.T, multioutput='raw_values')
+        print(f'\nUNSEEN EXP DATA - {i}:')
+        unseen_pred, unseen_scores = pred_and_score(model, unseen_rms)
 
-        print(f'\n{i} UNSEEN EXP DATA:')
-        print(f'MAE: {np.mean(unseen_mae):.5f}')
-        print(f'MSE: {np.mean(unseen_mse):.5f}')
-        print(f'R2: {np.mean(unseen_r2):.5f}')
+        fig, ax = scatter_scores(unseen_scores)
+        fig.suptitle(f'{i.upper()} - {fig._suptitle.get_text()}')
 
-        fig, ax = plt.subplots(1,2)
-        ax[0].scatter(x=range(len(unseen_mse)), y=unseen_mse, color='b', label='mse')
-        ax[1].scatter(x=range(len(unseen_mae)), y=unseen_mae, color='g', label='mae')
-        ax[0].legend()
-        ax[1].legend()
-        fig.suptitle(f'{i}')
+        # plot prediction from unseen data
+        fig, ax = pred_plot(unseen_rms, unseen_pred, 0)
+        ax.set_title(f'UNSEEN DATA {i.upper()} - {ax.get_title()}')
 
-        # unseen predict test values
-        def unseen_pred_plot(no):
-            pred_input = unseen_rms[no].reshape(-1, n_inputs)
-            x_pred = unseen_pred[no].reshape(-1, n_inputs)
-
-            pred_input = scaler.inverse_transform(pred_input)
-            x_pred = scaler.inverse_transform(x_pred)
-
-            mse = mean_squared_error(pred_input, x_pred)
-            mae = mean_absolute_error(pred_input, x_pred)
-
-            fig2, ax2 = plt.subplots()
-            ax2.plot(pred_input.T, label='Real')
-            ax2.plot(x_pred.T, label='Predicition')
-            ax2.legend()
-            ax2.set_title(f'{i} UNSEEN DATA \nMAE: {mae:.4f} MSE: {mse:.4f}')
-
-        unseen_pred_plot(1)
 
     plt.show(block=False)
