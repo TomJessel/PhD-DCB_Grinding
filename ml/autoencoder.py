@@ -84,18 +84,18 @@ def pred_plot(input, pred, no):
 def scatter_scores(scores):
     # presumes scores is a tuple with (mae, mse, r2)
     fig, ax = plt.subplots(1, 3)
-    ax[0].scatter(x=range(len(unseen_scores[0])),
-                  y=unseen_scores[0],
+    ax[0].scatter(x=range(len(scores[0])),
+                  y=scores[0],
                   color='b',
                   label='mae'
                   )
-    ax[1].scatter(x=range(len(unseen_scores[1])),
-                  y=unseen_scores[1],
+    ax[1].scatter(x=range(len(scores[1])),
+                  y=scores[1],
                   color='g',
                   label='mse'
                   )
-    ax[2].scatter(x=range(len(unseen_scores[2])),
-                  y=unseen_scores[2],
+    ax[2].scatter(x=range(len(scores[2])),
+                  y=scores[2],
                   color='r',
                   label='r2'
                   )
