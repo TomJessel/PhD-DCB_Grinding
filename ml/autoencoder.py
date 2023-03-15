@@ -23,11 +23,13 @@ from keras.layers import Input, Dense, BatchNormalization
 from keras.models import Model
 import tensorflow_addons as tfa
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from pathlib import Path
 
 import resources
 
+DATA_DIR = rf'Testing/RMS'
 
-def mp_rms_process(fno):
+def _mp_rms_process(fno):
     avg_size = 100000
     sig = exp.ae.readAE(fno)
     sig = pd.DataFrame(sig)
@@ -44,7 +46,7 @@ def mp_rms_process(fno):
 def mp_get_rms(fnos):
     with mp.Pool(processes=20, maxtasksperchild=1) as pool:
         rms = list(tqdm(pool.imap(
-            mp_rms_process,
+            _mp_rms_process,
             fnos),
             total=len(fnos),
             desc='RMS averaging'
@@ -105,28 +107,77 @@ def scatter_scores(scores):
     fig.suptitle(f'Scores')
     return fig, ax
 
-if __name__ == '__main__':
-    rms = []
-    for i in ['Test 5', 'Test 7', 'Test 8', 'Test 9']:
-        #load in test file
-        exp = resources.load(i)
-    
-        # list of fnos to load in
-        # fnos = range(len(exp.ae._files)
-        fnos = list(range(0, 100))
-    
-        r = mp_get_rms(fnos)
-        rms.extend(r)
 
-    m = min([r.shape[0] for r in rms])
-    rms = [r[:m] for r in rms]
-    rms = np.array(rms)
+class RMS:
+    def __init__(
+            self,
+            exp_name,
+    ):
+        self.exp_name = exp_name
+
+        # Read in data from file or compute
+        self._get_data()
+
+    def _process_exp(self, save_path=None):
+        # load in exp for this obj
+        global exp
+        exp = resources.load(self.exp_name)
+
+        # get no of AE files in exp dataset
+        fnos = range(len(exp.ae._files))
+
+        # process data, requires func outside class for mp
+        rms = mp_get_rms(fnos)
+
+        # find min length of signals and create array
+        m = min([r.shape[0] for r in rms])
+        rms = [r[:m] for r in rms]
+        rms = np.array(rms)
+
+        # create dataframe from array each column is a cut
+        df = pd.DataFrame(rms.T)
+        self.data = df
+
+        if save_path is not None:
+            df.to_csv(save_path,
+                      encoding='utf-8',
+                      index=False)
+            print(f'Data file saved to: {save_path}')
+
+    def _get_data(self):
+        # get path to home directory
+        dirs = Path.cwd().parts
+        search_str = 'tomje'
+        i = dirs.index(search_str)
+        home_dir = os.path.join(*dirs[:i + 1])
+
+        # get file name of .csv file if created
+        file_name = f'RMS_{self.exp_name.upper().replace(" ", "_")}.csv'
+
+        # join path of home dir, data folder, and file name for reading
+        path = Path(os.path.join(home_dir, DATA_DIR, file_name))
+
+        try:
+            # try to read in .csv file
+            self.data = pd.read_csv(path)
+        except FileNotFoundError:
+            print(f'RMS Data File Not Found for {self.exp_name}')
+            # if no data file process data and save
+            self._process_exp(path)
+
+
+if __name__ == '__main__':
+
+    rms_5 = RMS('Test 5')
+    rms_7 = RMS('Test 7')
+    rms_8 = RMS('Test 8')
+    rms_9 = RMS('Test 9')
 
     # split dataset
-    x_train, x_test = train_test_split(rms, test_size=0.1, random_state=1)
+    x_train, x_test = train_test_split(rms_8.data.values.T, test_size=0.1,
+                                       random_state=1)
     print(f'X train shape: {x_train.shape}')
     print(f'X test shape: {x_test.shape}')
-    del rms
 
     # scale data
     scaler = MinMaxScaler(feature_range=(0, 1))
@@ -179,7 +230,7 @@ if __name__ == '__main__':
     # calc metrics
     print(f'\nTraining Scores:')
     pred, scores = pred_and_score(model, x_test)
-   
+
     # plot loss
     fig1, ax1 = plt.subplots()
     ax1.plot(history.history['loss'], label='train')
@@ -189,31 +240,30 @@ if __name__ == '__main__':
     # predict test values
     fig, ax = pred_plot(x_test, pred, 0)
     ax.set_title(f'Training Dataset - {ax.get_title()}')
-    
-    # TEST ON OTHER EXPERIMENTS
 
-    for i in ['Test 5', 'Test 7', 'Test 8', 'Test 9']:
-        exp = resources.load(i)
-        fnos = range(len(exp.ae._files))
-
-        print('\n')
-        rms = mp_get_rms(fnos)
-
-        rms = [r[:m] for r in rms]
-        unseen_rms = np.array(rms)
-
-        unseen_rms = scaler.transform(unseen_rms)
-
-        # calc metrics
-        print(f'\nUNSEEN EXP DATA - {i}:')
-        unseen_pred, unseen_scores = pred_and_score(model, unseen_rms)
-
-        fig, ax = scatter_scores(unseen_scores)
-        fig.suptitle(f'{i.upper()} - {fig._suptitle.get_text()}')
-
-        # plot prediction from unseen data
-        fig, ax = pred_plot(unseen_rms, unseen_pred, 0)
-        ax.set_title(f'UNSEEN DATA {i.upper()} - {ax.get_title()}')
-
+    # # TEST ON OTHER EXPERIMENTS
+    #
+    # for i in ['Test 8']:
+    #     exp = resources.load(i)
+    #     fnos = range(len(exp.ae._files))
+    #
+    #     print('\n')
+    #     rms = mp_get_rms(fnos)
+    #
+    #     rms = [r[:m] for r in rms]
+    #     unseen_rms = np.array(rms)
+    #
+    #     unseen_rms = scaler.transform(unseen_rms)
+    #
+    #     # calc metrics
+    #     print(f'\nUNSEEN EXP DATA - {i}:')
+    #     unseen_pred, unseen_scores = pred_and_score(model, unseen_rms)
+    #
+    #     fig, ax = scatter_scores(unseen_scores)
+    #     fig.suptitle(f'{i.upper()} - {fig._suptitle.get_text()}')
+    #
+    #     # plot prediction from unseen data
+    #     fig, ax = pred_plot(unseen_rms, unseen_pred, 0)
+    #     ax.set_title(f'UNSEEN DATA {i.upper()} - {ax.get_title()}')
 
     plt.show(block=False)
