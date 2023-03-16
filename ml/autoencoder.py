@@ -20,7 +20,7 @@ import multiprocessing as mp
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from keras.layers import Input, Dense, BatchNormalization
-from keras.models import Model
+from keras.models import Model, Sequential
 import tensorflow_addons as tfa
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from pathlib import Path
@@ -61,9 +61,9 @@ def pred_and_score(mod, input_data):
     mse = mean_squared_error(input_data.T, pred.T, multioutput='raw_values')
     r2 = r2_score(input_data.T, pred.T, multioutput='raw_values')
 
-    print(f'MAE: {np.mean(mae):.5f}')
-    print(f'MSE: {np.mean(mse):.5f}')
-    print(f'R2: {np.mean(r2):.5f}')
+    print(f'\tMAE: {np.mean(mae):.5f}')
+    print(f'\tMSE: {np.mean(mse):.5f}')
+    print(f'\tR2: {np.mean(r2):.5f}')
     return pred, (mae, mse, r2)
 
 def pred_plot(input, pred, no):
@@ -115,6 +115,8 @@ class RMS:
     ):
         self.exp_name = exp_name
 
+        print(f'\nLoaded {exp_name.upper().replace(" ", "_")} RMS Data')
+
         # Read in data from file or compute
         self._get_data()
 
@@ -136,13 +138,14 @@ class RMS:
 
         # create dataframe from array each column is a cut
         df = pd.DataFrame(rms.T)
-        self.data = df
 
         if save_path is not None:
             df.to_csv(save_path,
                       encoding='utf-8',
                       index=False)
             print(f'Data file saved to: {save_path}')
+        del exp
+        return df
 
     def _get_data(self):
         # get path to home directory
@@ -163,73 +166,98 @@ class RMS:
         except FileNotFoundError:
             print(f'RMS Data File Not Found for {self.exp_name}')
             # if no data file process data and save
-            self._process_exp(path)
+            self.data = self._process_exp(path)
 
+
+class AutoEncoder_Model(Model):
+    def __init__(
+            self,
+            data,
+            random_state = None,
+    ):
+        print('AutoEncoder Model')
+        super(AutoEncoder_Model, self).__init__()
+        self.data = data
+        self.random_state = random_state
+
+        self.pre_process()
+        self.encoder = self.get_encoder(self.n_inputs, 10)
+        self.decoder = self.get_decoder(self.n_inputs, 10)
+
+    def pre_process(
+            self,
+            val_frac: float = 0.1,
+    ):
+        print(f'\tPre-Processing Data:')
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
+
+        if self.random_state is None:
+            x_train, x_test = train_test_split(self.data.values.T,
+                                               test_size=val_frac,)
+        else:
+            x_train, x_test = train_test_split(self.data.values.T,
+                                               test_size=val_frac,
+                                               random_state=self.random_state,)
+
+        print(f'\tX train shape: {x_train.shape}')
+        print(f'\tX test shape: {x_test.shape}')
+
+        self.scaler.fit(x_train)
+        x_train = self.scaler.transform(x_train)
+        x_test = self.scaler.transform(x_test)
+
+        self.n_inputs = x_train.shape[1]
+        self.train_data = x_train
+        self.val_data = x_test
+
+    @staticmethod
+    def get_encoder(n_inputs, n_bottleneck):
+        encoder = Sequential(name='Encoder')
+        encoder.add(Input(shape=(n_inputs, )))
+        encoder.add(Dense(64, activation='relu'))
+        encoder.add(BatchNormalization())
+
+        encoder.add(Dense(64, activation='relu'))
+        encoder.add(BatchNormalization())
+
+        encoder.add(Dense(n_bottleneck, activation='relu'))
+        return encoder
+
+    @staticmethod
+    def get_decoder(n_inputs, n_bottleneck):
+        decoder = Sequential(name='Decoder')
+        decoder.add(Input(shape=(n_bottleneck, )))
+        decoder.add(Dense(64, activation='relu'))
+        decoder.add(BatchNormalization())
+
+        decoder.add(Dense(64, activation='relu'))
+        decoder.add(BatchNormalization())
+
+        decoder.add(Dense(n_inputs, activation='relu'))
+        return decoder
+
+    def call(self, x):
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        return decoded
 
 if __name__ == '__main__':
 
-    rms_5 = RMS('Test 5')
-    rms_7 = RMS('Test 7')
     rms_8 = RMS('Test 8')
-    rms_9 = RMS('Test 9')
-
-    # split dataset
-    x_train, x_test = train_test_split(rms_8.data.values.T, test_size=0.1,
-                                       random_state=1)
-    print(f'X train shape: {x_train.shape}')
-    print(f'X test shape: {x_test.shape}')
-
-    # scale data
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaler.fit(x_train)
-    x_train = scaler.transform(x_train)
-    x_test = scaler.transform(x_test)
-
-    ## AUTOENCODER MODEL
-    n_inputs = x_train.shape[1]
-    # define encoder
-    visible = Input(shape=(n_inputs, ))
-    e = Dense(64, activation='relu')(visible)
-    e = BatchNormalization()(e)
-
-    e = Dense(64, activation='relu')(e)
-    e = BatchNormalization()(e)
-
-    # define bottleneck
-    n_bottleneck = 10
-    bottleneck = Dense(n_bottleneck, activation='relu')(e)
-
-    # define decoder
-    d = Dense(64, activation='relu')(bottleneck)
-    d = BatchNormalization()(d)
-
-    d = Dense(64, activation='relu')(d)
-    d = BatchNormalization()(d)
-
-    # output layer
-    output = Dense(n_inputs, activation='relu')(d)
-
-    # define autoencoder model
-    model = Model(inputs=visible, outputs=output)
-
-    # compile autoencoder model
-    model.compile(
-        optimizer='adam',
-        loss='mse',
-        )
-
-    history = model.fit(x_train, x_train,
+    autoe_8 = AutoEncoder_Model(data=rms_8.data)
+    autoe_8.compile(optimizer='adam', loss='mse')
+    history = autoe_8.fit(autoe_8.train_data, autoe_8.train_data,
                         epochs=500,
                         batch_size=16,
                         verbose=0,
-                        validation_data=(x_test, x_test),
+                        validation_data=(autoe_8.val_data, autoe_8.val_data),
                         callbacks=tfa.callbacks.TQDMProgressBar(
                             show_epoch_progress=False),
                         )
 
     # calc metrics
     print(f'\nTraining Scores:')
-    pred, scores = pred_and_score(model, x_test)
+    pred, scores = pred_and_score(autoe_8, autoe_8.val_data)
 
     # plot loss
     fig1, ax1 = plt.subplots()
@@ -237,33 +265,30 @@ if __name__ == '__main__':
     ax1.plot(history.history['val_loss'], label='test')
     ax1.legend()
 
-    # predict test values
-    fig, ax = pred_plot(x_test, pred, 0)
-    ax.set_title(f'Training Dataset - {ax.get_title()}')
+    plt.show(block=True)
 
-    # # TEST ON OTHER EXPERIMENTS
     #
-    # for i in ['Test 8']:
-    #     exp = resources.load(i)
-    #     fnos = range(len(exp.ae._files))
+    # # predict test values
+    # fig, ax = pred_plot(x_test, pred, 0)
+    # ax.set_title(f'Training Dataset - {ax.get_title()}')
     #
-    #     print('\n')
-    #     rms = mp_get_rms(fnos)
+    # ## TEST ON OTHER EXPERIMENTS
     #
-    #     rms = [r[:m] for r in rms]
-    #     unseen_rms = np.array(rms)
+    # i = rms_8.exp_name
     #
-    #     unseen_rms = scaler.transform(unseen_rms)
+    # unseen_rms = rms_8.data.values.T
     #
-    #     # calc metrics
-    #     print(f'\nUNSEEN EXP DATA - {i}:')
-    #     unseen_pred, unseen_scores = pred_and_score(model, unseen_rms)
+    # unseen_rms = scaler.transform(unseen_rms)
     #
-    #     fig, ax = scatter_scores(unseen_scores)
-    #     fig.suptitle(f'{i.upper()} - {fig._suptitle.get_text()}')
+    # # calc metrics
+    # print(f'\nUNSEEN EXP DATA - {i}:')
+    # unseen_pred, unseen_scores = pred_and_score(model, unseen_rms)
     #
-    #     # plot prediction from unseen data
-    #     fig, ax = pred_plot(unseen_rms, unseen_pred, 0)
-    #     ax.set_title(f'UNSEEN DATA {i.upper()} - {ax.get_title()}')
-
-    plt.show(block=False)
+    # fig, ax = scatter_scores(unseen_scores)
+    # fig.suptitle(f'{i.upper()} - {fig._suptitle.get_text()}')
+    #
+    # # plot prediction from unseen data
+    # fig, ax = pred_plot(unseen_rms, unseen_pred, 0)
+    # ax.set_title(f'UNSEEN DATA {i.upper()} - {ax.get_title()}')
+    #
+    # plt.show(block=True)
