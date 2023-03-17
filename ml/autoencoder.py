@@ -255,10 +255,11 @@ class AutoEncoder_Model(Model):
 if __name__ == '__main__':
 
    exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
+   # exps = ['Test 8']
    for test in exps:
 
         rms = RMS(test)
-        autoe = AutoEncoder_Model(data=rms.data)
+        autoe = AutoEncoder_Model(data=rms.data, random_state=1)
         autoe.compile(optimizer='adam', loss='mse')
         history = autoe.fit(autoe.train_data, autoe.train_data,
                             epochs=500,
@@ -274,6 +275,32 @@ if __name__ == '__main__':
         autoe_val_pred, autoe_val_scores = pred_and_score(autoe,
                                                           autoe.val_data)
 
+        # plot hist of loss values from training
+        p = autoe.predict(autoe.train_data)
+        train_mse = mean_squared_error(autoe.train_data, p,
+                                        multioutput='raw_values')
+
+        train_mae =mean_absolute_error(autoe.train_data, p,
+                                       multioutput='raw_values')
+
+        train_r2 =r2_score(autoe.train_data, p,
+                           multioutput='raw_values')
+
+        plt.hist(train_mse, bins=50)
+        plt.xlabel('Train Loss')
+        plt.ylabel('No of Occurences')
+        plt.title(f'{test} Histogram of Training Loss')
+
+        # calc thresholds from each metric based on mean and std
+        thr_mse = np.mean(train_mse) + np.std(train_mse)
+        thr_mae = np.mean(train_mae) + np.std(train_mae)
+        thr_r2 = np.mean(train_r2) - np.std(train_r2)
+
+        print(f'\nThreshold:')
+        print(f'\tMSE = {thr_mse}')
+        print(f'\tMAE = {thr_mae}')
+        print(f'\tR2 = {thr_r2}')
+
         # plot loss
         fig, ax = plt.subplots()
         ax.plot(history.history['loss'], label='train')
@@ -281,9 +308,9 @@ if __name__ == '__main__':
         ax.set_title(f'{test} - Model Loss')
         ax.legend()
 
-        # prediction plot
-        fig, ax = pred_plot(autoe, autoe.val_data, autoe_val_pred, 8)
-        ax.set_title(f'{test} Validation Predictions - {ax.get_title()}')
+        # prediction plot of cut 8
+        # fig, ax = pred_plot(autoe, autoe.val_data, autoe_val_pred, 8)
+        # ax.set_title(f'{test} Validation Predictions - {ax.get_title()}')
 
         # Prediction on whole dataset
         print(f'\nDataset Predictions:')
@@ -292,10 +319,16 @@ if __name__ == '__main__':
         autoe_pred, autoe_scores = pred_and_score(autoe,
                                                   d)
 
+        # plot scatter scores with the threshold from training scores
+        # TODO need to check anomalies within RMS data espcially test 5 and 9
         fig, ax = scatter_scores(scores=autoe_scores)
         fig.suptitle(f'{test} - {fig._suptitle.get_text()}')
+        ax[0].axhline(thr_mae, color='k', ls='--')
+        ax[1].axhline(thr_mse, color='k', ls='--')
+        ax[2].axhline(thr_r2, color='k', ls='--')
 
-        fig, ax = pred_plot(autoe, d, autoe_pred, 110)
-        ax.set_title(f'{test} UNSEEN DATA - {ax.get_title()}')
+        # prediction plot of cut 110
+        # fig, ax = pred_plot(autoe, d, autoe_pred, 110)
+        # ax.set_title(f'{test} UNSEEN DATA - {ax.get_title()}')
 
-   plt.show(block=True)
+   plt.show(block=False)
