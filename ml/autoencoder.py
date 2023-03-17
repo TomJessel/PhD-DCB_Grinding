@@ -66,12 +66,12 @@ def pred_and_score(mod, input_data):
     print(f'\tR2: {np.mean(r2):.5f}')
     return pred, (mae, mse, r2)
 
-def pred_plot(input, pred, no):
-    pred_input =input[no,:].reshape(-1, n_inputs)
-    x_pred = pred[no,:].reshape(-1, n_inputs)
+def pred_plot(mod, input, pred, no):
+    pred_input =input[no,:].reshape(-1, mod.n_inputs)
+    x_pred = pred[no,:].reshape(-1, mod.n_inputs)
 
-    pred_input = scaler.inverse_transform(pred_input)
-    x_pred = scaler.inverse_transform(x_pred)
+    pred_input = mod.scaler.inverse_transform(pred_input)
+    x_pred = mod.scaler.inverse_transform(x_pred)
 
     mse = mean_squared_error(pred_input, x_pred)
     mae = mean_absolute_error(pred_input, x_pred)
@@ -173,11 +173,13 @@ class AutoEncoder_Model(Model):
     def __init__(
             self,
             data,
+            train_slice = (0,100),
             random_state = None,
     ):
         print('AutoEncoder Model')
         super(AutoEncoder_Model, self).__init__()
         self.data = data
+        self._train_slice = np.s_[train_slice[0]:train_slice[1]]
         self.random_state = random_state
 
         self.pre_process()
@@ -189,18 +191,27 @@ class AutoEncoder_Model(Model):
             val_frac: float = 0.1,
     ):
         print(f'\tPre-Processing Data:')
+
+        # First split off Test data based on slice from self._train_slice
+        # to let the model only be trained ona  portion of the data.
+        # i.e. first 100 cuts
+
+        print(f'\tTraining Data: {self._train_slice}')
+        data = self.data.values.T
+        train_data = data[self._train_slice]
+
         self.scaler = MinMaxScaler(feature_range=(0, 1))
 
         if self.random_state is None:
-            x_train, x_test = train_test_split(self.data.values.T,
+            x_train, x_test = train_test_split(train_data,
                                                test_size=val_frac,)
         else:
-            x_train, x_test = train_test_split(self.data.values.T,
+            x_train, x_test = train_test_split(train_data,
                                                test_size=val_frac,
                                                random_state=self.random_state,)
 
-        print(f'\tX train shape: {x_train.shape}')
-        print(f'\tX test shape: {x_test.shape}')
+        print(f'\tInput train shape: {x_train.shape}')
+        print(f'\tInput val shape: {x_test.shape}')
 
         self.scaler.fit(x_train)
         x_train = self.scaler.transform(x_train)
@@ -243,52 +254,48 @@ class AutoEncoder_Model(Model):
 
 if __name__ == '__main__':
 
-    rms_8 = RMS('Test 8')
-    autoe_8 = AutoEncoder_Model(data=rms_8.data)
-    autoe_8.compile(optimizer='adam', loss='mse')
-    history = autoe_8.fit(autoe_8.train_data, autoe_8.train_data,
-                        epochs=500,
-                        batch_size=16,
-                        verbose=0,
-                        validation_data=(autoe_8.val_data, autoe_8.val_data),
-                        callbacks=tfa.callbacks.TQDMProgressBar(
-                            show_epoch_progress=False),
-                        )
+   exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
+   for test in exps:
 
-    # calc metrics
-    print(f'\nTraining Scores:')
-    pred, scores = pred_and_score(autoe_8, autoe_8.val_data)
+        rms = RMS(test)
+        autoe = AutoEncoder_Model(data=rms.data)
+        autoe.compile(optimizer='adam', loss='mse')
+        history = autoe.fit(autoe.train_data, autoe.train_data,
+                            epochs=500,
+                            batch_size=10,
+                            verbose=0,
+                            validation_data=(autoe.val_data, autoe.val_data),
+                            callbacks=tfa.callbacks.TQDMProgressBar(
+                                show_epoch_progress=False),
+                            )
 
-    # plot loss
-    fig1, ax1 = plt.subplots()
-    ax1.plot(history.history['loss'], label='train')
-    ax1.plot(history.history['val_loss'], label='test')
-    ax1.legend()
+        # calc metrics
+        print(f'\nValidation Scores:')
+        autoe_val_pred, autoe_val_scores = pred_and_score(autoe,
+                                                          autoe.val_data)
 
-    plt.show(block=True)
+        # plot loss
+        fig, ax = plt.subplots()
+        ax.plot(history.history['loss'], label='train')
+        ax.plot(history.history['val_loss'], label='test')
+        ax.set_title(f'{test} - Model Loss')
+        ax.legend()
 
-    #
-    # # predict test values
-    # fig, ax = pred_plot(x_test, pred, 0)
-    # ax.set_title(f'Training Dataset - {ax.get_title()}')
-    #
-    # ## TEST ON OTHER EXPERIMENTS
-    #
-    # i = rms_8.exp_name
-    #
-    # unseen_rms = rms_8.data.values.T
-    #
-    # unseen_rms = scaler.transform(unseen_rms)
-    #
-    # # calc metrics
-    # print(f'\nUNSEEN EXP DATA - {i}:')
-    # unseen_pred, unseen_scores = pred_and_score(model, unseen_rms)
-    #
-    # fig, ax = scatter_scores(unseen_scores)
-    # fig.suptitle(f'{i.upper()} - {fig._suptitle.get_text()}')
-    #
-    # # plot prediction from unseen data
-    # fig, ax = pred_plot(unseen_rms, unseen_pred, 0)
-    # ax.set_title(f'UNSEEN DATA {i.upper()} - {ax.get_title()}')
-    #
-    # plt.show(block=True)
+        # prediction plot
+        fig, ax = pred_plot(autoe, autoe.val_data, autoe_val_pred, 8)
+        ax.set_title(f'{test} Validation Predictions - {ax.get_title()}')
+
+        # Prediction on whole dataset
+        print(f'\nDataset Predictions:')
+        # first scale whole dataset
+        d = autoe.scaler.transform(autoe.data.values.T)
+        autoe_pred, autoe_scores = pred_and_score(autoe,
+                                                  d)
+
+        fig, ax = scatter_scores(scores=autoe_scores)
+        fig.suptitle(f'{test} - {fig._suptitle.get_text()}')
+
+        fig, ax = pred_plot(autoe, d, autoe_pred, 110)
+        ax.set_title(f'{test} UNSEEN DATA - {ax.get_title()}')
+
+   plt.show(block=True)
