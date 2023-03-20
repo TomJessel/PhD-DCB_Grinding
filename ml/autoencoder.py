@@ -11,10 +11,8 @@
 import os
 import io
 import pathlib
-import tensorflow as tf
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import matplotlib
-matplotlib.use('TkAgg')
+import tensorflow as tf
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -260,8 +258,8 @@ class AutoEncoder_Model(Model):
 
 if __name__ == '__main__':
 
-    exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
-    # exps = ['Test 5']
+    # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
+    exps = ['Test 5']
 
     rms= {}
     for test in exps:
@@ -344,8 +342,8 @@ if __name__ == '__main__':
         # ax.legend()
 
         # prediction plot of cut 8
-        # fig, ax = pred_plot(autoe, autoe.val_data, autoe_val_pred, 8)
-        # ax.set_title(f'{test} Validation Predictions - {ax.get_title()}')
+        fig, ax = pred_plot(autoe, autoe.val_data, autoe_val_pred, 8)
+        ax.set_title(f'{test} Validation Predictions - {ax.get_title()}')
 
         # Prediction on whole dataset
         print(f'\nDataset Predictions:')
@@ -383,7 +381,7 @@ if __name__ == '__main__':
             tf.summary.image("Scatter Predicitons", plot_to_tf_im(fig), step=0)
 
         # prediction plot of cut 110
-        # fig, ax = pred_plot(autoe, d, autoe_pred, 110)
-        # ax.set_title(f'{test} UNSEEN DATA - {ax.get_title()}')
+        fig, ax = pred_plot(autoe, d, autoe_pred, 110)
+        ax.set_title(f'{test} UNSEEN DATA - {ax.get_title()}')
 
     plt.show(block=False)

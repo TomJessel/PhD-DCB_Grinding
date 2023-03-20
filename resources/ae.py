@@ -17,7 +17,7 @@ from pathlib import PureWindowsPath, Path
 from typing import Tuple, Any, Union
 
 import matplotlib as mpl
-mpl.use('TkAgg')
+# mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import mplcursors
 import numpy as np

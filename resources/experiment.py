@@ -25,7 +25,7 @@ from typing import Union
 import numpy as np
 import mplcursors
 import matplotlib as mpl
-mpl.use('TkAgg')
+# mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import pandas as pd
 

@@ -24,7 +24,7 @@ from scipy.ndimage.filters import uniform_filter1d
 from scipy import signal
 import circle_fit
 import matplotlib as mpl
-mpl.use("TkAgg")
+# mpl.use("TkAgg")
 import matplotlib.pyplot as plt
 import mplcursors
 import pickle
