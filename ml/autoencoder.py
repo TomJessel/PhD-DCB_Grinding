@@ -9,6 +9,9 @@
 """
 
 import os
+import io
+import pathlib
+import tensorflow as tf
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import matplotlib
 matplotlib.use('TkAgg')
@@ -24,6 +27,8 @@ from keras.models import Model, Sequential
 import tensorflow_addons as tfa
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from pathlib import Path
+import time
+from scikeras.wrappers import KerasRegressor
 
 import resources
 
@@ -105,6 +110,7 @@ def scatter_scores(scores):
     ax[1].legend()
     ax[2].legend()
     fig.suptitle(f'Scores')
+    fig.tight_layout()
     return fig, ax
 
 
@@ -254,20 +260,48 @@ class AutoEncoder_Model(Model):
 
 if __name__ == '__main__':
 
-   exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
-   # exps = ['Test 8']
-   for test in exps:
+    exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
+    # exps = ['Test 5']
 
-        rms = RMS(test)
-        autoe = AutoEncoder_Model(data=rms.data, random_state=1)
-        autoe.compile(optimizer='adam', loss='mse')
+    rms= {}
+    for test in exps:
+
+        rms[test] = RMS(test)
+
+    rms['Test 5'].data.drop(['23', '24'], axis=1, inplace=True)
+
+    for test in exps:
+
+        print(f'\n{test.upper().replace(" ", "_")}')
+
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        base_folder = os.path.abspath(rf'{pathlib.Path.home()}/ml/Tensorboard')
+        run_name = os.path.join(base_folder,
+                                r'AUTOEN',
+                                rf'{test.upper().replace(" ", "_")}-AE-{t}')
+
+        autoe = AutoEncoder_Model(data=rms[test].data,
+                                  random_state=1,
+                                  train_slice=(0, 100),
+                                  )
+        autoe.compile(optimizer='adam',
+                      loss='mse',
+                      metrics = ('MSE',
+                                 'MAE',
+                                 KerasRegressor.r_squared,
+                                 ),
+                      )
         history = autoe.fit(autoe.train_data, autoe.train_data,
                             epochs=500,
                             batch_size=10,
                             verbose=0,
                             validation_data=(autoe.val_data, autoe.val_data),
-                            callbacks=tfa.callbacks.TQDMProgressBar(
-                                show_epoch_progress=False),
+                            callbacks=[
+                                tfa.callbacks.TQDMProgressBar(
+                                    show_epoch_progress=False),
+                                tf.keras.callbacks.TensorBoard(
+                                    log_dir=run_name)
+                            ],
                             )
 
         # calc metrics
@@ -276,7 +310,7 @@ if __name__ == '__main__':
                                                           autoe.val_data)
 
         # plot hist of loss values from training
-        p = autoe.predict(autoe.train_data)
+        p = autoe.predict(autoe.train_data, verbose=0)
         train_mse = mean_squared_error(autoe.train_data, p,
                                         multioutput='raw_values')
 
@@ -286,10 +320,11 @@ if __name__ == '__main__':
         train_r2 =r2_score(autoe.train_data, p,
                            multioutput='raw_values')
 
-        plt.hist(train_mse, bins=50)
-        plt.xlabel('Train Loss')
-        plt.ylabel('No of Occurences')
-        plt.title(f'{test} Histogram of Training Loss')
+        # fig, ax = plt.subplots()
+        # ax.hist(train_mse, bins=50)
+        # ax.set_xlabel('Error')
+        # ax.set_ylabel('No of Occurences')
+        # ax.set_title(f'{test} Histogram of Training Dataset Prediction Error')
 
         # calc thresholds from each metric based on mean and std
         thr_mse = np.mean(train_mse) + np.std(train_mse)
@@ -302,11 +337,11 @@ if __name__ == '__main__':
         print(f'\tR2 = {thr_r2}')
 
         # plot loss
-        fig, ax = plt.subplots()
-        ax.plot(history.history['loss'], label='train')
-        ax.plot(history.history['val_loss'], label='test')
-        ax.set_title(f'{test} - Model Loss')
-        ax.legend()
+        # fig, ax = plt.subplots()
+        # ax.plot(history.history['loss'], label='train')
+        # ax.plot(history.history['val_loss'], label='test')
+        # ax.set_title(f'{test} - Model Loss')
+        # ax.legend()
 
         # prediction plot of cut 8
         # fig, ax = pred_plot(autoe, autoe.val_data, autoe_val_pred, 8)
@@ -320,15 +355,35 @@ if __name__ == '__main__':
                                                   d)
 
         # plot scatter scores with the threshold from training scores
-        # TODO need to check anomalies within RMS data espcially test 5 and 9
+        # TODO need to check anomalies within RMS data especially test 5 and 9
         fig, ax = scatter_scores(scores=autoe_scores)
         fig.suptitle(f'{test} - {fig._suptitle.get_text()}')
         ax[0].axhline(thr_mae, color='k', ls='--')
         ax[1].axhline(thr_mse, color='k', ls='--')
         ax[2].axhline(thr_r2, color='k', ls='--')
 
+
+        def plot_to_tf_im(figure):
+            """Converts the matplotlib plot specified by 'figure' to a PNG
+            image and
+            returns it. The supplied figure is closed and inaccessible after
+            this call."""
+            # Save the plot to a PNG in memory.
+            buf = io.BytesIO()
+            figure.savefig(buf, format='png')
+            buf.seek(0)
+            # Convert PNG buffer to TF image
+            image = tf.image.decode_png(buf.getvalue(), channels=4)
+            # Add the batch dimension
+            image = tf.expand_dims(image, 0)
+            return image
+
+        tb_writer = tf.summary.create_file_writer(run_name)
+        with tb_writer.as_default():
+            tf.summary.image("Scatter Predicitons", plot_to_tf_im(fig), step=0)
+
         # prediction plot of cut 110
         # fig, ax = pred_plot(autoe, d, autoe_pred, 110)
         # ax.set_title(f'{test} UNSEEN DATA - {ax.get_title()}')
 
-   plt.show(block=False)
+    plt.show(block=False)
