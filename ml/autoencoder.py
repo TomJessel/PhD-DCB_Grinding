@@ -67,7 +67,9 @@ def pred_and_score(mod, input_data):
     print(f'\tMAE: {np.mean(mae):.5f}')
     print(f'\tMSE: {np.mean(mse):.5f}')
     print(f'\tR2: {np.mean(r2):.5f}')
-    return pred, (mae, mse, r2)
+
+    scores = {'mae':mae, 'mse':mse, 'r2': r2}
+    return pred, scores
 
 def pred_plot(mod, input, pred, no):
     pred_input =input[no,:].reshape(-1, mod.n_inputs)
@@ -87,20 +89,20 @@ def pred_plot(mod, input, pred, no):
     return fig, ax
 
 def scatter_scores(scores):
-    # presumes scores is a tuple with (mae, mse, r2)
+    # presumes scores is a dict with (mae, mse, r2)
     fig, ax = plt.subplots(1, 3)
-    ax[0].scatter(x=range(len(scores[0])),
-                  y=scores[0],
+    ax[0].scatter(x=range(len(scores['mae'])),
+                  y=scores['mae'],
                   color='b',
                   label='mae'
                   )
-    ax[1].scatter(x=range(len(scores[1])),
-                  y=scores[1],
+    ax[1].scatter(x=range(len(scores['mse'])),
+                  y=scores['mse'],
                   color='g',
                   label='mse'
                   )
-    ax[2].scatter(x=range(len(scores[2])),
-                  y=scores[2],
+    ax[2].scatter(x=range(len(scores['r2'])),
+                  y=scores['r2'],
                   color='r',
                   label='r2'
                   )
@@ -258,8 +260,8 @@ class AutoEncoder_Model(Model):
 
 if __name__ == '__main__':
 
-    # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
-    exps = ['Test 5']
+    exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
+    # exps = ['Test 5']
 
     rms= {}
     for test in exps:
@@ -312,10 +314,10 @@ if __name__ == '__main__':
         train_mse = mean_squared_error(autoe.train_data, p,
                                         multioutput='raw_values')
 
-        train_mae =mean_absolute_error(autoe.train_data, p,
+        train_mae = mean_absolute_error(autoe.train_data, p,
                                        multioutput='raw_values')
 
-        train_r2 =r2_score(autoe.train_data, p,
+        train_r2 = r2_score(autoe.train_data, p,
                            multioutput='raw_values')
 
         # fig, ax = plt.subplots()
@@ -333,13 +335,6 @@ if __name__ == '__main__':
         print(f'\tMSE = {thr_mse}')
         print(f'\tMAE = {thr_mae}')
         print(f'\tR2 = {thr_r2}')
-
-        # plot loss
-        # fig, ax = plt.subplots()
-        # ax.plot(history.history['loss'], label='train')
-        # ax.plot(history.history['val_loss'], label='test')
-        # ax.set_title(f'{test} - Model Loss')
-        # ax.legend()
 
         # prediction plot of cut 8
         fig, ax = pred_plot(autoe, autoe.val_data, autoe_val_pred, 8)
@@ -379,9 +374,14 @@ if __name__ == '__main__':
         tb_writer = tf.summary.create_file_writer(run_name)
         with tb_writer.as_default():
             tf.summary.image("Scatter Predicitons", plot_to_tf_im(fig), step=0)
+            for key, score in autoe_scores.items():
+                step = 0
+                for error in score:
+                    tf.summary.scalar(f'pred_scores/{key}', error, step=step)
+                    step += 1
 
         # prediction plot of cut 110
         fig, ax = pred_plot(autoe, d, autoe_pred, 110)
         ax.set_title(f'{test} UNSEEN DATA - {ax.get_title()}')
 
-    plt.show(block=False)
+    plt.show(block=True)
