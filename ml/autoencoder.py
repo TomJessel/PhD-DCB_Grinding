@@ -11,6 +11,7 @@
 import os
 import io
 import pathlib
+from typing import Any
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -26,7 +27,7 @@ import tensorflow_addons as tfa
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from pathlib import Path
 import time
-from scikeras.wrappers import KerasRegressor
+from scikeras.wrappers import KerasRegressor, BaseWrapper
 
 import resources
 
@@ -258,10 +259,146 @@ class AutoEncoder_Model(Model):
         decoded = self.decoder(encoded)
         return decoded
 
+
+class AutoEncoder():
+    def __init__(
+        self,
+        data,
+        params: dict = None,
+        train_slice = (0,100),
+        random_state = None,
+    ):
+        print('AutoEncoder Model')
+        self.data = data
+        self._train_slice = np.s_[train_slice[0]:train_slice[1]]
+        self.random_state = random_state
+        
+        if params is None:
+            params = {}
+        self.params = params
+
+        self.pre_process()
+        self.model = self.initialise_model(**self.params)
+        self.model.initialize(X=self.train_data)
+
+
+
+    def pre_process(
+        self,
+        val_frac: float = 0.1,
+    ):
+        print(f'\tPre-Processing Data:')
+
+        # First split off Test data based on slice from self._train_slice
+        # to let the model only be trained ona  portion of the data.
+        # i.e. first 100 cuts
+
+        print(f'\tTraining Data: {self._train_slice}')
+        data = self.data.values.T
+        train_data = data[self._train_slice]
+
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
+
+        if self.random_state is None:
+            x_train, x_test = train_test_split(train_data,
+                                               test_size=val_frac,)
+        else:
+            x_train, x_test = train_test_split(train_data,
+                                               test_size=val_frac,
+                                               random_state=self.random_state,)
+
+        print(f'\tInput train shape: {x_train.shape}')
+        print(f'\tInput val shape: {x_test.shape}')
+
+        self.scaler.fit(x_train)
+        x_train = self.scaler.transform(x_train)
+        x_test = self.scaler.transform(x_test)
+
+        self._n_inputs = x_train.shape[1]
+        self.train_data = x_train
+        self.val_data = x_test
+
+    @staticmethod 
+    def get_autoencoder(
+        n_inputs: int,
+        n_bottleneck: int,
+        n_size: list[int],
+        activation: str, 
+    ):
+        def get_encoder(n_inputs, n_bottleneck, n_size, activation):
+            encoder_in = Input(shape=(n_inputs, ))
+            e = encoder_in
+
+            for dim in n_size:
+                e = Dense(dim, activation=activation)(e)
+                e = BatchNormalization()(e)
+
+            encoder_out = Dense(n_bottleneck, activation='relu')(e)
+            encoder = Model(encoder_in, encoder_out, name='Encoder')
+            return encoder
+
+        def get_decoder(n_inputs, n_bottleneck, n_size, activation):
+            decoder_in  = Input(shape=(n_bottleneck, ))
+            d = decoder_in
+
+            for dim in n_size[::-1]:
+                d = Dense(dim, activation=activation)(d)
+                d = BatchNormalization()(d)
+
+            decoder_out = Dense(n_inputs, activation='relu')(d)
+            decoder = Model(decoder_in, decoder_out, name='Decoder')
+            return decoder
+
+        encoder = get_encoder(n_inputs, n_bottleneck, n_size, activation)
+        decoder = get_decoder(n_inputs, n_bottleneck, n_size, activation)
+
+        autoencoder_in = Input(shape=(n_inputs, ), name='Input')
+        encoded = encoder(autoencoder_in)
+        decoded = decoder(encoded)
+        autoencoder = Model(autoencoder_in, decoded, name='AutoEncoder')
+        autoencoder.summary()
+
+        # self.encoder = encoder
+        # self.decoder = decoder
+        return autoencoder
+    
+    def initialise_model(
+        self,
+        n_bottleneck: int = 10,
+        n_size: list[int] = [64, 64],
+        activation: str = 'relu',
+        epochs: int = 500,
+        loss: str = 'mse',
+        metrics: list[str] = ['MSE',
+                              'MAE', 
+                              KerasRegressor.r_squared
+                            ],
+        optimizer = tf.keras.optimizers.Adam,
+        verbose: int = 1,
+        callbacks: list[Any] = None,
+        **params,
+    ):
+        model = BaseWrapper(
+            model=self.get_autoencoder,
+            model__n_inputs = self._n_inputs,
+            model__n_bottleneck = n_bottleneck,
+            model__n_size = n_size,
+            model__activation = activation,
+            epochs=epochs,
+            loss=loss,
+            metrics=metrics,
+            optimizer=optimizer,
+            verbose=verbose,
+            callbacks=callbacks,
+        )
+        
+        return model
+
+
 if __name__ == '__main__':
 
-    exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
-    # exps = ['Test 5']
+    # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
+    exps = ['Test 5']
 
     rms= {}
     for test in exps:
@@ -272,116 +409,126 @@ if __name__ == '__main__':
 
     for test in exps:
 
-        print(f'\n{test.upper().replace(" ", "_")}')
+        autoe = AutoEncoder(rms[test].data,
+                            random_state=1,
+                            train_slice=(0, 100),
+                            params={
+                                'n_bottleneck': 5,
+                                'n_size': [64, 32],
+                                'epochs': 250,
+                            }
+        )
 
-        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        base_folder = os.path.abspath(rf'{pathlib.Path.home()}/ml/Tensorboard')
-        run_name = os.path.join(base_folder,
-                                r'AUTOEN',
-                                rf'{test.upper().replace(" ", "_")}-AE-{t}')
+        # print(f'\n{test.upper().replace(" ", "_")}')
 
-        autoe = AutoEncoder_Model(data=rms[test].data,
-                                  random_state=1,
-                                  train_slice=(0, 100),
-                                  )
-        autoe.compile(optimizer='adam',
-                      loss='mse',
-                      metrics = ('MSE',
-                                 'MAE',
-                                 KerasRegressor.r_squared,
-                                 ),
-                      )
-        history = autoe.fit(autoe.train_data, autoe.train_data,
-                            epochs=500,
-                            batch_size=10,
-                            verbose=0,
-                            validation_data=(autoe.val_data, autoe.val_data),
-                            callbacks=[
-                                tfa.callbacks.TQDMProgressBar(
-                                    show_epoch_progress=False),
-                                tf.keras.callbacks.TensorBoard(
-                                    log_dir=run_name)
-                            ],
-                            )
+        # t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        # base_folder = os.path.abspath(rf'{pathlib.Path.home()}/ml/Tensorboard')
+        # run_name = os.path.join(base_folder,
+        #                         r'AUTOEN',
+        #                         rf'{test.upper().replace(" ", "_")}-AE-{t}')
 
-        # calc metrics
-        print(f'\nValidation Scores:')
-        autoe_val_pred, autoe_val_scores = pred_and_score(autoe,
-                                                          autoe.val_data)
+        # autoe = AutoEncoder_Model(data=rms[test].data,
+        #                           random_state=1,
+        #                           train_slice=(0, 100),
+        #                           )
+        # autoe.compile(optimizer='adam',
+        #               loss='mse',
+        #               metrics = ('MSE',
+        #                          'MAE',
+        #                          KerasRegressor.r_squared,
+        #                          ),
+        #               )
+        # history = autoe.fit(autoe.train_data, autoe.train_data,
+        #                     epochs=500,
+        #                     batch_size=10,
+        #                     verbose=0,
+        #                     validation_data=(autoe.val_data, autoe.val_data),
+        #                     callbacks=[
+        #                         tfa.callbacks.TQDMProgressBar(
+        #                             show_epoch_progress=False),
+        #                         tf.keras.callbacks.TensorBoard(
+        #                             log_dir=run_name)
+        #                     ],
+        #                     )
 
-        # plot hist of loss values from training
-        p = autoe.predict(autoe.train_data, verbose=0)
-        train_mse = mean_squared_error(autoe.train_data, p,
-                                        multioutput='raw_values')
+        # # calc metrics
+        # print(f'\nValidation Scores:')
+        # autoe_val_pred, autoe_val_scores = pred_and_score(autoe,
+        #                                                   autoe.val_data)
 
-        train_mae = mean_absolute_error(autoe.train_data, p,
-                                       multioutput='raw_values')
+        # # plot hist of loss values from training
+        # p = autoe.predict(autoe.train_data, verbose=0)
+        # train_mse = mean_squared_error(autoe.train_data, p,
+        #                                 multioutput='raw_values')
 
-        train_r2 = r2_score(autoe.train_data, p,
-                           multioutput='raw_values')
+        # train_mae = mean_absolute_error(autoe.train_data, p,
+        #                                multioutput='raw_values')
 
-        # fig, ax = plt.subplots()
-        # ax.hist(train_mse, bins=50)
-        # ax.set_xlabel('Error')
-        # ax.set_ylabel('No of Occurences')
-        # ax.set_title(f'{test} Histogram of Training Dataset Prediction Error')
+        # train_r2 = r2_score(autoe.train_data, p,
+        #                    multioutput='raw_values')
 
-        # calc thresholds from each metric based on mean and std
-        thr_mse = np.mean(train_mse) + np.std(train_mse)
-        thr_mae = np.mean(train_mae) + np.std(train_mae)
-        thr_r2 = np.mean(train_r2) - np.std(train_r2)
+        # # fig, ax = plt.subplots()
+        # # ax.hist(train_mse, bins=50)
+        # # ax.set_xlabel('Error')
+        # # ax.set_ylabel('No of Occurences')
+        # # ax.set_title(f'{test} Histogram of Training Dataset Prediction Error')
 
-        print(f'\nThreshold:')
-        print(f'\tMSE = {thr_mse}')
-        print(f'\tMAE = {thr_mae}')
-        print(f'\tR2 = {thr_r2}')
+        # # calc thresholds from each metric based on mean and std
+        # thr_mse = np.mean(train_mse) + np.std(train_mse)
+        # thr_mae = np.mean(train_mae) + np.std(train_mae)
+        # thr_r2 = np.mean(train_r2) - np.std(train_r2)
 
-        # prediction plot of cut 8
-        fig, ax = pred_plot(autoe, autoe.val_data, autoe_val_pred, 8)
-        ax.set_title(f'{test} Validation Predictions - {ax.get_title()}')
+        # print(f'\nThreshold:')
+        # print(f'\tMSE = {thr_mse}')
+        # print(f'\tMAE = {thr_mae}')
+        # print(f'\tR2 = {thr_r2}')
 
-        # Prediction on whole dataset
-        print(f'\nDataset Predictions:')
-        # first scale whole dataset
-        d = autoe.scaler.transform(autoe.data.values.T)
-        autoe_pred, autoe_scores = pred_and_score(autoe,
-                                                  d)
+        # # prediction plot of cut 8
+        # fig, ax = pred_plot(autoe, autoe.val_data, autoe_val_pred, 8)
+        # ax.set_title(f'{test} Validation Predictions - {ax.get_title()}')
 
-        # plot scatter scores with the threshold from training scores
-        # TODO need to check anomalies within RMS data especially test 5 and 9
-        fig, ax = scatter_scores(scores=autoe_scores)
-        fig.suptitle(f'{test} - {fig._suptitle.get_text()}')
-        ax[0].axhline(thr_mae, color='k', ls='--')
-        ax[1].axhline(thr_mse, color='k', ls='--')
-        ax[2].axhline(thr_r2, color='k', ls='--')
+        # # Prediction on whole dataset
+        # print(f'\nDataset Predictions:')
+        # # first scale whole dataset
+        # d = autoe.scaler.transform(autoe.data.values.T)
+        # autoe_pred, autoe_scores = pred_and_score(autoe,
+        #                                           d)
+
+        # # plot scatter scores with the threshold from training scores
+        # # TODO need to check anomalies within RMS data especially test 5 and 9
+        # fig, ax = scatter_scores(scores=autoe_scores)
+        # fig.suptitle(f'{test} - {fig._suptitle.get_text()}')
+        # ax[0].axhline(thr_mae, color='k', ls='--')
+        # ax[1].axhline(thr_mse, color='k', ls='--')
+        # ax[2].axhline(thr_r2, color='k', ls='--')
 
 
-        def plot_to_tf_im(figure):
-            """Converts the matplotlib plot specified by 'figure' to a PNG
-            image and
-            returns it. The supplied figure is closed and inaccessible after
-            this call."""
-            # Save the plot to a PNG in memory.
-            buf = io.BytesIO()
-            figure.savefig(buf, format='png')
-            buf.seek(0)
-            # Convert PNG buffer to TF image
-            image = tf.image.decode_png(buf.getvalue(), channels=4)
-            # Add the batch dimension
-            image = tf.expand_dims(image, 0)
-            return image
+        # def plot_to_tf_im(figure):
+        #     """Converts the matplotlib plot specified by 'figure' to a PNG
+        #     image and
+        #     returns it. The supplied figure is closed and inaccessible after
+        #     this call."""
+        #     # Save the plot to a PNG in memory.
+        #     buf = io.BytesIO()
+        #     figure.savefig(buf, format='png')
+        #     buf.seek(0)
+        #     # Convert PNG buffer to TF image
+        #     image = tf.image.decode_png(buf.getvalue(), channels=4)
+        #     # Add the batch dimension
+        #     image = tf.expand_dims(image, 0)
+        #     return image
 
-        tb_writer = tf.summary.create_file_writer(run_name)
-        with tb_writer.as_default():
-            tf.summary.image("Scatter Predicitons", plot_to_tf_im(fig), step=0)
-            for key, score in autoe_scores.items():
-                step = 0
-                for error in score:
-                    tf.summary.scalar(f'pred_scores/{key}', error, step=step)
-                    step += 1
+        # tb_writer = tf.summary.create_file_writer(run_name)
+        # with tb_writer.as_default():
+        #     tf.summary.image("Scatter Predicitons", plot_to_tf_im(fig), step=0)
+        #     for key, score in autoe_scores.items():
+        #         step = 0
+        #         for error in score:
+        #             tf.summary.scalar(f'pred_scores/{key}', error, step=step)
+        #             step += 1
 
-        # prediction plot of cut 110
-        fig, ax = pred_plot(autoe, d, autoe_pred, 110)
-        ax.set_title(f'{test} UNSEEN DATA - {ax.get_title()}')
+        # # prediction plot of cut 110
+        # fig, ax = pred_plot(autoe, d, autoe_pred, 110)
+        # ax.set_title(f'{test} UNSEEN DATA - {ax.get_title()}')
 
-    plt.show(block=True)
+    # plt.show(block=True)
