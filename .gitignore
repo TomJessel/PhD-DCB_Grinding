@@ -10,3 +10,4 @@ ML.log
 *.iml
 /.vscode/
 .ipynb_checkpoints
+*.pdf
