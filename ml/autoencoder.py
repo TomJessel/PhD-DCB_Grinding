@@ -22,7 +22,8 @@ import multiprocessing as mp
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from keras.layers import Input, Dense, BatchNormalization
-from keras.models import Model, Sequential
+from keras.models import Model
+import tensorboard.plugins.hparams.api as hp
 import tensorflow_addons as tfa
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from pathlib import Path
@@ -31,7 +32,9 @@ from scikeras.wrappers import KerasRegressor, BaseWrapper
 
 import resources
 
-DATA_DIR = rf'Testing/RMS'
+DATA_DIR = Path.home().joinpath(r'Testing/RMS')
+TB_DIR = Path.home().joinpath(r'ml/Tensorboard/AUTOE')
+
 
 def _mp_rms_process(fno):
     avg_size = 100000
@@ -40,12 +43,13 @@ def _mp_rms_process(fno):
     sig = sig.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
     sig = np.array(sig)[500000-1:]
     avg_sig = np.nanmean(np.pad(sig.astype(float),
-                                ((0, avg_size - sig.size%avg_size), (0,0)),
+                                ((0, avg_size - sig.size % avg_size), (0, 0)),
                                 mode='constant',
                                 constant_values=np.NaN
                                 )
                          .reshape(-1, avg_size), axis=1)
     return avg_sig
+
 
 def mp_get_rms(fnos):
     with mp.Pool(processes=20, maxtasksperchild=1) as pool:
@@ -59,6 +63,7 @@ def mp_get_rms(fnos):
         pool.join()
     return rms
 
+
 def pred_and_score(mod, input_data):
     pred = mod.predict(input_data, verbose=0)
     mae = mean_absolute_error(input_data.T, pred.T, multioutput='raw_values')
@@ -69,12 +74,13 @@ def pred_and_score(mod, input_data):
     print(f'\tMSE: {np.mean(mse):.5f}')
     print(f'\tR2: {np.mean(r2):.5f}')
 
-    scores = {'mae':mae, 'mse':mse, 'r2': r2}
+    scores = {'mae': mae, 'mse': mse, 'r2': r2}
     return pred, scores
 
+
 def pred_plot(mod, input, pred, no):
-    pred_input =input[no,:].reshape(-1, mod.n_inputs)
-    x_pred = pred[no,:].reshape(-1, mod.n_inputs)
+    pred_input = input[no, :].reshape(-1, mod.n_inputs)
+    x_pred = pred[no, :].reshape(-1, mod.n_inputs)
 
     pred_input = mod.scaler.inverse_transform(pred_input)
     x_pred = mod.scaler.inverse_transform(x_pred)
@@ -88,6 +94,7 @@ def pred_plot(mod, input, pred, no):
     ax.legend()
     ax.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
     return fig, ax
+
 
 def scatter_scores(scores):
     # presumes scores is a dict with (mae, mse, r2)
@@ -110,7 +117,7 @@ def scatter_scores(scores):
     ax[0].legend()
     ax[1].legend()
     ax[2].legend()
-    fig.suptitle(f'Scores')
+    fig.suptitle('Scores')
     fig.tight_layout()
     return fig, ax
 
@@ -120,9 +127,9 @@ class RMS:
             self,
             exp_name,
     ):
-        self.exp_name = exp_name
+        self.exp_name = exp_name.upper().replace(" ", "_")
 
-        print(f'\nLoaded {exp_name.upper().replace(" ", "_")} RMS Data')
+        print(f'\nLoaded {exp_name} RMS Data')
 
         # Read in data from file or compute
         self._get_data()
@@ -155,17 +162,11 @@ class RMS:
         return df
 
     def _get_data(self):
-        # get path to home directory
-        dirs = Path.cwd().parts
-        search_str = 'tomje'
-        i = dirs.index(search_str)
-        home_dir = os.path.join(*dirs[:i + 1])
-
         # get file name of .csv file if created
-        file_name = f'RMS_{self.exp_name.upper().replace(" ", "_")}.csv'
+        file_name = f'RMS_{self.exp_name}.csv'
 
         # join path of home dir, data folder, and file name for reading
-        path = Path(os.path.join(home_dir, DATA_DIR, file_name))
+        path = DATA_DIR.joinpath(file_name)
 
         try:
             # try to read in .csv file
@@ -176,118 +177,38 @@ class RMS:
             self.data = self._process_exp(path)
 
 
-class AutoEncoder_Model(Model):
-    def __init__(
-            self,
-            data,
-            train_slice = (0,100),
-            random_state = None,
-    ):
-        print('AutoEncoder Model')
-        super(AutoEncoder_Model, self).__init__()
-        self.data = data
-        self._train_slice = np.s_[train_slice[0]:train_slice[1]]
-        self.random_state = random_state
-
-        self.pre_process()
-        self.encoder = self.get_encoder(self.n_inputs, 10)
-        self.decoder = self.get_decoder(self.n_inputs, 10)
-
-    def pre_process(
-            self,
-            val_frac: float = 0.1,
-    ):
-        print(f'\tPre-Processing Data:')
-
-        # First split off Test data based on slice from self._train_slice
-        # to let the model only be trained ona  portion of the data.
-        # i.e. first 100 cuts
-
-        print(f'\tTraining Data: {self._train_slice}')
-        data = self.data.values.T
-        train_data = data[self._train_slice]
-
-        self.scaler = MinMaxScaler(feature_range=(0, 1))
-
-        if self.random_state is None:
-            x_train, x_test = train_test_split(train_data,
-                                               test_size=val_frac,)
-        else:
-            x_train, x_test = train_test_split(train_data,
-                                               test_size=val_frac,
-                                               random_state=self.random_state,)
-
-        print(f'\tInput train shape: {x_train.shape}')
-        print(f'\tInput val shape: {x_test.shape}')
-
-        self.scaler.fit(x_train)
-        x_train = self.scaler.transform(x_train)
-        x_test = self.scaler.transform(x_test)
-
-        self.n_inputs = x_train.shape[1]
-        self.train_data = x_train
-        self.val_data = x_test
-
-    @staticmethod
-    def get_encoder(n_inputs, n_bottleneck):
-        encoder = Sequential(name='Encoder')
-        encoder.add(Input(shape=(n_inputs, )))
-        encoder.add(Dense(64, activation='relu'))
-        encoder.add(BatchNormalization())
-
-        encoder.add(Dense(64, activation='relu'))
-        encoder.add(BatchNormalization())
-
-        encoder.add(Dense(n_bottleneck, activation='relu'))
-        return encoder
-
-    @staticmethod
-    def get_decoder(n_inputs, n_bottleneck):
-        decoder = Sequential(name='Decoder')
-        decoder.add(Input(shape=(n_bottleneck, )))
-        decoder.add(Dense(64, activation='relu'))
-        decoder.add(BatchNormalization())
-
-        decoder.add(Dense(64, activation='relu'))
-        decoder.add(BatchNormalization())
-
-        decoder.add(Dense(n_inputs, activation='relu'))
-        return decoder
-
-    def call(self, x):
-        encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return decoded
-
-
 class AutoEncoder():
     def __init__(
         self,
-        data,
+        rms_obj: RMS,
+        tb: bool = True,
+        tb_logdir: str = '',
         params: dict = None,
-        train_slice = (0,100),
-        random_state = None,
+        train_slice=(0, 100),
+        random_state=None,
     ):
         print('AutoEncoder Model')
-        self.data = data
+        self.RMS = rms_obj
+        self.data = rms_obj.data
         self._train_slice = np.s_[train_slice[0]:train_slice[1]]
         self.random_state = random_state
-        
+        self._tb = tb
+        self._tb_logdir = TB_DIR.joinpath(tb_logdir)
+
         if params is None:
             params = {}
         self.params = params
 
         self.pre_process()
         self.model = self.initialise_model(**self.params)
+        print(f'{self.run_name}')
         self.model.initialize(X=self.train_data)
-
-
 
     def pre_process(
         self,
         val_frac: float = 0.1,
     ):
-        print(f'\tPre-Processing Data:')
+        print('\tPre-Processing Data:')
 
         # First split off Test data based on slice from self._train_slice
         # to let the model only be trained ona  portion of the data.
@@ -318,12 +239,12 @@ class AutoEncoder():
         self.train_data = x_train
         self.val_data = x_test
 
-    @staticmethod 
+    @staticmethod
     def get_autoencoder(
         n_inputs: int,
         n_bottleneck: int,
         n_size: list[int],
-        activation: str, 
+        activation: str,
     ):
         def get_encoder(n_inputs, n_bottleneck, n_size, activation):
             encoder_in = Input(shape=(n_inputs, ))
@@ -338,7 +259,7 @@ class AutoEncoder():
             return encoder
 
         def get_decoder(n_inputs, n_bottleneck, n_size, activation):
-            decoder_in  = Input(shape=(n_bottleneck, ))
+            decoder_in = Input(shape=(n_bottleneck, ))
             d = decoder_in
 
             for dim in n_size[::-1]:
@@ -361,29 +282,57 @@ class AutoEncoder():
         # self.encoder = encoder
         # self.decoder = decoder
         return autoencoder
-    
+
     def initialise_model(
         self,
         n_bottleneck: int = 10,
-        n_size: list[int] = [64, 64],
+        n_size: list = [64, 64],
         activation: str = 'relu',
         epochs: int = 500,
         loss: str = 'mse',
         metrics: list[str] = ['MSE',
-                              'MAE', 
+                              'MAE',
                               KerasRegressor.r_squared
-                            ],
-        optimizer = tf.keras.optimizers.Adam,
+                              ],
+        optimizer=tf.keras.optimizers.Adam,
         verbose: int = 1,
         callbacks: list[Any] = None,
-        **params,
     ):
+        layers = n_size + [n_bottleneck] + n_size[::-1]
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        self.run_name = f'AUTOE-{self.RMS.exp_name}-E-{epochs}-L-{layers}-{t}'
+
+        if callbacks is None:
+            callbacks = []
+        callbacks.append(tfa.callbacks.TQDMProgressBar(
+            show_epoch_progress=False))
+
+        if self._tb:
+            callbacks.append(tf.keras.callbacks.TensorBoard(
+                log_dir=self._tb_logdir.joinpath(self.run_name),
+                histogram_freq=1,
+            ))
+            tb_writer = tf.summary.create_file_writer(
+                f'{self._tb_logdir.joinpath(self.run_name)}')
+
+            with tb_writer.as_default():
+                hp_params = self.params
+                hp_params.pop('callbacks', None)
+                if 'n_size' in hp_params.keys():
+                    s = hp_params.pop('n_size')
+                    hp_params['n_size'] = str(s)
+
+                hp.hparams(
+                    hp_params,
+                    trial_id=f'{self._tb_logdir.joinpath(self.run_name)}'
+                )
+
         model = BaseWrapper(
             model=self.get_autoencoder,
-            model__n_inputs = self._n_inputs,
-            model__n_bottleneck = n_bottleneck,
-            model__n_size = n_size,
-            model__activation = activation,
+            model__n_inputs=self._n_inputs,
+            model__n_bottleneck=n_bottleneck,
+            model__n_size=n_size,
+            model__activation=activation,
             epochs=epochs,
             loss=loss,
             metrics=metrics,
@@ -391,8 +340,11 @@ class AutoEncoder():
             verbose=verbose,
             callbacks=callbacks,
         )
-        
+
         return model
+
+    def fit(self, x, y, **kwargs):
+        self.model.fit(x, y, **kwargs)
 
 
 if __name__ == '__main__':
@@ -400,7 +352,7 @@ if __name__ == '__main__':
     # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
     exps = ['Test 5']
 
-    rms= {}
+    rms = {}
     for test in exps:
 
         rms[test] = RMS(test)
@@ -409,15 +361,18 @@ if __name__ == '__main__':
 
     for test in exps:
 
-        autoe = AutoEncoder(rms[test].data,
+        autoe = AutoEncoder(rms[test],
                             random_state=1,
                             train_slice=(0, 100),
-                            params={
-                                'n_bottleneck': 5,
-                                'n_size': [64, 32],
-                                'epochs': 250,
-                            }
-        )
+                            tb=True,
+                            tb_logdir=rms[test].exp_name,
+                            params={'n_bottleneck': 5,
+                                    'epochs': 250,
+                                    'n_size': [64, 32]
+                                    }
+                            )
+
+        autoe.fit(autoe.train_data, autoe.train_data, verbose=0)
 
         # print(f'\n{test.upper().replace(" ", "_")}')
 
@@ -501,7 +456,6 @@ if __name__ == '__main__':
         # ax[0].axhline(thr_mae, color='k', ls='--')
         # ax[1].axhline(thr_mse, color='k', ls='--')
         # ax[2].axhline(thr_r2, color='k', ls='--')
-
 
         # def plot_to_tf_im(figure):
         #     """Converts the matplotlib plot specified by 'figure' to a PNG
