@@ -25,7 +25,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from tqdm.auto import tqdm
 
-import tensorflow as tf # noqa: E402
+import tensorflow as tf  # noqa: E402
 import tensorflow_addons as tfa  # noqa: E402
 import tensorboard.plugins.hparams.api as hp
 from tensorboard.backend.event_processing import event_accumulator
@@ -34,11 +34,12 @@ tf.config.set_visible_devices([], 'GPU')
 from absl import logging
 logging.set_verbosity(logging.ERROR)
 
-from keras.layers import Dense, Dropout, LSTM # noqa: E402
+from keras.layers import Dense, Dropout, LSTM  # noqa: E402
 from keras.models import Sequential  # noqa: E402
 from keras.optimizers import Adam  # noqa: E402
 
 import resources  # noqa: E402
+
 
 def parse_tensorboard(path: str, scalars: list[str]):
     """
@@ -67,6 +68,7 @@ def parse_tensorboard(path: str, scalars: list[str]):
         'step')
         for scalar in scalars}
     return pd.concat(results.values(), axis=1)
+
 
 class Base_Model:
     def __init__(
