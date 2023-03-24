@@ -48,7 +48,7 @@ def parse_tensorboard(path: str, scalars: list[str]):
     Args:
        path: Path containing TB files
        scalars: List of scalars in the TB logs
-    
+
     Returns:
 
     """
@@ -56,7 +56,7 @@ def parse_tensorboard(path: str, scalars: list[str]):
         path,
         size_guidance={'tensors': 0},
     )
-    _absorb_print = ea.Reload()
+    ea.Reload()
     # make sure the scalars are in the event accumulator tags
     assert all(
         s in ea.Tags()["tensors"] for s in scalars
@@ -400,11 +400,10 @@ class Base_Model:
                     enumerate(cv.split(X))]
 
         with multiprocessing.Pool(processes=20, maxtasksperchild=1) as pool:
-            outputs = list(tqdm(pool.imap(
-                                    self._cv_model_star, 
-                                    cv_items,
-                                    chunksize=1,
-                                    ),
+            outputs = list(tqdm(pool.imap(self._cv_model_star,
+                                          cv_items,
+                                          chunksize=1,
+                                          ),
                                 total=len(cv_items),
                                 desc='CV Model'
                                 ))
@@ -475,9 +474,9 @@ class Base_Model:
                 step = 0
                 step = tf.convert_to_tensor(step, dtype=tf.int64)
                 for score in scores:
-                    tf.summary.scalar('cv_iter/mae',score['MAE'],step=step)
-                    tf.summary.scalar('cv_iter/mse',score['MSE'],step=step)
-                    tf.summary.scalar('cv_iter/r2',score['r2'],step=step)
+                    tf.summary.scalar('cv_iter/mae', score['MAE'], step=step)
+                    tf.summary.scalar('cv_iter/mse', score['MSE'], step=step)
+                    tf.summary.scalar('cv_iter/r2', score['r2'], step=step)
                     step += 1
         return _cv_score
 
@@ -680,7 +679,6 @@ class MLP_Model(Base_Model):
                     hp_params,
                     trial_id=self._run_name.split(self.tb_log_dir)[1][1:]
                 )
-            # callbacks.append(hp.KerasCallback(self._run_name, hp_params, self._run_name))
 
         model = KerasRegressor(
             model=self.build_mod,
@@ -769,7 +767,7 @@ class Linear_Model(Base_Model):
         from sklearn.linear_model import LinearRegression
         model = LinearRegression(**params)
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        self._run_name = os.path.join(self.tb_log_dir,f'Lin_Reg-{t}')
+        self._run_name = os.path.join(self.tb_log_dir, f'Lin_Reg-{t}')
         return model
 
     def score(
@@ -1331,6 +1329,7 @@ class LSTM_Model(Base_Model):
         # print(f'Test data shape:\t{test_X.shape}')
         self._no_features = (self.train_data[0].shape[1:])
         return self.train_data, self.val_data
+
     @staticmethod
     def build_mod(
             no_features,
