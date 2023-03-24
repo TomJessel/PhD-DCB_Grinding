@@ -824,8 +824,8 @@ class Linear_Model(Base_Model):
             print(f'{self._run_name.split(self.tb_log_dir)[1][1:]}')
             print('Validation Scores:')
             print('-' * 65)
-            print(f'MAE = {np.abs(_test_score["test_MAE"].mean()) * 1000:.3f} um')
-            print(f'MSE = {np.abs(_test_score["test_MSE"].mean()) * 1_000_000:.3f} um^2')
+            print(f'MAE = {np.abs(_test_score["test_MAE"].mean()) * 1e3:.3f} um')
+            print(f'MSE = {np.abs(_test_score["test_MSE"].mean()) * 1e6:.3f} um^2')
             print(f'R^2 = {np.mean(_test_score["test_r2"].mean()):.3f}')
             # print('-' * 65)
 
@@ -1033,8 +1033,8 @@ class MLP_Win_Model(Base_Model):
         self.train_data = [train_X, train_y]
         self.val_data = [test_X, test_y]
         # reshape feature data for MLP win model input
-        self._no_features = (self.train_data[0].shape[1] *
-                             self.train_data[0].shape[2])
+        self._no_features = (self.train_data[0].shape[1] * self.train_data[0]
+                             .shape[2])
         self.train_data[0] = self.train_data[0].reshape(
             (self.train_data[0].shape[0], self._no_features))
         self.val_data[0] = self.val_data[0].reshape(
