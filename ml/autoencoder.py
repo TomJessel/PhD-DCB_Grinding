@@ -9,10 +9,9 @@
 """
 
 import os
-import io
-import pathlib
-from typing import Any
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+from textwrap import dedent
+from typing import Any
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -41,7 +40,7 @@ def _mp_rms_process(fno):
     sig = exp.ae.readAE(fno)
     sig = pd.DataFrame(sig)
     sig = sig.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
-    sig = np.array(sig)[500000-1:]
+    sig = np.array(sig)[500000 - 1:]
     avg_sig = np.nanmean(np.pad(sig.astype(float),
                                 ((0, avg_size - sig.size % avg_size), (0, 0)),
                                 mode='constant',
@@ -201,14 +200,16 @@ class AutoEncoder():
 
         self.pre_process()
         self.model = self.initialise_model(**self.params)
-        print(f'{self.run_name}')
+        print(f'\n{self.run_name}')
         self.model.initialize(X=self.train_data)
+        self.model.model_.summary()
+        print()
 
     def pre_process(
         self,
         val_frac: float = 0.1,
     ):
-        print('\tPre-Processing Data:')
+        print('Pre-Processing Data:')
 
         # First split off Test data based on slice from self._train_slice
         # to let the model only be trained ona  portion of the data.
@@ -277,7 +278,6 @@ class AutoEncoder():
         encoded = encoder(autoencoder_in)
         decoded = decoder(encoded)
         autoencoder = Model(autoencoder_in, decoded, name='AutoEncoder')
-        autoencoder.summary()
 
         # self.encoder = encoder
         # self.decoder = decoder
@@ -343,8 +343,64 @@ class AutoEncoder():
 
         return model
 
-    def fit(self, x, y, **kwargs):
-        self.model.fit(x, y, **kwargs)
+    def fit(self, x, val_data, **kwargs):
+        self.model.fit(
+            X=x,
+            y=x,
+            validation_data=(val_data, val_data),
+            **kwargs
+        )
+
+    def score(
+            self,
+            x: np.ndarray,
+            print_score: bool = True,
+    ) -> dict:
+        pred = self.model.predict(x, verbose=0)
+
+        mae = mean_absolute_error(x, pred, multioutput='raw_values')
+        mse = mean_squared_error(x, pred, multioutput='raw_values')
+        r2 = r2_score(x, pred, multioutput='raw_values')
+
+        if print_score:
+            print(f'\tMAE: {np.mean(mae):.5f}')
+            print(f'\tMSE: {np.mean(mse):.5f}')
+            print(f'\tR2: {np.mean(r2):.5f}')
+
+        scores = {'mae': mae, 'mse': mse, 'r2': r2}
+
+        if self._tb:
+            tb_writer = tf.summary.create_file_writer(
+                f'{self._tb_logdir.joinpath(self.run_name)}')
+
+            md_scores = dedent(f'''
+                    ### Scores - Validation Data
+
+                     | MAE | MSE |  R2  |
+                     | ---- | ---- | ---- |
+                     | {np.mean(scores['mae']) * 1e3:.5f} |\
+                         {np.mean(scores['mse']) * 1e6:.5f} |\
+                             {np.mean(scores['r2']):.5f} |
+
+                    ''')
+            with tb_writer.as_default():
+                tf.summary.text('Model Info', md_scores, step=2)
+                tf.summary.scalar(
+                    'Val MAE',
+                    np.mean(scores['mae']),
+                    step=1,
+                )
+                tf.summary.scalar(
+                    'Val MSE',
+                    np.mean(scores['mse']),
+                    step=1,
+                )
+                tf.summary.scalar(
+                    'Val R\u00B2',
+                    np.mean(scores['r2']),
+                    step=1,
+                )
+        return pred, scores
 
 
 if __name__ == '__main__':
@@ -358,6 +414,7 @@ if __name__ == '__main__':
         rms[test] = RMS(test)
 
     rms['Test 5'].data.drop(['23', '24'], axis=1, inplace=True)
+    print()
 
     for test in exps:
 
@@ -366,50 +423,21 @@ if __name__ == '__main__':
                             train_slice=(0, 100),
                             tb=True,
                             tb_logdir=rms[test].exp_name,
-                            params={'n_bottleneck': 5,
-                                    'epochs': 250,
-                                    'n_size': [64, 32]
+                            params={'n_bottleneck': 10,
+                                    'n_size': [64, 64],
+                                    'epochs': 500,
+                                    'loss': 'mse',
                                     }
                             )
 
-        autoe.fit(autoe.train_data, autoe.train_data, verbose=0)
+        autoe.fit(
+            x=autoe.train_data,
+            val_data=autoe.val_data,
+            verbose=0
+        )
 
-        # print(f'\n{test.upper().replace(" ", "_")}')
-
-        # t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        # base_folder = os.path.abspath(rf'{pathlib.Path.home()}/ml/Tensorboard')
-        # run_name = os.path.join(base_folder,
-        #                         r'AUTOEN',
-        #                         rf'{test.upper().replace(" ", "_")}-AE-{t}')
-
-        # autoe = AutoEncoder_Model(data=rms[test].data,
-        #                           random_state=1,
-        #                           train_slice=(0, 100),
-        #                           )
-        # autoe.compile(optimizer='adam',
-        #               loss='mse',
-        #               metrics = ('MSE',
-        #                          'MAE',
-        #                          KerasRegressor.r_squared,
-        #                          ),
-        #               )
-        # history = autoe.fit(autoe.train_data, autoe.train_data,
-        #                     epochs=500,
-        #                     batch_size=10,
-        #                     verbose=0,
-        #                     validation_data=(autoe.val_data, autoe.val_data),
-        #                     callbacks=[
-        #                         tfa.callbacks.TQDMProgressBar(
-        #                             show_epoch_progress=False),
-        #                         tf.keras.callbacks.TensorBoard(
-        #                             log_dir=run_name)
-        #                     ],
-        #                     )
-
-        # # calc metrics
-        # print(f'\nValidation Scores:')
-        # autoe_val_pred, autoe_val_scores = pred_and_score(autoe,
-        #                                                   autoe.val_data)
+        print('\nValidation Scores:')
+        autoe.score(autoe.val_data)
 
         # # plot hist of loss values from training
         # p = autoe.predict(autoe.train_data, verbose=0)
@@ -450,7 +478,7 @@ if __name__ == '__main__':
         #                                           d)
 
         # # plot scatter scores with the threshold from training scores
-        # # TODO need to check anomalies within RMS data especially test 5 and 9
+        # # TODO need to check anomalies within RMS data especially test 5, 9
         # fig, ax = scatter_scores(scores=autoe_scores)
         # fig.suptitle(f'{test} - {fig._suptitle.get_text()}')
         # ax[0].axhline(thr_mae, color='k', ls='--')
