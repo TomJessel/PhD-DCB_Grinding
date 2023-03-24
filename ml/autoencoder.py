@@ -78,8 +78,8 @@ def pred_and_score(mod, input_data):
 
 
 def pred_plot(mod, input, pred, no):
-    pred_input = input[no, :].reshape(-1, mod.n_inputs)
-    x_pred = pred[no, :].reshape(-1, mod.n_inputs)
+    pred_input = input[no, :].reshape(-1, mod._n_inputs)
+    x_pred = pred[no, :].reshape(-1, mod._n_inputs)
 
     pred_input = mod.scaler.inverse_transform(pred_input)
     x_pred = mod.scaler.inverse_transform(x_pred)
@@ -289,12 +289,13 @@ class AutoEncoder():
         n_size: list = [64, 64],
         activation: str = 'relu',
         epochs: int = 500,
+        batch_size: int = 10,
         loss: str = 'mse',
         metrics: list[str] = ['MSE',
                               'MAE',
                               KerasRegressor.r_squared
                               ],
-        optimizer=tf.keras.optimizers.Adam,
+        optimizer='adam',
         verbose: int = 1,
         callbacks: list[Any] = None,
     ):
@@ -319,8 +320,8 @@ class AutoEncoder():
                 hp_params = self.params
                 hp_params.pop('callbacks', None)
                 if 'n_size' in hp_params.keys():
-                    s = hp_params.pop('n_size')
-                    hp_params['n_size'] = str(s)
+                    _ = hp_params.pop('n_size')
+                    hp_params['n_size'] = str(layers)
 
                 hp.hparams(
                     hp_params,
@@ -334,6 +335,7 @@ class AutoEncoder():
             model__n_size=n_size,
             model__activation=activation,
             epochs=epochs,
+            batch_size=batch_size,
             loss=loss,
             metrics=metrics,
             optimizer=optimizer,
@@ -355,17 +357,12 @@ class AutoEncoder():
             self,
             x: np.ndarray,
             print_score: bool = True,
-    ) -> dict:
+    ) -> tuple[np.ndarray, dict]:
         pred = self.model.predict(x, verbose=0)
 
-        mae = mean_absolute_error(x, pred, multioutput='raw_values')
-        mse = mean_squared_error(x, pred, multioutput='raw_values')
-        r2 = r2_score(x, pred, multioutput='raw_values')
-
-        if print_score:
-            print(f'\tMAE: {np.mean(mae):.5f}')
-            print(f'\tMSE: {np.mean(mse):.5f}')
-            print(f'\tR2: {np.mean(r2):.5f}')
+        mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
+        mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
+        r2 = r2_score(x.T, pred.T, multioutput='raw_values')
 
         scores = {'mae': mae, 'mse': mse, 'r2': r2}
 
@@ -400,20 +397,28 @@ class AutoEncoder():
                     np.mean(scores['r2']),
                     step=1,
                 )
+
+        if print_score:
+            print(f'\tMAE: {np.mean(mae):.5f}')
+            print(f'\tMSE: {np.mean(mse):.5f}')
+            print(f'\tR2: {np.mean(r2):.5f}')
         return pred, scores
 
 
 if __name__ == '__main__':
 
     # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
-    exps = ['Test 5']
+    exps = ['Test 8']
 
     rms = {}
     for test in exps:
 
         rms[test] = RMS(test)
+    try:
+        rms['Test 5'].data.drop(['23', '24'], axis=1, inplace=True)
+    except KeyError:
+        pass
 
-    rms['Test 5'].data.drop(['23', '24'], axis=1, inplace=True)
     print()
 
     for test in exps:
@@ -427,17 +432,21 @@ if __name__ == '__main__':
                                     'n_size': [64, 64],
                                     'epochs': 500,
                                     'loss': 'mse',
+                                    'batch_size': 16,
                                     }
                             )
 
         autoe.fit(
             x=autoe.train_data,
             val_data=autoe.val_data,
-            verbose=0
+            verbose=0,
         )
 
         print('\nValidation Scores:')
-        autoe.score(autoe.val_data)
+        pred, scores = autoe.score(autoe.val_data)
+
+        pred_plot(autoe, autoe.val_data, pred, 0)
+        plt.show(block=True)
 
         # # plot hist of loss values from training
         # p = autoe.predict(autoe.train_data, verbose=0)
