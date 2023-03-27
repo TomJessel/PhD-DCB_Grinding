@@ -37,7 +37,19 @@ DATA_DIR = Path.home().joinpath(r'Testing/RMS')
 TB_DIR = Path.home().joinpath(r'ml/Tensorboard/AUTOE')
 
 
-def _mp_rms_process(fno):
+def _mp_rms_process(fno: int):
+    """
+    Multiprocessing function to compute RMS of AE data.
+
+    Calc averaged rms of AE data for each cut and return as array.
+    Average size is 100000. RMS calcualted using rolling window of 500000.
+
+    Args:
+        fno (int): File number of AE data to calc RMS for.
+    
+    Returns:
+        np.array: Array of RMS values for each cut.
+    """
     avg_size = 100000
     sig = exp.ae.readAE(fno)
     sig = pd.DataFrame(sig)
@@ -52,7 +64,16 @@ def _mp_rms_process(fno):
     return avg_sig
 
 
-def mp_get_rms(fnos):
+def mp_get_rms(fnos: list[int]):
+    """
+    Master multiprocessing function to compute RMS of AE data.
+
+    Args:
+        fnos (list[int]): List of file numbers to calc RMS for.
+    
+    Returns:
+        list: RMS values for each cut.
+    """
     with mp.Pool(processes=20, maxtasksperchild=1) as pool:
         rms = list(tqdm(pool.imap(
             _mp_rms_process,
@@ -65,23 +86,20 @@ def mp_get_rms(fnos):
     return rms
 
 
-def pred_and_score(mod, input_data):
-    pred = mod.predict(input_data, verbose=0)
-    mae = mean_absolute_error(input_data.T, pred.T, multioutput='raw_values')
-    mse = mean_squared_error(input_data.T, pred.T, multioutput='raw_values')
-    r2 = r2_score(input_data.T, pred.T, multioutput='raw_values')
+def pred_plot(mod, input: tuple, no: int):
+    """
+    Plot prediction vs real data for a given cut.
 
-    print(f'\tMAE: {np.mean(mae):.5f}')
-    print(f'\tMSE: {np.mean(mse):.5f}')
-    print(f'\tR2: {np.mean(r2):.5f}')
-
-    scores = {'mae': mae, 'mse': mse, 'r2': r2}
-    return pred, scores
-
-
-def pred_plot(mod, input, pred, no):
-    pred_input = input[no, :].reshape(-1, mod._n_inputs)
-    x_pred = pred[no, :].reshape(-1, mod._n_inputs)
+    Args:
+        mod (AutoEncoder): Model to make prediction with.
+        input (tuple): Input data array for plotting (real, pred).
+        no (int): Cut number to plot.
+    
+    Returns:
+        fig, ax: Matplotlib figure and axis.
+    """
+    pred_input = input[0][no, :].reshape(-1, mod._n_inputs)
+    x_pred = input[1][no, :].reshape(-1, mod._n_inputs)
 
     pred_input = mod.scaler.inverse_transform(pred_input)
     x_pred = mod.scaler.inverse_transform(x_pred)
@@ -102,6 +120,12 @@ class RMS:
             self,
             exp_name,
     ):
+        """
+        RMS Data Object for AutoEncoder.
+
+        Args:
+            exp_name (str): Name of experiment to load data from.
+        """
         self.exp_name = exp_name.upper().replace(" ", "_")
 
         print(f'\nLoaded {exp_name} RMS Data')
@@ -109,7 +133,17 @@ class RMS:
         # Read in data from file or compute
         self._get_data()
 
-    def _process_exp(self, save_path=None):
+    def _process_exp(self, save_path: Path = None):
+        """
+        Process AE data and save to .csv file.
+
+        Args:
+            save_path (Path, optional): Path to save .csv file to.
+
+        Returns:
+            pd.DataFrame: Dataframe of RMS data.
+        """
+
         # load in exp for this obj
         global exp
         exp = resources.load(self.exp_name)
@@ -137,6 +171,9 @@ class RMS:
         return df
 
     def _get_data(self):
+        """
+        Find and read in data from .csv file or process data and save to .csv.
+        """
         # get file name of .csv file if created
         file_name = f'RMS_{self.exp_name}.csv'
 
@@ -162,6 +199,22 @@ class AutoEncoder():
         train_slice=(0, 100),
         random_state=None,
     ):
+        """
+        AuotoEncoder class.
+
+        Takes the rms AE data and pre-processes it for training. Then\
+              initialises the model based on it.
+
+        Args:
+            rms_obj (RMS): RMS object containing the AE data to use.
+            tb (bool, optional): Whether to use tensorboard. Defaults to True.
+            tb_logdir (str, optional): Name of tensorboard log directory.
+            params (dict, optional): Dictionary of parameters to pass to\
+                initialise_model.
+            train_slice (tuple, optional): Tuple of start and end index\
+                for training data. Defaults to (0, 100).
+            random_state (int, optional): Random state for reproducibility.
+        """
         print('AutoEncoder Model')
         self.RMS = rms_obj
         self.data = rms_obj.data
@@ -185,6 +238,19 @@ class AutoEncoder():
         self,
         val_frac: float = 0.1,
     ):
+        """
+        Pre-process the data for training and fit scaler.
+
+        First splits the data based on _train_slice and then splits the data \
+        into training and validation sets based on val_frac and random_state.\
+        Then fits the scaler to the training data and transforms both the \
+        training and validation data.
+
+        Args:
+            val_frac (float, optional): Fraction of data to use for the\
+                validation set. Defaults to 0.1.
+        
+        """
         print('Pre-Processing Data:')
 
         # First split off Test data based on slice from self._train_slice
@@ -225,7 +291,20 @@ class AutoEncoder():
         n_bottleneck: int,
         n_size: list[int],
         activation: str,
-    ):
+    ) -> Model:
+        """
+        Create a Keras autoencoder model with the given parameters.
+
+        Args:
+            n_inputs (int): Number of inputs to the model.
+            n_bottleneck (int): Number of nodes in the bottleneck layer.
+            n_size (list[int]): List of integers for the number of nodes in \
+                the encoder (and decoder but reversed)
+            activation (str): Activation function to use.
+
+        Returns:
+            Model: Keras model of the autoencoder.
+        """
         def get_encoder(n_inputs, n_bottleneck, n_size, activation):
             encoder_in = Input(shape=(n_inputs, ))
             e = encoder_in
@@ -278,6 +357,27 @@ class AutoEncoder():
         verbose: int = 1,
         callbacks: list[Any] = None,
     ):
+        """
+        Initialise the model with the given parameters and callbacks.
+
+        Creates an AutoEncoder model within a sickeras basewrapper, based on
+        the inputted parameters. Also creates a unique run name for logging to 
+        tensorboard if chosen.
+
+        Args:
+            n_bottleneck (int, optional): Number of nodes in the bottleneck\
+                  layer.
+            n_size (list, optional): List of nodes in the encoder\
+                  (decoder reversed).
+            activation (str, optional): Activation function to use.
+            epochs (int, optional): Number of epochs to train for.
+            batch_size (int, optional): Batch size to use.
+            loss (str, optional): Loss function to use for each node.
+            metrics (list[str], optional): List of metrics to calc for.
+            optimizer (str, optional): Optimizer to use.
+            verbose (int, optional): Verbosity of the model.
+            callbacks (list[Any], optional): List of callbacks to use.
+        """
         layers = n_size + [n_bottleneck] + n_size[::-1]
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         self.run_name = f'AUTOE-{self.RMS.exp_name}-E-{epochs}-L-{layers}-{t}'
@@ -324,19 +424,54 @@ class AutoEncoder():
 
         return model
 
-    def fit(self, x, val_data, **kwargs):
-        self.model.fit(
-            X=x,
-            y=x,
-            validation_data=(val_data, val_data),
-            **kwargs
-        )
+    def fit(self, x, val_data: np.ndarray = None, **kwargs):
+        """
+        Fit the model to the inputted data.
+
+        Passthrough func to fit the model to the inputted data. Will also track
+        use validation data if provided.
+
+        Args:
+            x (np.ndarray): Input data to fit the model to.
+            val_data (np.ndarray, optional): Validation data to use.\
+                Defaults to None.
+            **kwargs: Additional arguments to pass to the model.fit method.
+        """
+        if val_data is not None:
+            self.model.fit(
+                X=x,
+                y=x,
+                validation_data=(val_data, val_data),
+                **kwargs
+            )
+        else:
+            self.model.fit(
+                X=x,
+                y=x,
+                **kwargs
+            )
 
     def score(
             self,
             x: np.ndarray,
             print_score: bool = True,
-    ) -> tuple[np.ndarray, dict]:
+    ) -> tuple[tuple[np.ndarray, np.ndarray], dict]:
+        """
+        Score the model on the inputted data.
+
+        Scores the model based on predictions made from the input data, will
+        also log to tensorboard if the self._tb flag is set to True, and
+        print to the console if the print_score flag is set to True.
+
+        Args:
+            x (np.ndarray): Input data to score the model on.
+            print_score (bool, optional): Print the scores. Defaults to True.
+        
+        Returns:
+            tuple[tuple[np.ndarray, np.ndarray], dict]: A tuple (input,
+              prediction) and a dictionary of scores.
+
+        """
         pred = self.model.predict(x, verbose=0)
 
         mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
@@ -381,7 +516,7 @@ class AutoEncoder():
             print(f'\tMAE: {np.mean(mae):.5f}')
             print(f'\tMSE: {np.mean(mse):.5f}')
             print(f'\tR2: {np.mean(r2):.5f}')
-        return pred, scores
+        return (x, pred), scores
 
 
 if __name__ == '__main__':
@@ -421,13 +556,15 @@ if __name__ == '__main__':
             verbose=0,
         )
 
+        # compare scores between training and validation data
         print('\nTraining Scores:')
         pred_tr, scores_tr = autoe.score(autoe.train_data)
         print('\nValidation Scores:')
         pred_val, scores_val = autoe.score(autoe.val_data)
 
-        pred_plot(autoe, autoe.train_data, pred_tr, 0)
-        pred_plot(autoe, autoe.val_data, pred_val, 0)
+        # plot a prediciton from both the training and validation data
+        pred_plot(autoe, pred_tr, 0)
+        pred_plot(autoe, pred_val, 0)
 
         # plot histogram of training scores
         def hist_scores(scores, metrics: list = None):
@@ -466,7 +603,7 @@ if __name__ == '__main__':
                 ax.set_ylabel(f'{key.upper()}')
                 ax.set_title(f'Scatter of training dataset prediciton {key}')
                 if thresholds is not None and key in thr.keys():
-                    ax.axhline(thr[key], color='r')
+                    ax.axhline(thr[key], color='r', linestyle='--')
 
                     # create cmap for plot depending on if the scores is
                     # above/below the threshold
@@ -517,6 +654,9 @@ if __name__ == '__main__':
         print('\nWhole Dataset Scores:')
         pred, scores = autoe.score(autoe.data)
         scatter_scores([scores], thr=thresholds)
+
+        fig, ax = pred_plot(autoe, pred, 150)
+        ax.set_title(f'{autoe.exp_name} Unseen Data - {ax.get_title()}')
 
         plt.show(block=True)
 
