@@ -15,6 +15,8 @@ from typing import Any
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import pandas as pd
+from collections import defaultdict
+from matplotlib import transforms
 import numpy as np
 from tqdm.auto import tqdm
 import multiprocessing as mp
@@ -92,32 +94,6 @@ def pred_plot(mod, input, pred, no):
     ax.plot(x_pred.T, label='Predicition')
     ax.legend()
     ax.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
-    return fig, ax
-
-
-def scatter_scores(scores):
-    # presumes scores is a dict with (mae, mse, r2)
-    fig, ax = plt.subplots(1, 3)
-    ax[0].scatter(x=range(len(scores['mae'])),
-                  y=scores['mae'],
-                  color='b',
-                  label='mae'
-                  )
-    ax[1].scatter(x=range(len(scores['mse'])),
-                  y=scores['mse'],
-                  color='g',
-                  label='mse'
-                  )
-    ax[2].scatter(x=range(len(scores['r2'])),
-                  y=scores['r2'],
-                  color='r',
-                  label='r2'
-                  )
-    ax[0].legend()
-    ax[1].legend()
-    ax[2].legend()
-    fig.suptitle('Scores')
-    fig.tight_layout()
     return fig, ax
 
 
@@ -235,6 +211,9 @@ class AutoEncoder():
         self.scaler.fit(x_train)
         x_train = self.scaler.transform(x_train)
         x_test = self.scaler.transform(x_test)
+
+        # scale self.data to be used for predictions
+        self.data = self.scaler.transform(data)
 
         self._n_inputs = x_train.shape[1]
         self.train_data = x_train
@@ -408,7 +387,7 @@ class AutoEncoder():
 if __name__ == '__main__':
 
     # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
-    exps = ['Test 8']
+    exps = ['Test 7']
 
     rms = {}
     for test in exps:
@@ -424,15 +403,15 @@ if __name__ == '__main__':
     for test in exps:
 
         autoe = AutoEncoder(rms[test],
-                            random_state=1,
+                            random_state=0,
                             train_slice=(0, 100),
-                            tb=True,
+                            tb=False,
                             tb_logdir=rms[test].exp_name,
                             params={'n_bottleneck': 10,
                                     'n_size': [64, 64],
                                     'epochs': 500,
                                     'loss': 'mse',
-                                    'batch_size': 16,
+                                    'batch_size': 10,
                                     }
                             )
 
@@ -442,57 +421,104 @@ if __name__ == '__main__':
             verbose=0,
         )
 
+        print('\nTraining Scores:')
+        pred_tr, scores_tr = autoe.score(autoe.train_data)
         print('\nValidation Scores:')
-        pred, scores = autoe.score(autoe.val_data)
+        pred_val, scores_val = autoe.score(autoe.val_data)
 
-        pred_plot(autoe, autoe.val_data, pred, 0)
+        pred_plot(autoe, autoe.train_data, pred_tr, 0)
+        pred_plot(autoe, autoe.val_data, pred_val, 0)
+
+        # plot histogram of training scores
+        def hist_scores(scores, metrics: list = None):
+
+            sc = defaultdict(list)
+
+            if metrics is None:
+                metrics = scores[0].keys()
+            for score in scores:
+                for key, score in score.items():
+                    if key in metrics:
+                        sc[key].extend(score)
+
+            for key, score in sc.items():
+                fig, ax = plt.subplots()
+                ax.hist(score, bins=50)
+                ax.set_xlabel(f'{key} error')
+                ax.set_ylabel('No of Occurences')
+                ax.set_title(f'Histogram of training dataset prediciton {key}')
+
+        # plot a scatter graph of the training scores
+        def scatter_scores(scores, thr: dict = None, metrics: list = None):
+
+            sc = defaultdict(list)
+
+            if metrics is None:
+                metrics = scores[0].keys()
+            for score in scores:
+                for key, score in score.items():
+                    if key in metrics:
+                        sc[key].extend(score)
+
+            for key, score in sc.items():
+                fig, ax = plt.subplots()
+                ax.set_xlabel('Cut Number')
+                ax.set_ylabel(f'{key.upper()}')
+                ax.set_title(f'Scatter of training dataset prediciton {key}')
+                if thresholds is not None and key in thr.keys():
+                    ax.axhline(thr[key], color='r')
+
+                    # create cmap for plot depending on if the scores is
+                    # above/below the threshold
+                    if key == 'r2':
+                        cmap = ['b' if y > thr[key] else 'r'
+                                for y in sc[key]]
+                    else:
+                        cmap = ['r' if y > thr[key] else 'b'
+                                for y in sc[key]]
+                        
+                    ax.scatter(x=range(len(sc[key])),
+                               y=sc[key],
+                               s=2,
+                               c=cmap)
+                    trans = transforms.blended_transform_factory(
+                        ax.get_yticklabels()[0].get_transform(), ax.transData)
+                    ax.text(0, thr[key], "{:.2f}".format(thr[key]),
+                            color="red",
+                            transform=trans,
+                            ha="right",
+                            va="center"
+                            )
+
+        hist_scores([scores_tr, scores_val], metrics=['mse'])
+
+        def calc_cutoff(scores):
+
+            sc = defaultdict(list)
+
+            for score in scores:
+                for key, score in score.items():
+                    sc[key].extend(score)
+
+            cutoffs = {}
+            for key, score in sc.items():
+                # check if the scores should be trying to inc or dec
+                if key == 'r2':
+                    cutoffs[key] = np.mean(score) - np.std(score)
+                else:
+                    cutoffs[key] = np.mean(score) + np.std(score)
+                print(f'{key.upper()} cutoff: {cutoffs[key]:.5f}')
+            return cutoffs
+
+        print('\nCutoffs:')
+        thresholds = calc_cutoff([scores_tr, scores_val])
+
+        # prediction on whole dataset
+        print('\nWhole Dataset Scores:')
+        pred, scores = autoe.score(autoe.data)
+        scatter_scores([scores], thr=thresholds)
+
         plt.show(block=True)
-
-        # # plot hist of loss values from training
-        # p = autoe.predict(autoe.train_data, verbose=0)
-        # train_mse = mean_squared_error(autoe.train_data, p,
-        #                                 multioutput='raw_values')
-
-        # train_mae = mean_absolute_error(autoe.train_data, p,
-        #                                multioutput='raw_values')
-
-        # train_r2 = r2_score(autoe.train_data, p,
-        #                    multioutput='raw_values')
-
-        # # fig, ax = plt.subplots()
-        # # ax.hist(train_mse, bins=50)
-        # # ax.set_xlabel('Error')
-        # # ax.set_ylabel('No of Occurences')
-        # # ax.set_title(f'{test} Histogram of Training Dataset Prediction Error')
-
-        # # calc thresholds from each metric based on mean and std
-        # thr_mse = np.mean(train_mse) + np.std(train_mse)
-        # thr_mae = np.mean(train_mae) + np.std(train_mae)
-        # thr_r2 = np.mean(train_r2) - np.std(train_r2)
-
-        # print(f'\nThreshold:')
-        # print(f'\tMSE = {thr_mse}')
-        # print(f'\tMAE = {thr_mae}')
-        # print(f'\tR2 = {thr_r2}')
-
-        # # prediction plot of cut 8
-        # fig, ax = pred_plot(autoe, autoe.val_data, autoe_val_pred, 8)
-        # ax.set_title(f'{test} Validation Predictions - {ax.get_title()}')
-
-        # # Prediction on whole dataset
-        # print(f'\nDataset Predictions:')
-        # # first scale whole dataset
-        # d = autoe.scaler.transform(autoe.data.values.T)
-        # autoe_pred, autoe_scores = pred_and_score(autoe,
-        #                                           d)
-
-        # # plot scatter scores with the threshold from training scores
-        # # TODO need to check anomalies within RMS data especially test 5, 9
-        # fig, ax = scatter_scores(scores=autoe_scores)
-        # fig.suptitle(f'{test} - {fig._suptitle.get_text()}')
-        # ax[0].axhline(thr_mae, color='k', ls='--')
-        # ax[1].axhline(thr_mse, color='k', ls='--')
-        # ax[2].axhline(thr_r2, color='k', ls='--')
 
         # def plot_to_tf_im(figure):
         #     """Converts the matplotlib plot specified by 'figure' to a PNG
