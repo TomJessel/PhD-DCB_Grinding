@@ -13,10 +13,12 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from textwrap import dedent
 from typing import Any
 import tensorflow as tf
+import matplotlib as mpl
+mpl.use('TkAgg')
 import matplotlib.pyplot as plt
+from matplotlib import transforms
 import pandas as pd
 from collections import defaultdict
-from matplotlib import transforms
 import numpy as np
 from tqdm.auto import tqdm
 import multiprocessing as mp
@@ -520,11 +522,10 @@ class AutoEncoder():
 if __name__ == '__main__':
 
     # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
-    exps = ['Test 7']
+    exps = ['Test 9']
 
     rms = {}
     for test in exps:
-
         rms[test] = RMS(test)
     try:
         rms['Test 5'].data.drop(['23', '24'], axis=1, inplace=True)
@@ -538,10 +539,10 @@ if __name__ == '__main__':
         autoe = AutoEncoder(rms[test],
                             random_state=0,
                             train_slice=(0, 100),
-                            tb=False,
-                            tb_logdir=rms[test].exp_name,
+                            tb=True,
+                            tb_logdir=rms[test].exp_name + '/manual_test',
                             params={'n_bottleneck': 10,
-                                    'n_size': [64, 64],
+                                    'n_size': [32, 32],
                                     'epochs': 500,
                                     'loss': 'mse',
                                     'batch_size': 10,
@@ -561,10 +562,11 @@ if __name__ == '__main__':
         pred_val, scores_val = autoe.score(autoe.val_data)
 
         # plot a prediciton from both the training and validation data
-        autoe.pred_plot(pred_tr, 0)
-        autoe.pred_plot(pred_val, 0)
+        fig, ax = autoe.pred_plot(pred_tr, 0)
+        ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
+        fig, ax = autoe.pred_plot(pred_val, 0)
+        ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
 
-        # plot histogram of training scores
         def hist_scores(scores, metrics: list = None):
 
             sc = defaultdict(list)
@@ -583,7 +585,6 @@ if __name__ == '__main__':
                 ax.set_ylabel('No of Occurences')
                 ax.set_title(f'Histogram of training dataset prediciton {key}')
 
-        # plot a scatter graph of the training scores
         def scatter_scores(scores, thr: dict = None, metrics: list = None):
 
             sc = defaultdict(list)
@@ -595,6 +596,14 @@ if __name__ == '__main__':
                     if key in metrics:
                         sc[key].extend(score)
 
+            def onclick(event):
+                if event.dblclick:
+                    if event.button == 1:
+                        x = round(event.xdata)
+                        fig, ax_temp = autoe.pred_plot(pred, x)
+                        ax_temp.set_title(f'Cut {x} {ax_temp.get_title()}')
+                        plt.show()
+            
             for key, score in sc.items():
                 fig, ax = plt.subplots()
                 ax.set_xlabel('Cut Number')
@@ -624,6 +633,7 @@ if __name__ == '__main__':
                             ha="right",
                             va="center"
                             )
+                    fig.canvas.mpl_connect('button_press_event', onclick)
 
         hist_scores([scores_tr, scores_val], metrics=['mse'])
 
@@ -653,7 +663,7 @@ if __name__ == '__main__':
         pred, scores = autoe.score(autoe.data)
         scatter_scores([scores], thr=thresholds)
 
-        fig, ax = autoe.pred_plot(pred, 150)
+        fig, ax = autoe.pred_plot(pred, 130)
         ax.set_title(f'{autoe.RMS.exp_name} Unseen Data - {ax.get_title()}')
 
         plt.show(block=True)
