@@ -86,35 +86,6 @@ def mp_get_rms(fnos: list[int]):
     return rms
 
 
-def pred_plot(mod, input: tuple, no: int):
-    """
-    Plot prediction vs real data for a given cut.
-
-    Args:
-        mod (AutoEncoder): Model to make prediction with.
-        input (tuple): Input data array for plotting (real, pred).
-        no (int): Cut number to plot.
-    
-    Returns:
-        fig, ax: Matplotlib figure and axis.
-    """
-    pred_input = input[0][no, :].reshape(-1, mod._n_inputs)
-    x_pred = input[1][no, :].reshape(-1, mod._n_inputs)
-
-    pred_input = mod.scaler.inverse_transform(pred_input)
-    x_pred = mod.scaler.inverse_transform(x_pred)
-
-    mse = mean_squared_error(pred_input, x_pred)
-    mae = mean_absolute_error(pred_input, x_pred)
-
-    fig, ax = plt.subplots()
-    ax.plot(pred_input.T, label='Real')
-    ax.plot(x_pred.T, label='Predicition')
-    ax.legend()
-    ax.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
-    return fig, ax
-
-
 class RMS:
     def __init__(
             self,
@@ -361,7 +332,7 @@ class AutoEncoder():
         Initialise the model with the given parameters and callbacks.
 
         Creates an AutoEncoder model within a sickeras basewrapper, based on
-        the inputted parameters. Also creates a unique run name for logging to 
+        the inputted parameters. Also creates a unique run name for logging to
         tensorboard if chosen.
 
         Args:
@@ -518,6 +489,33 @@ class AutoEncoder():
             print(f'\tR2: {np.mean(r2):.5f}')
         return (x, pred), scores
 
+    def pred_plot(self, input: tuple, no: int):
+        """
+        Plot prediction vs real data for a given cut.
+
+        Args:
+            input (tuple): Input data array for plotting (real, pred).
+            no (int): Cut number to plot.
+        
+        Returns:
+            fig, ax: Matplotlib figure and axis.
+        """
+        pred_input = input[0][no, :].reshape(-1, self._n_inputs)
+        x_pred = input[1][no, :].reshape(-1, self._n_inputs)
+
+        pred_input = self.scaler.inverse_transform(pred_input)
+        x_pred = self.scaler.inverse_transform(x_pred)
+
+        mse = mean_squared_error(pred_input, x_pred)
+        mae = mean_absolute_error(pred_input, x_pred)
+
+        fig, ax = plt.subplots()
+        ax.plot(pred_input.T, label='Real')
+        ax.plot(x_pred.T, label='Predicition')
+        ax.legend()
+        ax.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
+        return fig, ax
+
 
 if __name__ == '__main__':
 
@@ -563,8 +561,8 @@ if __name__ == '__main__':
         pred_val, scores_val = autoe.score(autoe.val_data)
 
         # plot a prediciton from both the training and validation data
-        pred_plot(autoe, pred_tr, 0)
-        pred_plot(autoe, pred_val, 0)
+        autoe.pred_plot(pred_tr, 0)
+        autoe.pred_plot(pred_val, 0)
 
         # plot histogram of training scores
         def hist_scores(scores, metrics: list = None):
@@ -655,8 +653,8 @@ if __name__ == '__main__':
         pred, scores = autoe.score(autoe.data)
         scatter_scores([scores], thr=thresholds)
 
-        fig, ax = pred_plot(autoe, pred, 150)
-        ax.set_title(f'{autoe.exp_name} Unseen Data - {ax.get_title()}')
+        fig, ax = autoe.pred_plot(pred, 150)
+        ax.set_title(f'{autoe.RMS.exp_name} Unseen Data - {ax.get_title()}')
 
         plt.show(block=True)
 
