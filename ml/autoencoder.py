@@ -26,6 +26,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from keras.layers import Input, Dense, BatchNormalization
 from keras.models import Model
+# from keras.regularizers import l1, l2
 import tensorboard.plugins.hparams.api as hp
 import tensorflow_addons as tfa
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -204,7 +205,7 @@ class AutoEncoder():
         self.model = self.initialise_model(**self.params)
         print(f'\n{self.run_name}')
         self.model.initialize(X=self.train_data)
-        self.model.model_.summary()
+        # self.model.model_.summary()
         print()
 
     def pre_process(
@@ -264,6 +265,7 @@ class AutoEncoder():
         n_bottleneck: int,
         n_size: list[int],
         activation: str,
+        activity_regularizer,
     ) -> Model:
         """
         Create a Keras autoencoder model with the given parameters.
@@ -274,6 +276,7 @@ class AutoEncoder():
             n_size (list[int]): List of integers for the number of nodes in \
                 the encoder (and decoder but reversed)
             activation (str): Activation function to use.
+            activity_regularizer: Activity regulariser to use in encoder.
 
         Returns:
             Model: Keras model of the autoencoder.
@@ -286,7 +289,9 @@ class AutoEncoder():
                 e = Dense(dim, activation=activation)(e)
                 e = BatchNormalization()(e)
 
-            encoder_out = Dense(n_bottleneck, activation='relu')(e)
+            encoder_out = Dense(n_bottleneck,
+                                activation='relu',
+                                activity_regularizer=activity_regularizer)(e)
             encoder = Model(encoder_in, encoder_out, name='Encoder')
             return encoder
 
@@ -327,6 +332,7 @@ class AutoEncoder():
                               KerasRegressor.r_squared
                               ],
         optimizer='adam',
+        activity_regularizer=None,
         verbose: int = 1,
         callbacks: list[Any] = None,
     ):
@@ -371,10 +377,25 @@ class AutoEncoder():
             with tb_writer.as_default():
                 hp_params = self.params
                 hp_params.pop('callbacks', None)
-                if 'n_size' in hp_params.keys():
-                    _ = hp_params.pop('n_size')
-                    hp_params['n_size'] = str(layers)
+                
+                t_allow = (int, float, str, bool)
+                types = {k: isinstance(val, t_allow)
+                         for k, val in hp_params.items()}
 
+                for k in types.keys():
+                    if types[k] is False:
+                        old = hp_params.pop(k)
+                        if k == 'n_size':
+                            hp_params[k] = str(layers)
+                        elif k == 'activity_regularizer':
+                            if old is not None:
+                                [[key, value]] = old.get_config().items()
+                                hp_params[k] = f'{key}: {value:.3g}'
+                            else:
+                                hp_params[k] = str(old)
+                        else:
+                            hp_params[k] = str(old)
+                
                 hp.hparams(
                     hp_params,
                     trial_id=f'{self._tb_logdir.joinpath(self.run_name)}'
@@ -386,6 +407,7 @@ class AutoEncoder():
             model__n_bottleneck=n_bottleneck,
             model__n_size=n_size,
             model__activation=activation,
+            model__activity_regularizer=activity_regularizer,
             epochs=epochs,
             batch_size=batch_size,
             loss=loss,
@@ -427,6 +449,7 @@ class AutoEncoder():
     def score(
             self,
             x: np.ndarray,
+            tb: bool = True,
             print_score: bool = True,
     ) -> tuple[tuple[np.ndarray, np.ndarray], dict]:
         """
@@ -438,6 +461,7 @@ class AutoEncoder():
 
         Args:
             x (np.ndarray): Input data to score the model on.
+            tb (bool, optional): Log to tensorboard. Defaults to True.
             print_score (bool, optional): Print the scores. Defaults to True.
         
         Returns:
@@ -453,7 +477,7 @@ class AutoEncoder():
 
         scores = {'mae': mae, 'mse': mse, 'r2': r2}
 
-        if self._tb:
+        if self._tb and tb:
             tb_writer = tf.summary.create_file_writer(
                 f'{self._tb_logdir.joinpath(self.run_name)}')
 
@@ -462,8 +486,8 @@ class AutoEncoder():
 
                      | MAE | MSE |  R2  |
                      | ---- | ---- | ---- |
-                     | {np.mean(scores['mae']) * 1e3:.5f} |\
-                         {np.mean(scores['mse']) * 1e6:.5f} |\
+                     | {np.mean(scores['mae']):.5f} |\
+                         {np.mean(scores['mse']):.5f} |\
                              {np.mean(scores['r2']):.5f} |
 
                     ''')
@@ -522,7 +546,7 @@ class AutoEncoder():
 if __name__ == '__main__':
 
     # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
-    exps = ['Test 9']
+    exps = ['Test 8']
 
     rms = {}
     for test in exps:
@@ -540,12 +564,13 @@ if __name__ == '__main__':
                             random_state=0,
                             train_slice=(0, 100),
                             tb=True,
-                            tb_logdir=rms[test].exp_name + '/manual_test',
+                            tb_logdir=rms[test].exp_name + '/neurons',
                             params={'n_bottleneck': 10,
-                                    'n_size': [32, 32],
-                                    'epochs': 500,
+                                    'n_size': [64, 64],
+                                    'epochs': 1000,
                                     'loss': 'mse',
                                     'batch_size': 10,
+                                    # 'activity_regularizer': None,
                                     }
                             )
 
@@ -557,7 +582,7 @@ if __name__ == '__main__':
 
         # compare scores between training and validation data
         print('\nTraining Scores:')
-        pred_tr, scores_tr = autoe.score(autoe.train_data)
+        pred_tr, scores_tr = autoe.score(autoe.train_data, tb=False)
         print('\nValidation Scores:')
         pred_val, scores_val = autoe.score(autoe.val_data)
 
@@ -585,6 +610,7 @@ if __name__ == '__main__':
                 ax.set_ylabel('No of Occurences')
                 ax.set_title(f'Histogram of training dataset prediciton {key}')
 
+# TODO integrate scatter_scores within the AutoEncoder class
         def scatter_scores(scores, thr: dict = None, metrics: list = None):
 
             sc = defaultdict(list)
@@ -660,13 +686,13 @@ if __name__ == '__main__':
 
         # prediction on whole dataset
         print('\nWhole Dataset Scores:')
-        pred, scores = autoe.score(autoe.data)
+        pred, scores = autoe.score(autoe.data, tb=False)
         scatter_scores([scores], thr=thresholds)
 
         fig, ax = autoe.pred_plot(pred, 130)
         ax.set_title(f'{autoe.RMS.exp_name} Unseen Data - {ax.get_title()}')
 
-        plt.show(block=True)
+        plt.show()
 
         # def plot_to_tf_im(figure):
         #     """Converts the matplotlib plot specified by 'figure' to a PNG
