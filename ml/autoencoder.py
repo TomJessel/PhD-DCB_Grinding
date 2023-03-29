@@ -546,6 +546,70 @@ class AutoEncoder():
         return fig, ax
 
 
+class _VariationalAutoEncoder(Model):
+    def __init__(self, input_dim, latent_dim, inter_dim):
+        super().__init__()
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
+        self.inter_dim = inter_dim
+        self.encoder = self.get_encoder(input_dim, latent_dim, inter_dim)
+        self.decoder = self.get_decoder(input_dim, latent_dim, inter_dim)
+
+    def get_encoder(self, input_dim, latent_dim, intermediate_dim):
+        inputs = Input(shape=(input_dim,), name='encoder_input')
+        d = Dense(intermediate_dim, activation='relu')(inputs)
+        d = Dense(intermediate_dim, activation='relu')(d)
+        z_mean = Dense(latent_dim, name='z_mean')(d)
+        z_log_sigma = Dense(latent_dim, name='z_log_sigma')(d)
+
+        def sampling(args):
+            z_mean, z_log_sigma = args
+            epsilon = K.random_normal(shape=(K.shape(z_mean)[0], latent_dim),
+                                      mean=0., stddev=0.1)
+            return z_mean + K.exp(z_log_sigma) * epsilon
+        
+        z = Lambda(sampling)([z_mean, z_log_sigma])
+
+        # encoder mapping inputs to rthe latent space
+        encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
+        return encoder
+
+    def get_decoder(self, input_dim, latent_dim, intermediate_dim):
+        latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
+        d = Dense(intermediate_dim, activation='relu')(latent_inputs)
+        d = Dense(intermediate_dim, activation='relu')(d)
+        outputs = Dense(input_dim, activation='sigmoid')(d)
+
+        decoder = Model(latent_inputs, outputs, name='decoder')
+        return decoder
+
+    def call(self, inputs):
+        out_encoder = self.encoder(inputs)
+        z_mean, z_log_sigma, z = out_encoder
+        out_decoder = self.decoder(z)
+
+        reconstruction_loss = tf.keras.metrics.mean_squared_error(inputs, out_decoder)
+        reconstruction_loss *= self.input_dim
+        kl_loss = 1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma)
+        kl_loss = K.sum(kl_loss, axis=-1)
+        kl_loss *= -0.5
+        # vae_loss = K.mean(reconstruction_loss + kl_loss)
+        # self.add_loss(vae_loss)
+        return inputs, out_decoder
+
+# TODO set it up so VAE class is subclass of AUTOE class
+
+
+class VariationalAutoEncoder():
+    def __init__(self):
+        self.model = BaseWrapper(_VariationalAutoEncoder(393, 2, 64),
+                                 optimizer='adam',
+                                 epochs=100,
+                                 batch_size=10,
+                                #  loss='mse',
+                                 )
+
+
 if __name__ == '__main__':
 
     # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
@@ -581,199 +645,204 @@ if __name__ == '__main__':
         intermediate_dim = 128
         input_dim = autoe._n_inputs
 
-        # -------------------------------
-        # VARIATIONAL AUTOENCODER ATTEMPT
-        # -------------------------------
+        vae = VariationalAutoEncoder()
 
-        inputs = Input(shape=(input_dim,), name='encoder_input')
-        d = Dense(intermediate_dim, activation='relu')(inputs)
-        d = Dense(intermediate_dim, activation='relu')(d)
-        z_mean = Dense(latent_dim, name='z_mean')(d)
-        z_log_sigma = Dense(latent_dim, name='z_log_sigma')(d)
+        vae.model.fit(X=autoe.train_data, y=autoe.train_data,
+                      )
 
-        def sampling(args):
-            z_mean, z_log_sigma = args
-            epsilon = K.random_normal(shape=(K.shape(z_mean)[0], latent_dim),
-                                      mean=0., stddev=0.1)
-            return z_mean + K.exp(z_log_sigma) * epsilon
+    #     # -------------------------------
+    #     # VARIATIONAL AUTOENCODER ATTEMPT
+    #     # -------------------------------
+
+    #     inputs = Input(shape=(input_dim,), name='encoder_input')
+    #     d = Dense(intermediate_dim, activation='relu')(inputs)
+    #     d = Dense(intermediate_dim, activation='relu')(d)
+    #     z_mean = Dense(latent_dim, name='z_mean')(d)
+    #     z_log_sigma = Dense(latent_dim, name='z_log_sigma')(d)
+
+    #     def sampling(args):
+    #         z_mean, z_log_sigma = args
+    #         epsilon = K.random_normal(shape=(K.shape(z_mean)[0], latent_dim),
+    #                                   mean=0., stddev=0.1)
+    #         return z_mean + K.exp(z_log_sigma) * epsilon
         
-        z = Lambda(sampling)([z_mean, z_log_sigma])
+    #     z = Lambda(sampling)([z_mean, z_log_sigma])
 
-        # encoder mapping inputs to rthe latent space
-        encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
-        encoder.summary()
+    #     # encoder mapping inputs to rthe latent space
+    #     encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
+    #     encoder.summary()
 
-        latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
-        d = Dense(intermediate_dim, activation='relu')(latent_inputs)
-        d = Dense(intermediate_dim, activation='relu')(d)
-        outputs = Dense(input_dim, activation='sigmoid')(d)
+    #     latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
+    #     d = Dense(intermediate_dim, activation='relu')(latent_inputs)
+    #     d = Dense(intermediate_dim, activation='relu')(d)
+    #     outputs = Dense(input_dim, activation='sigmoid')(d)
 
-        # decoder taking latent space and outputting reconstructed samples
-        decoder = Model(latent_inputs, outputs, name='decoder')
-        decoder.summary()
+    #     # decoder taking latent space and outputting reconstructed samples
+    #     decoder = Model(latent_inputs, outputs, name='decoder')
+    #     decoder.summary()
 
-        outputs = decoder(encoder(inputs)[2])
-        # variational autoencoder for reconstruction
-        vae = Model(inputs, outputs, name='vae_mlp')
+    #     outputs = decoder(encoder(inputs)[2])
+    #     # variational autoencoder for reconstruction
+    #     vae = Model(inputs, outputs, name='vae_mlp')
 
-        # CUSTOM LOSS FUNCTION
-        reconstruction_loss = tf.keras.metrics.mean_squared_error(inputs, outputs)
-        reconstruction_loss *= input_dim
-        kl_loss = 1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma)
-        kl_loss = K.sum(kl_loss, axis=-1)
-        kl_loss *= -0.5
-        vae_loss = K.mean(reconstruction_loss + kl_loss)
-        vae.add_loss(vae_loss)
-        vae.compile(optimizer='adam')
+    #     # CUSTOM LOSS FUNCTION
+    #     reconstruction_loss = tf.keras.metrics.mean_squared_error(inputs, outputs)
+    #     reconstruction_loss *= input_dim
+    #     kl_loss = 1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma)
+    #     kl_loss = K.sum(kl_loss, axis=-1)
+    #     kl_loss *= -0.5
+    #     vae_loss = K.mean(reconstruction_loss + kl_loss)
+    #     vae.add_loss(vae_loss)
+    #     vae.compile(optimizer='adam')
 
-        history = vae.fit(autoe.train_data, autoe.train_data,
-                          epochs=500,
-                          batch_size=10,
-                          validation_data=(autoe.val_data, autoe.val_data),
-                          verbose=1,
-                          )
+    #     history = vae.fit(autoe.train_data, autoe.train_data,
+    #                       epochs=500,
+    #                       batch_size=10,
+    #                       validation_data=(autoe.val_data, autoe.val_data),
+    #                       verbose=1,
+    #                       )
         
-        fig, ax = plt.subplots()
-        ax.plot(history.history['loss'], label='Train')
-        ax.plot(history.history['val_loss'], label='Validation')
-        ax.legend()
-        ax.set_xlabel('Epoch')
-        ax.set_ylabel('Loss')
-        ax.set_title(f'{test} - VAE Loss')
+    #     fig, ax = plt.subplots()
+    #     ax.plot(history.history['loss'], label='Train')
+    #     ax.plot(history.history['val_loss'], label='Validation')
+    #     ax.legend()
+    #     ax.set_xlabel('Epoch')
+    #     ax.set_ylabel('Loss')
+    #     ax.set_title(f'{test} - VAE Loss')
 
-        pred_tr = vae.predict(autoe.train_data, verbose=0)
-        pred_val = vae.predict(autoe.val_data, verbose=0)
-        pred_data = vae.predict(autoe.data, verbose=0)
+    #     pred_tr = vae.predict(autoe.train_data, verbose=0)
+    #     pred_val = vae.predict(autoe.val_data, verbose=0)
+    #     pred_data = vae.predict(autoe.data, verbose=0)
 
-        # autoe.pred_plot((autoe.train_data, pred_tr), 0)
-        # autoe.pred_plot((autoe.val_data, pred_val), 0)
+    #     # autoe.pred_plot((autoe.train_data, pred_tr), 0)
+    #     # autoe.pred_plot((autoe.val_data, pred_val), 0)
 
-        def score(x, pred):
-            mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
-            mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
-            r2 = r2_score(x.T, pred.T, multioutput='raw_values')
+    #     def score(x, pred):
+    #         mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
+    #         mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
+    #         r2 = r2_score(x.T, pred.T, multioutput='raw_values')
 
-            print(f'\tMAE: {np.mean(mae):.5f}')
-            print(f'\tMSE: {np.mean(mse):.5f}')
-            print(f'\tR2: {np.mean(r2):.5f}')
-            return {'mae': mae, 'mse': mse, 'r2': r2}
+    #         print(f'\tMAE: {np.mean(mae):.5f}')
+    #         print(f'\tMSE: {np.mean(mse):.5f}')
+    #         print(f'\tR2: {np.mean(r2):.5f}')
+    #         return {'mae': mae, 'mse': mse, 'r2': r2}
         
-        print('Training Scores')
-        scores_tr = score(autoe.train_data, pred_tr)
+    #     print('Training Scores')
+    #     scores_tr = score(autoe.train_data, pred_tr)
 
-        print('Validation Scores')
-        scores_val = score(autoe.val_data, pred_val)
+    #     print('Validation Scores')
+    #     scores_val = score(autoe.val_data, pred_val)
 
-        def calc_cutoff(scores):
+    #     def calc_cutoff(scores):
 
-            sc = defaultdict(list)
+    #         sc = defaultdict(list)
 
-            for score in scores:
-                for key, score in score.items():
-                    sc[key].extend(score)
+    #         for score in scores:
+    #             for key, score in score.items():
+    #                 sc[key].extend(score)
 
-            cutoffs = {}
-            for key, score in sc.items():
-                # check if the scores should be trying to inc or dec
-                if key == 'r2':
-                    cutoffs[key] = np.mean(score) - np.std(score)
-                else:
-                    cutoffs[key] = np.mean(score) + np.std(score)
-                print(f'{key.upper()} cutoff: {cutoffs[key]:.5f}')
-            return cutoffs
+    #         cutoffs = {}
+    #         for key, score in sc.items():
+    #             # check if the scores should be trying to inc or dec
+    #             if key == 'r2':
+    #                 cutoffs[key] = np.mean(score) - np.std(score)
+    #             else:
+    #                 cutoffs[key] = np.mean(score) + np.std(score)
+    #             print(f'{key.upper()} cutoff: {cutoffs[key]:.5f}')
+    #         return cutoffs
 
-        def scatter_scores(scores, thr: dict = None, metrics: list = None):
+    #     def scatter_scores(scores, thr: dict = None, metrics: list = None):
 
-            sc = defaultdict(list)
+    #         sc = defaultdict(list)
 
-            if metrics is None:
-                metrics = scores[0].keys()
-            for score in scores:
-                for key, score in score.items():
-                    if key in metrics:
-                        sc[key].extend(score)
+    #         if metrics is None:
+    #             metrics = scores[0].keys()
+    #         for score in scores:
+    #             for key, score in score.items():
+    #                 if key in metrics:
+    #                     sc[key].extend(score)
 
-            def onclick(event):
-                if event.dblclick:
-                    if event.button == 1:
-                        x = round(event.xdata)
-                        fig, ax_temp = autoe.pred_plot((autoe.data, pred_data), x)
-                        ax_temp.set_title(f'Cut {x} {ax_temp.get_title()}')
-                        plt.show()
+    #         def onclick(event):
+    #             if event.dblclick:
+    #                 if event.button == 1:
+    #                     x = round(event.xdata)
+    #                     fig, ax_temp = autoe.pred_plot((autoe.data, pred_data), x)
+    #                     ax_temp.set_title(f'Cut {x} {ax_temp.get_title()}')
+    #                     plt.show()
             
-            for key, score in sc.items():
-                fig, ax = plt.subplots()
-                ax.set_xlabel('Cut Number')
-                ax.set_ylabel(f'{key.upper()}')
-                ax.set_title(f'Scatter of training dataset prediciton {key}')
-                if thr is not None and key in thr.keys():
-                    ax.axhline(thr[key], color='r', linestyle='--')
+    #         for key, score in sc.items():
+    #             fig, ax = plt.subplots()
+    #             ax.set_xlabel('Cut Number')
+    #             ax.set_ylabel(f'{key.upper()}')
+    #             ax.set_title(f'Scatter of training dataset prediciton {key}')
+    #             if thr is not None and key in thr.keys():
+    #                 ax.axhline(thr[key], color='r', linestyle='--')
 
-                    # create cmap for plot depending on if the scores is
-                    # above/below the threshold
-                    if key == 'r2':
-                        cmap = ['b' if y > thr[key] else 'r'
-                                for y in sc[key]]
-                    else:
-                        cmap = ['r' if y > thr[key] else 'b'
-                                for y in sc[key]]
+    #                 # create cmap for plot depending on if the scores is
+    #                 # above/below the threshold
+    #                 if key == 'r2':
+    #                     cmap = ['b' if y > thr[key] else 'r'
+    #                             for y in sc[key]]
+    #                 else:
+    #                     cmap = ['r' if y > thr[key] else 'b'
+    #                             for y in sc[key]]
                         
-                    ax.scatter(x=range(len(sc[key])),
-                               y=sc[key],
-                               s=2,
-                               c=cmap)
-                    trans = transforms.blended_transform_factory(
-                        ax.get_yticklabels()[0].get_transform(), ax.transData)
-                    ax.text(0, thr[key], "{:.2f}".format(thr[key]),
-                            color="red",
-                            transform=trans,
-                            ha="right",
-                            va="center"
-                            )
-                    fig.canvas.mpl_connect('button_press_event', onclick)
-                    return fig, ax
+    #                 ax.scatter(x=range(len(sc[key])),
+    #                            y=sc[key],
+    #                            s=2,
+    #                            c=cmap)
+    #                 trans = transforms.blended_transform_factory(
+    #                     ax.get_yticklabels()[0].get_transform(), ax.transData)
+    #                 ax.text(0, thr[key], "{:.2f}".format(thr[key]),
+    #                         color="red",
+    #                         transform=trans,
+    #                         ha="right",
+    #                         va="center"
+    #                         )
+    #                 fig.canvas.mpl_connect('button_press_event', onclick)
+    #                 return fig, ax
 
-        print('\nCutoffs:')
-        thrs = calc_cutoff([scores_tr, scores_val])
+    #     print('\nCutoffs:')
+    #     thrs = calc_cutoff([scores_tr, scores_val])
 
-        scores_data = score(autoe.data, pred_data)
+    #     scores_data = score(autoe.data, pred_data)
 
-        fig, ax = scatter_scores([scores_data], thrs, ['mse'])
-        ax.set_title(f'{test} - {ax.get_title()}')
+    #     fig, ax = scatter_scores([scores_data], thrs, ['mse'])
+    #     ax.set_title(f'{test} - {ax.get_title()}')
 
-        # GENERATE NEW SAMPLES FROM THE DECODER
-        # add a method to be able to click on the scatter plot and then
-        # generate the signal from those latent points
+    #     # GENERATE NEW SAMPLES FROM THE DECODER
+    #     # add a method to be able to click on the scatter plot and then
+    #     # generate the signal from those latent points
 
-        def generate(dec, z):
-            out = dec.predict(z, verbose=0)
-            out = autoe.scaler.inverse_transform(out)
-            fig, ax = plt.subplots()
-            ax.plot(out.T)
+    #     def generate(dec, z):
+    #         out = dec.predict(z, verbose=0)
+    #         out = autoe.scaler.inverse_transform(out)
+    #         fig, ax = plt.subplots()
+    #         ax.plot(out.T)
 
-        cmap = ['r' if y > thrs['mse'] else 'b' for y in scores_data['mse']]
+    #     cmap = ['r' if y > thrs['mse'] else 'b' for y in scores_data['mse']]
         
-        def encoder_scatter(encoder, data, cmap):
-            data_encoder = encoder.predict(data)
+    #     def encoder_scatter(encoder, data, cmap):
+    #         data_encoder = encoder.predict(data)
 
-            def onclick(event):
-                if event.dblclick:
-                    if event.button == 1:
-                        generate(decoder, [[event.xdata, event.ydata]])
-                        plt.show()
+    #         def onclick(event):
+    #             if event.dblclick:
+    #                 if event.button == 1:
+    #                     generate(decoder, [[event.xdata, event.ydata]])
+    #                     plt.show()
 
-            fig, ax = plt.subplots()
-            labels = [f'Cut {i}' for i in range(len(autoe.data))]
-            ax.scatter(data_encoder[0][:, 0], data_encoder[0][:, 1], c=cmap)
-            mplcursors.cursor(ax, highlight=True, hover=2).connect(
-                "add", lambda sel: sel.annotation.set_text(
-                    f'{labels[sel.index]}' +
-                    f' MSE: {scores_data["mse"][sel.index]:.5f}'
-                )
-            )
-            fig.canvas.mpl_connect('button_press_event', onclick)
-            return fig, ax
+    #         fig, ax = plt.subplots()
+    #         labels = [f'Cut {i}' for i in range(len(autoe.data))]
+    #         ax.scatter(data_encoder[0][:, 0], data_encoder[0][:, 1], c=cmap)
+    #         mplcursors.cursor(ax, highlight=True, hover=2).connect(
+    #             "add", lambda sel: sel.annotation.set_text(
+    #                 f'{labels[sel.index]}' +
+    #                 f' MSE: {scores_data["mse"][sel.index]:.5f}'
+    #             )
+    #         )
+    #         fig.canvas.mpl_connect('button_press_event', onclick)
+    #         return fig, ax
 
-        fig, ax = encoder_scatter(encoder, autoe.data, cmap)
-        ax.set_title(f'{test} - {ax.get_title()}')
-    plt.show(block=True)
+    #     fig, ax = encoder_scatter(encoder, autoe.data, cmap)
+    #     ax.set_title(f'{test} - {ax.get_title()}')
+    # plt.show(block=True)
