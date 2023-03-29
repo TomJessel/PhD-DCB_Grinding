@@ -40,7 +40,7 @@ from keras import backend as K
 import resources
 
 DATA_DIR = Path.home().joinpath(r'Testing/RMS')
-TB_DIR = Path.home().joinpath(r'ml/Tensorboard/AUTOE')
+TB_DIR = Path.home().joinpath(r'ml/Tensorboard')
 
 
 def _mp_rms_process(fno: int):
@@ -192,13 +192,12 @@ class AutoEncoder():
                 for training data. Defaults to (0, 100).
             random_state (int, optional): Random state for reproducibility.
         """
-        print('AutoEncoder Model')
         self.RMS = rms_obj
         self.data = rms_obj.data
         self._train_slice = np.s_[train_slice[0]:train_slice[1]]
         self.random_state = random_state
         self._tb = tb
-        self._tb_logdir = TB_DIR.joinpath(tb_logdir)
+        self._tb_logdir = tb_logdir
 
         if params is None:
             params = {}
@@ -207,7 +206,7 @@ class AutoEncoder():
         self.pre_process()
         self.model = self.initialise_model(**self.params)
         print(f'\n{self.run_name}')
-        self.model.initialize(X=self.train_data)
+        # self.model.initialize(X=self.train_data)
         # self.model.model_.summary()
         print()
 
@@ -360,6 +359,8 @@ class AutoEncoder():
             verbose (int, optional): Verbosity of the model.
             callbacks (list[Any], optional): List of callbacks to use.
         """
+
+        self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
         layers = n_size + [n_bottleneck] + n_size[::-1]
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         self.run_name = f'AUTOE-{self.RMS.exp_name}-E-{epochs}-L-{layers}-{t}'
@@ -549,6 +550,7 @@ class AutoEncoder():
 class _VariationalAutoEncoder(Model):
     def __init__(self, input_dim, latent_dim, inter_dim):
         super().__init__()
+        # TODO change to work with n_size to allow for dynamic layers 
         self.input_dim = input_dim
         self.latent_dim = latent_dim
         self.inter_dim = inter_dim
@@ -588,26 +590,73 @@ class _VariationalAutoEncoder(Model):
         z_mean, z_log_sigma, z = out_encoder
         out_decoder = self.decoder(z)
 
-        reconstruction_loss = tf.keras.metrics.mean_squared_error(inputs, out_decoder)
+        reconstruction_loss = tf.keras.metrics.mean_squared_error(
+            inputs,
+            out_decoder,
+        )
         reconstruction_loss *= self.input_dim
         kl_loss = 1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma)
         kl_loss = K.sum(kl_loss, axis=-1)
         kl_loss *= -0.5
-        # vae_loss = K.mean(reconstruction_loss + kl_loss)
-        # self.add_loss(vae_loss)
-        return inputs, out_decoder
+        vae_loss = K.mean(reconstruction_loss + kl_loss)
+        self.add_loss(vae_loss)
+        return out_decoder
 
 # TODO set it up so VAE class is subclass of AUTOE class
 
 
-class VariationalAutoEncoder():
-    def __init__(self):
-        self.model = BaseWrapper(_VariationalAutoEncoder(393, 2, 64),
-                                 optimizer='adam',
-                                 epochs=100,
-                                 batch_size=10,
-                                #  loss='mse',
-                                 )
+class VariationalAutoEncoder(AutoEncoder):
+    def __init__(
+        self,
+        rms_obj: RMS,
+        tb: bool = True,
+        tb_logdir: str = '',
+        params: dict = None,
+        train_slice=(0, 100),
+        random_state=None,
+    ):
+        super().__init__(rms_obj,
+                         tb,
+                         tb_logdir,
+                         params,
+                         train_slice,
+                         random_state,
+                         )
+
+    def initialise_model(
+            self,
+            latent_dim: int = 2,
+            inter_dim: int = 64,
+            optimizer: str = 'adam',
+            epochs: int = 100,
+            batch_size: int = 10,
+            metrics: list = ['MSE', 'MAE', KerasRegressor.r_squared],
+            verbose: int = 1,
+            callbacks: list = None,
+    ):
+        
+        self._tb_logdir = TB_DIR.joinpath('VAE', self._tb_logdir)
+        if callbacks is None:
+            callbacks = []
+        callbacks.append(tfa.callbacks.TQDMProgressBar(
+            show_epoch_progress=False))
+
+        model = BaseWrapper(
+            _VariationalAutoEncoder(
+                input_dim=self._n_inputs,
+                latent_dim=latent_dim,
+                inter_dim=inter_dim,
+            ),
+            optimizer=optimizer,
+            epochs=epochs,
+            batch_size=batch_size,
+            metrics=metrics,
+            verbose=verbose,
+            callbacks=callbacks,
+        )
+        
+        self.run_name = 'DOES THIS WORK?'
+        return model
 
 
 if __name__ == '__main__':
@@ -627,28 +676,25 @@ if __name__ == '__main__':
 
     for test in exps:
 
-        autoe = AutoEncoder(rms[test],
-                            random_state=1,
-                            train_slice=(0, 100),
-                            tb=False,
-                            tb_logdir=rms[test].exp_name + '/neurons',
-                            params={'n_bottleneck': 10,
-                                    'n_size': [64, 64],
-                                    'epochs': 1000,
-                                    'loss': 'mse',
-                                    'batch_size': 10,
-                                    # 'activity_regularizer': None,
-                                    }
-                            )
-        
-        latent_dim = 2
-        intermediate_dim = 128
-        input_dim = autoe._n_inputs
+        vae = VariationalAutoEncoder(rms[test],
+                                     tb=False,
+                                     tb_logdir='',
+                                     train_slice=(0, 100),
+                                     random_state=1,
+                                     params={'latent_dim': 2,
+                                             'inter_dim': 64,
+                                             'epochs': 500,
+                                             }
+                                     )
 
-        vae = VariationalAutoEncoder()
+        vae.fit(x=vae.train_data,
+                val_data=vae.val_data,
+                verbose=0,
+                )
 
-        vae.model.fit(X=autoe.train_data, y=autoe.train_data,
-                      )
+        pred_tr, scores_tr = vae.score(vae.train_data)
+        pred_val, scores_val = vae.score(vae.val_data)
+        pred_data, scores_data = vae.score(vae.data)
 
     #     # -------------------------------
     #     # VARIATIONAL AUTOENCODER ATTEMPT
