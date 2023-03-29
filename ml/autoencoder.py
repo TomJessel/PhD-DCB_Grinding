@@ -37,7 +37,7 @@ from scikeras.wrappers import KerasRegressor, BaseWrapper
 import resources
 
 DATA_DIR = Path.home().joinpath(r'Testing/RMS')
-TB_DIR = Path.home().joinpath(r'ml/Tensorboard/AUTOE')
+TB_DIR = Path.home().joinpath(r'ml/Tensorboard')
 
 
 def _mp_rms_process(fno: int):
@@ -195,7 +195,7 @@ class AutoEncoder():
         self._train_slice = np.s_[train_slice[0]:train_slice[1]]
         self.random_state = random_state
         self._tb = tb
-        self._tb_logdir = TB_DIR.joinpath(tb_logdir)
+        self._tb_logdir = TB_DIR.joinpath('AUTOE', tb_logdir)
 
         if params is None:
             params = {}
@@ -563,7 +563,7 @@ if __name__ == '__main__':
         autoe = AutoEncoder(rms[test],
                             random_state=0,
                             train_slice=(0, 100),
-                            tb=True,
+                            tb=False,
                             tb_logdir=rms[test].exp_name + '/neurons',
                             params={'n_bottleneck': 10,
                                     'n_size': [64, 64],
