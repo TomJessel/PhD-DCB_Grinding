@@ -644,10 +644,50 @@ class VariationalAutoEncoder(AutoEncoder):
     ):
         
         self._tb_logdir = TB_DIR.joinpath('VAE', self._tb_logdir)
+
+        layers = n_size + [latent_dim] + n_size[::-1]
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        self.run_name = f'VAE-{self.RMS.exp_name}-E-{epochs}-L-{layers}-T-{t}'
+
         if callbacks is None:
             callbacks = []
         callbacks.append(tfa.callbacks.TQDMProgressBar(
             show_epoch_progress=False))
+        
+        if self._tb:
+            callbacks.append(tf.keras.callbacks.TensorBoard(
+                log_dir=self._tb_logdir.joinpath(self.run_name),
+                histogram_freq=1,
+            ))
+            tb_writer = tf.summary.create_file_writer(
+                f'{self._tb_logdir.joinpath(self.run_name)}')
+            
+            with tb_writer.as_default():
+                hp_params = self.params
+                hp_params.pop('callbacks', None)
+
+                t_allow = (int, float, str, bool)
+                types = {k: isinstance(val, t_allow)
+                         for k, val in hp_params.items()}
+
+                for k in types.keys():
+                    if types[k] is False:
+                        old = hp_params.pop(k)
+                        if k == 'n_size':
+                            hp_params[k] = str(layers)
+                        elif k == 'activity_regularizer':
+                            if old is not None:
+                                [[key, value]] = old.get_config().items()
+                                hp_params[k] = f'{key}: {value:.3g}'
+                            else:
+                                hp_params[k] = str(old)
+                        else:
+                            hp_params[k] = str(old)
+                
+                hp.hparams(
+                    hp_params,
+                    trial_id=f'{self._tb_logdir.joinpath(self.run_name)}'
+                )
 
         model = BaseWrapper(
             _VariationalAutoEncoder(
@@ -663,7 +703,6 @@ class VariationalAutoEncoder(AutoEncoder):
             callbacks=callbacks,
         )
         
-        self.run_name = 'DOES THIS WORK?'
         return model
 
     def generate(
@@ -743,7 +782,7 @@ if __name__ == '__main__':
     for test in exps:
         
         vae = VariationalAutoEncoder(rms[test],
-                                     tb=False,
+                                     tb=True,
                                      tb_logdir=rms[test].exp_name,
                                      train_slice=(0, 100),
                                      random_state=1,
@@ -811,102 +850,5 @@ if __name__ == '__main__':
         # %% PLOT LATENT SPACE
         # ---------------------------------------------------------------------
         fig, ax = vae.plot_latent_space()
-
-    # %%
-    #     def scatter_scores(scores, thr: dict = None, metrics: list = None):
-
-    #         sc = defaultdict(list)
-
-    #         if metrics is None:
-    #             metrics = scores[0].keys()
-    #         for score in scores:
-    #             for key, score in score.items():
-    #                 if key in metrics:
-    #                     sc[key].extend(score)
-
-    #         def onclick(event):
-    #             if event.dblclick:
-    #                 if event.button == 1:
-    #                     x = round(event.xdata)
-    #                     fig, ax_temp = autoe.pred_plot((autoe.data, pred_data), x)
-    #                     ax_temp.set_title(f'Cut {x} {ax_temp.get_title()}')
-    #                     plt.show()
-            
-    #         for key, score in sc.items():
-    #             fig, ax = plt.subplots()
-    #             ax.set_xlabel('Cut Number')
-    #             ax.set_ylabel(f'{key.upper()}')
-    #             ax.set_title(f'Scatter of training dataset prediciton {key}')
-    #             if thr is not None and key in thr.keys():
-    #                 ax.axhline(thr[key], color='r', linestyle='--')
-
-    #                 # create cmap for plot depending on if the scores is
-    #                 # above/below the threshold
-    #                 if key == 'r2':
-    #                     cmap = ['b' if y > thr[key] else 'r'
-    #                             for y in sc[key]]
-    #                 else:
-    #                     cmap = ['r' if y > thr[key] else 'b'
-    #                             for y in sc[key]]
-                        
-    #                 ax.scatter(x=range(len(sc[key])),
-    #                            y=sc[key],
-    #                            s=2,
-    #                            c=cmap)
-    #                 trans = transforms.blended_transform_factory(
-    #                     ax.get_yticklabels()[0].get_transform(), ax.transData)
-    #                 ax.text(0, thr[key], "{:.2f}".format(thr[key]),
-    #                         color="red",
-    #                         transform=trans,
-    #                         ha="right",
-    #                         va="center"
-    #                         )
-    #                 fig.canvas.mpl_connect('button_press_event', onclick)
-    #                 return fig, ax
-
-    #     print('\nCutoffs:')
-    #     thrs = calc_cutoff([scores_tr, scores_val])
-
-    #     scores_data = score(autoe.data, pred_data)
-
-    #     fig, ax = scatter_scores([scores_data], thrs, ['mse'])
-    #     ax.set_title(f'{test} - {ax.get_title()}')
-
-    #     # GENERATE NEW SAMPLES FROM THE DECODER
-    #     # add a method to be able to click on the scatter plot and then
-    #     # generate the signal from those latent points
-
-    #     def generate(dec, z):
-    #         out = dec.predict(z, verbose=0)
-    #         out = autoe.scaler.inverse_transform(out)
-    #         fig, ax = plt.subplots()
-    #         ax.plot(out.T)
-
-    #     cmap = ['r' if y > thrs['mse'] else 'b' for y in scores_data['mse']]
-        
-    #     def encoder_scatter(encoder, data, cmap):
-    #         data_encoder = encoder.predict(data)
-
-    #         def onclick(event):
-    #             if event.dblclick:
-    #                 if event.button == 1:
-    #                     generate(decoder, [[event.xdata, event.ydata]])
-    #                     plt.show()
-
-    #         fig, ax = plt.subplots()
-    #         labels = [f'Cut {i}' for i in range(len(autoe.data))]
-    #         ax.scatter(data_encoder[0][:, 0], data_encoder[0][:, 1], c=cmap)
-    #         mplcursors.cursor(ax, highlight=True, hover=2).connect(
-    #             "add", lambda sel: sel.annotation.set_text(
-    #                 f'{labels[sel.index]}' +
-    #                 f' MSE: {scores_data["mse"][sel.index]:.5f}'
-    #             )
-    #         )
-    #         fig.canvas.mpl_connect('button_press_event', onclick)
-    #         return fig, ax
-
-    #     fig, ax = encoder_scatter(encoder, autoe.data, cmap)
-    #     ax.set_title(f'{test} - {ax.get_title()}')
-    # plt.show(block=True)
 
 # %%
