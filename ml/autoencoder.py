@@ -7,16 +7,16 @@
 ------------      -------    --------    -----------
 27/02/2023 11:23   tomhj      1.0         N/A
 """
-
+# %%
 import os
 
 import mplcursors
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from textwrap import dedent
-from typing import Any
+from typing import Any, Union
 import tensorflow as tf
 import matplotlib as mpl
-mpl.use('TkAgg')
+# mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib import transforms
 import pandas as pd
@@ -548,21 +548,25 @@ class AutoEncoder():
 
 
 class _VariationalAutoEncoder(Model):
-    def __init__(self, input_dim, latent_dim, inter_dim):
+    def __init__(self, input_dim, latent_dim, n_size):
         super().__init__()
-        # TODO change to work with n_size to allow for dynamic layers 
+        # TODO change to work with n_size to allow for dynamic layers
         self.input_dim = input_dim
         self.latent_dim = latent_dim
-        self.inter_dim = inter_dim
-        self.encoder = self.get_encoder(input_dim, latent_dim, inter_dim)
-        self.decoder = self.get_decoder(input_dim, latent_dim, inter_dim)
+        self.n_size = n_size
+        self.encoder = self.get_encoder(input_dim, latent_dim, n_size)
+        self.decoder = self.get_decoder(input_dim, latent_dim, n_size)
 
-    def get_encoder(self, input_dim, latent_dim, intermediate_dim):
+    def get_encoder(self, input_dim, latent_dim, n_size):
         inputs = Input(shape=(input_dim,), name='encoder_input')
-        d = Dense(intermediate_dim, activation='relu')(inputs)
-        d = Dense(intermediate_dim, activation='relu')(d)
-        z_mean = Dense(latent_dim, name='z_mean')(d)
-        z_log_sigma = Dense(latent_dim, name='z_log_sigma')(d)
+        e = inputs
+
+        for dim in n_size:
+            e = Dense(dim, activation='relu')(e)
+            e = BatchNormalization()(e)
+
+        z_mean = Dense(latent_dim, name='z_mean')(e)
+        z_log_sigma = Dense(latent_dim, name='z_log_sigma')(e)
 
         def sampling(args):
             z_mean, z_log_sigma = args
@@ -576,10 +580,14 @@ class _VariationalAutoEncoder(Model):
         encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
         return encoder
 
-    def get_decoder(self, input_dim, latent_dim, intermediate_dim):
+    def get_decoder(self, input_dim, latent_dim, n_size):
         latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
-        d = Dense(intermediate_dim, activation='relu')(latent_inputs)
-        d = Dense(intermediate_dim, activation='relu')(d)
+        d = latent_inputs
+
+        for dim in n_size[::-1]:
+            d = Dense(dim, activation='relu')(d)
+            d = BatchNormalization()(d)
+
         outputs = Dense(input_dim, activation='sigmoid')(d)
 
         decoder = Model(latent_inputs, outputs, name='decoder')
@@ -626,7 +634,7 @@ class VariationalAutoEncoder(AutoEncoder):
     def initialise_model(
             self,
             latent_dim: int = 2,
-            inter_dim: int = 64,
+            n_size: list = [64, 64],
             optimizer: str = 'adam',
             epochs: int = 100,
             batch_size: int = 10,
@@ -645,7 +653,7 @@ class VariationalAutoEncoder(AutoEncoder):
             _VariationalAutoEncoder(
                 input_dim=self._n_inputs,
                 latent_dim=latent_dim,
-                inter_dim=inter_dim,
+                n_size=n_size,
             ),
             optimizer=optimizer,
             epochs=epochs,
@@ -657,6 +665,64 @@ class VariationalAutoEncoder(AutoEncoder):
         
         self.run_name = 'DOES THIS WORK?'
         return model
+
+    def generate(
+            self,
+            z: Union[list, np.ndarray] = None,
+            plot_fig: bool = True,
+    ):
+        """
+        Generate a new input from the latent space.
+
+        Create a new signal from a point within the latent space [x, y]. Also
+        will plot the generated signal if plot_fig is True.
+
+        Args:
+            z (Union[list, np.ndarray], optional): Point in latent space to
+                generate signal from. Defaults to None.
+            plot_fig (bool, optional): Plot the generated signal. Defaults to
+                True.
+        
+        Returns:
+            gen (np.ndarray): Generated signal.
+            fig (plt.figure): Figure object. If plot_fig is True.
+            ax (plt.axes): Axes object. If plot_fig is True.
+        """
+        if z is None:
+            raise ValueError('Z input must be provided for decoder. [x, y]')
+        gen = self.model.model_.decoder.predict([z], verbose=0)
+        gen = self.scaler.inverse_transform(gen)
+
+        if plot_fig:
+            fig, ax = plt.subplots()
+            ax.plot(gen.T)
+            ax.set_title(f'Generated input from latent space - Z({z})')
+            return gen, fig, ax
+        return gen
+    
+    def plot_latent_space(self):
+        """
+        Plot the latent space on all the data.
+
+        Plots the z_mean of the encoded data on a scatter plot. The colour
+        represents the cut number of the point.
+
+        Returns:
+            fig (plt.figure): Figure object.
+            ax (plt.axes): Axes object.
+        """
+        encoded = self.model.model_.encoder.predict(self.data, verbose=0)
+        z_mean, z_log_sigma, _ = encoded
+        
+        fig, ax = plt.subplots()
+        s = ax.scatter(z_mean[:, 0], z_mean[:, 1],
+                       c=range(len(z_mean[:, 0])),
+                       cmap=plt.get_cmap('jet')
+                       )
+        ax.set_title('Latent space')
+        cbar = plt.colorbar(s)
+        cbar.set_label('Cut No.')
+        return fig, ax
 
 
 if __name__ == '__main__':
@@ -675,15 +741,16 @@ if __name__ == '__main__':
     print()
 
     for test in exps:
-
+        
         vae = VariationalAutoEncoder(rms[test],
                                      tb=False,
-                                     tb_logdir='',
+                                     tb_logdir=rms[test].exp_name,
                                      train_slice=(0, 100),
                                      random_state=1,
                                      params={'latent_dim': 2,
-                                             'inter_dim': 64,
+                                             'n_size': [64, 64],
                                              'epochs': 500,
+                                             'batch_size': 10,
                                              }
                                      )
 
@@ -692,111 +759,60 @@ if __name__ == '__main__':
                 verbose=0,
                 )
 
+        # %% MODEL SUMMARY
+        # ---------------------------------------------------------------------
+        vae.model.model_.summary()
+        vae.model.model_.encoder.summary()
+        vae.model.model_.decoder.summary()
+
+        # %% SCORE THE MODEL ON TRAINING, VALIDATION AND ALL DATA
+        # ---------------------------------------------------------------------
+        print('\nTraining Scores:')
         pred_tr, scores_tr = vae.score(vae.train_data)
+        print('\nValidation Scores:')
         pred_val, scores_val = vae.score(vae.val_data)
+        print('\nWhole Dataset Scores:')
         pred_data, scores_data = vae.score(vae.data)
 
-    #     # -------------------------------
-    #     # VARIATIONAL AUTOENCODER ATTEMPT
-    #     # -------------------------------
+        # %% PLOT PREDICTIONS
+        # ---------------------------------------------------------------------
+        fig, ax = vae.pred_plot(pred_tr, 0)
+        ax.set_title(f'{vae.RMS.exp_name} Training Data - {ax.get_title()}')
+        fig, ax = vae.pred_plot(pred_val, 0)
+        ax.set_title(f'{vae.RMS.exp_name} Val Data - {ax.get_title()}')
 
-    #     inputs = Input(shape=(input_dim,), name='encoder_input')
-    #     d = Dense(intermediate_dim, activation='relu')(inputs)
-    #     d = Dense(intermediate_dim, activation='relu')(d)
-    #     z_mean = Dense(latent_dim, name='z_mean')(d)
-    #     z_log_sigma = Dense(latent_dim, name='z_log_sigma')(d)
+        # %% CALC CUTOFFS
+        # ---------------------------------------------------------------------
+        def calc_cutoff(scores):
 
-    #     def sampling(args):
-    #         z_mean, z_log_sigma = args
-    #         epsilon = K.random_normal(shape=(K.shape(z_mean)[0], latent_dim),
-    #                                   mean=0., stddev=0.1)
-    #         return z_mean + K.exp(z_log_sigma) * epsilon
+            sc = defaultdict(list)
+
+            for score in scores:
+                for key, score in score.items():
+                    sc[key].extend(score)
+
+            cutoffs = {}
+            for key, score in sc.items():
+                # check if the scores should be trying to inc or dec
+                if key == 'r2':
+                    cutoffs[key] = np.mean(score) - np.std(score)
+                else:
+                    cutoffs[key] = np.mean(score) + np.std(score)
+                print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
+            return cutoffs
         
-    #     z = Lambda(sampling)([z_mean, z_log_sigma])
+        print('\nCutoffs:')
+        thresholds = calc_cutoff([scores_tr, scores_val])
 
-    #     # encoder mapping inputs to rthe latent space
-    #     encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
-    #     encoder.summary()
+        # %% GENERATE NEW DATA
+        # ---------------------------------------------------------------------
+        _, fig, ax = vae.generate(z=[-2, 2])
 
-    #     latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
-    #     d = Dense(intermediate_dim, activation='relu')(latent_inputs)
-    #     d = Dense(intermediate_dim, activation='relu')(d)
-    #     outputs = Dense(input_dim, activation='sigmoid')(d)
+        # %% PLOT LATENT SPACE
+        # ---------------------------------------------------------------------
+        fig, ax = vae.plot_latent_space()
 
-    #     # decoder taking latent space and outputting reconstructed samples
-    #     decoder = Model(latent_inputs, outputs, name='decoder')
-    #     decoder.summary()
-
-    #     outputs = decoder(encoder(inputs)[2])
-    #     # variational autoencoder for reconstruction
-    #     vae = Model(inputs, outputs, name='vae_mlp')
-
-    #     # CUSTOM LOSS FUNCTION
-    #     reconstruction_loss = tf.keras.metrics.mean_squared_error(inputs, outputs)
-    #     reconstruction_loss *= input_dim
-    #     kl_loss = 1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma)
-    #     kl_loss = K.sum(kl_loss, axis=-1)
-    #     kl_loss *= -0.5
-    #     vae_loss = K.mean(reconstruction_loss + kl_loss)
-    #     vae.add_loss(vae_loss)
-    #     vae.compile(optimizer='adam')
-
-    #     history = vae.fit(autoe.train_data, autoe.train_data,
-    #                       epochs=500,
-    #                       batch_size=10,
-    #                       validation_data=(autoe.val_data, autoe.val_data),
-    #                       verbose=1,
-    #                       )
-        
-    #     fig, ax = plt.subplots()
-    #     ax.plot(history.history['loss'], label='Train')
-    #     ax.plot(history.history['val_loss'], label='Validation')
-    #     ax.legend()
-    #     ax.set_xlabel('Epoch')
-    #     ax.set_ylabel('Loss')
-    #     ax.set_title(f'{test} - VAE Loss')
-
-    #     pred_tr = vae.predict(autoe.train_data, verbose=0)
-    #     pred_val = vae.predict(autoe.val_data, verbose=0)
-    #     pred_data = vae.predict(autoe.data, verbose=0)
-
-    #     # autoe.pred_plot((autoe.train_data, pred_tr), 0)
-    #     # autoe.pred_plot((autoe.val_data, pred_val), 0)
-
-    #     def score(x, pred):
-    #         mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
-    #         mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
-    #         r2 = r2_score(x.T, pred.T, multioutput='raw_values')
-
-    #         print(f'\tMAE: {np.mean(mae):.5f}')
-    #         print(f'\tMSE: {np.mean(mse):.5f}')
-    #         print(f'\tR2: {np.mean(r2):.5f}')
-    #         return {'mae': mae, 'mse': mse, 'r2': r2}
-        
-    #     print('Training Scores')
-    #     scores_tr = score(autoe.train_data, pred_tr)
-
-    #     print('Validation Scores')
-    #     scores_val = score(autoe.val_data, pred_val)
-
-    #     def calc_cutoff(scores):
-
-    #         sc = defaultdict(list)
-
-    #         for score in scores:
-    #             for key, score in score.items():
-    #                 sc[key].extend(score)
-
-    #         cutoffs = {}
-    #         for key, score in sc.items():
-    #             # check if the scores should be trying to inc or dec
-    #             if key == 'r2':
-    #                 cutoffs[key] = np.mean(score) - np.std(score)
-    #             else:
-    #                 cutoffs[key] = np.mean(score) + np.std(score)
-    #             print(f'{key.upper()} cutoff: {cutoffs[key]:.5f}')
-    #         return cutoffs
-
+    # %%
     #     def scatter_scores(scores, thr: dict = None, metrics: list = None):
 
     #         sc = defaultdict(list)
@@ -892,3 +908,5 @@ if __name__ == '__main__':
     #     fig, ax = encoder_scatter(encoder, autoe.data, cmap)
     #     ax.set_title(f'{test} - {ax.get_title()}')
     # plt.show(block=True)
+
+# %%
