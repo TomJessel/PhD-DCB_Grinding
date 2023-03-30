@@ -7,16 +7,17 @@
 ------------      -------    --------    -----------
 27/02/2023 11:23   tomhj      1.0         N/A
 """
-
+# %%
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from textwrap import dedent
-from typing import Any
+from typing import Any, Union
 import tensorflow as tf
 import matplotlib as mpl
-mpl.use('TkAgg')
+# mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib import transforms
+import mplcursors
 import pandas as pd
 from collections import defaultdict
 import numpy as np
@@ -24,7 +25,7 @@ from tqdm.auto import tqdm
 import multiprocessing as mp
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from keras.layers import Input, Dense, BatchNormalization
+from keras.layers import Input, Dense, BatchNormalization, Lambda
 from keras.models import Model
 # from keras.regularizers import l1, l2
 import tensorboard.plugins.hparams.api as hp
@@ -33,6 +34,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from pathlib import Path
 import time
 from scikeras.wrappers import KerasRegressor, BaseWrapper
+from keras import backend as K
 
 import resources
 
@@ -189,7 +191,6 @@ class AutoEncoder():
                 for training data. Defaults to (0, 100).
             random_state (int, optional): Random state for reproducibility.
         """
-        print('AutoEncoder Model')
         self.RMS = rms_obj
         self.data = rms_obj.data
         self._train_slice = np.s_[train_slice[0]:train_slice[1]]
@@ -204,7 +205,7 @@ class AutoEncoder():
         self.pre_process()
         self.model = self.initialise_model(**self.params)
         print(f'\n{self.run_name}')
-        self.model.initialize(X=self.train_data)
+        # self.model.initialize(X=self.train_data)
         # self.model.model_.summary()
         print()
 
@@ -357,6 +358,8 @@ class AutoEncoder():
             verbose (int, optional): Verbosity of the model.
             callbacks (list[Any], optional): List of callbacks to use.
         """
+
+        self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
         layers = n_size + [n_bottleneck] + n_size[::-1]
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         self.run_name = f'AUTOE-{self.RMS.exp_name}-E-{epochs}-L-{layers}-{t}'
@@ -543,6 +546,223 @@ class AutoEncoder():
         return fig, ax
 
 
+class _VariationalAutoEncoder(Model):
+    def __init__(self, input_dim, latent_dim, n_size):
+        super().__init__()
+        # TODO change to work with n_size to allow for dynamic layers
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
+        self.n_size = n_size
+        self.encoder = self.get_encoder(input_dim, latent_dim, n_size)
+        self.decoder = self.get_decoder(input_dim, latent_dim, n_size)
+
+    def get_encoder(self, input_dim, latent_dim, n_size):
+        inputs = Input(shape=(input_dim,), name='encoder_input')
+        e = inputs
+
+        for dim in n_size:
+            e = Dense(dim, activation='relu')(e)
+            e = BatchNormalization()(e)
+
+        z_mean = Dense(latent_dim, name='z_mean')(e)
+        z_log_sigma = Dense(latent_dim, name='z_log_sigma')(e)
+
+        def sampling(args):
+            z_mean, z_log_sigma = args
+            epsilon = K.random_normal(shape=(K.shape(z_mean)[0], latent_dim),
+                                      mean=0., stddev=0.1)
+            return z_mean + K.exp(z_log_sigma) * epsilon
+        
+        z = Lambda(sampling)([z_mean, z_log_sigma])
+
+        # encoder mapping inputs to rthe latent space
+        encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
+        return encoder
+
+    def get_decoder(self, input_dim, latent_dim, n_size):
+        latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
+        d = latent_inputs
+
+        for dim in n_size[::-1]:
+            d = Dense(dim, activation='relu')(d)
+            d = BatchNormalization()(d)
+
+        outputs = Dense(input_dim, activation='sigmoid')(d)
+
+        decoder = Model(latent_inputs, outputs, name='decoder')
+        return decoder
+
+    def call(self, inputs):
+        out_encoder = self.encoder(inputs)
+        z_mean, z_log_sigma, z = out_encoder
+        out_decoder = self.decoder(z)
+
+        reconstruction_loss = tf.keras.metrics.mean_squared_error(
+            inputs,
+            out_decoder,
+        )
+        reconstruction_loss *= self.input_dim
+        kl_loss = 1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma)
+        kl_loss = K.sum(kl_loss, axis=-1)
+        kl_loss *= -0.5
+        vae_loss = K.mean(reconstruction_loss + kl_loss)
+        self.add_loss(vae_loss)
+        return out_decoder
+
+# TODO set it up so VAE class is subclass of AUTOE class
+
+
+class VariationalAutoEncoder(AutoEncoder):
+    def __init__(
+        self,
+        rms_obj: RMS,
+        tb: bool = True,
+        tb_logdir: str = '',
+        params: dict = None,
+        train_slice=(0, 100),
+        random_state=None,
+    ):
+        super().__init__(rms_obj,
+                         tb,
+                         tb_logdir,
+                         params,
+                         train_slice,
+                         random_state,
+                         )
+
+    def initialise_model(
+            self,
+            latent_dim: int = 2,
+            n_size: list = [64, 64],
+            optimizer: str = 'adam',
+            epochs: int = 100,
+            batch_size: int = 10,
+            metrics: list = ['MSE', 'MAE', KerasRegressor.r_squared],
+            verbose: int = 1,
+            callbacks: list = None,
+    ):
+        
+        self._tb_logdir = TB_DIR.joinpath('VAE', self._tb_logdir)
+
+        layers = n_size + [latent_dim] + n_size[::-1]
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        self.run_name = f'VAE-{self.RMS.exp_name}-E-{epochs}-L-{layers}-T-{t}'
+
+        if callbacks is None:
+            callbacks = []
+        callbacks.append(tfa.callbacks.TQDMProgressBar(
+            show_epoch_progress=False))
+        
+        if self._tb:
+            callbacks.append(tf.keras.callbacks.TensorBoard(
+                log_dir=self._tb_logdir.joinpath(self.run_name),
+                histogram_freq=1,
+            ))
+            tb_writer = tf.summary.create_file_writer(
+                f'{self._tb_logdir.joinpath(self.run_name)}')
+            
+            with tb_writer.as_default():
+                hp_params = self.params
+                hp_params.pop('callbacks', None)
+
+                t_allow = (int, float, str, bool)
+                types = {k: isinstance(val, t_allow)
+                         for k, val in hp_params.items()}
+
+                for k in types.keys():
+                    if types[k] is False:
+                        old = hp_params.pop(k)
+                        if k == 'n_size':
+                            hp_params[k] = str(layers)
+                        elif k == 'activity_regularizer':
+                            if old is not None:
+                                [[key, value]] = old.get_config().items()
+                                hp_params[k] = f'{key}: {value:.3g}'
+                            else:
+                                hp_params[k] = str(old)
+                        else:
+                            hp_params[k] = str(old)
+                
+                hp.hparams(
+                    hp_params,
+                    trial_id=f'{self._tb_logdir.joinpath(self.run_name)}'
+                )
+
+        model = BaseWrapper(
+            _VariationalAutoEncoder(
+                input_dim=self._n_inputs,
+                latent_dim=latent_dim,
+                n_size=n_size,
+            ),
+            optimizer=optimizer,
+            epochs=epochs,
+            batch_size=batch_size,
+            metrics=metrics,
+            verbose=verbose,
+            callbacks=callbacks,
+        )
+        
+        return model
+
+    def generate(
+            self,
+            z: Union[list, np.ndarray] = None,
+            plot_fig: bool = True,
+    ):
+        """
+        Generate a new input from the latent space.
+
+        Create a new signal from a point within the latent space [x, y]. Also
+        will plot the generated signal if plot_fig is True.
+
+        Args:
+            z (Union[list, np.ndarray], optional): Point in latent space to
+                generate signal from. Defaults to None.
+            plot_fig (bool, optional): Plot the generated signal. Defaults to
+                True.
+        
+        Returns:
+            gen (np.ndarray): Generated signal.
+            fig (plt.figure): Figure object. If plot_fig is True.
+            ax (plt.axes): Axes object. If plot_fig is True.
+        """
+        if z is None:
+            raise ValueError('Z input must be provided for decoder. [x, y]')
+        gen = self.model.model_.decoder.predict([z], verbose=0)
+        gen = self.scaler.inverse_transform(gen)
+
+        if plot_fig:
+            fig, ax = plt.subplots()
+            ax.plot(gen.T)
+            ax.set_title(f'Generated input from latent space - Z({z})')
+            return gen, fig, ax
+        return gen
+    
+    def plot_latent_space(self):
+        """
+        Plot the latent space on all the data.
+
+        Plots the z_mean of the encoded data on a scatter plot. The colour
+        represents the cut number of the point.
+
+        Returns:
+            fig (plt.figure): Figure object.
+            ax (plt.axes): Axes object.
+        """
+        encoded = self.model.model_.encoder.predict(self.data, verbose=0)
+        z_mean, z_log_sigma, _ = encoded
+        
+        fig, ax = plt.subplots()
+        s = ax.scatter(z_mean[:, 0], z_mean[:, 1],
+                       c=range(len(z_mean[:, 0])),
+                       cmap=plt.get_cmap('jet')
+                       )
+        ax.set_title('Latent space')
+        cbar = plt.colorbar(s)
+        cbar.set_label('Cut No.')
+        return fig, ax
+
+
 if __name__ == '__main__':
 
     # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
@@ -559,110 +779,49 @@ if __name__ == '__main__':
     print()
 
     for test in exps:
+        
+        vae = VariationalAutoEncoder(rms[test],
+                                     tb=True,
+                                     tb_logdir=rms[test].exp_name,
+                                     train_slice=(0, 100),
+                                     random_state=1,
+                                     params={'latent_dim': 2,
+                                             'n_size': [64, 64],
+                                             'epochs': 500,
+                                             'batch_size': 10,
+                                             }
+                                     )
 
-        autoe = AutoEncoder(rms[test],
-                            random_state=0,
-                            train_slice=(0, 100),
-                            tb=False,
-                            tb_logdir=rms[test].exp_name + '/neurons',
-                            params={'n_bottleneck': 10,
-                                    'n_size': [64, 64],
-                                    'epochs': 1000,
-                                    'loss': 'mse',
-                                    'batch_size': 10,
-                                    # 'activity_regularizer': None,
-                                    }
-                            )
+        vae.fit(x=vae.train_data,
+                val_data=vae.val_data,
+                verbose=0,
+                )
 
-        autoe.fit(
-            x=autoe.train_data,
-            val_data=autoe.val_data,
-            verbose=0,
-        )
 
-        # compare scores between training and validation data
+        # %% MODEL SUMMARY
+        # ---------------------------------------------------------------------
+        vae.model.model_.summary()
+        vae.model.model_.encoder.summary()
+        vae.model.model_.decoder.summary()
+
+        # %% SCORE THE MODEL ON TRAINING, VALIDATION AND ALL DATA
+        # ---------------------------------------------------------------------
         print('\nTraining Scores:')
-        pred_tr, scores_tr = autoe.score(autoe.train_data, tb=False)
+        pred_tr, scores_tr = vae.score(vae.train_data)
         print('\nValidation Scores:')
-        pred_val, scores_val = autoe.score(autoe.val_data)
+        pred_val, scores_val = vae.score(vae.val_data)
+        print('\nWhole Dataset Scores:')
+        pred_data, scores_data = vae.score(vae.data)
 
-        # plot a prediciton from both the training and validation data
-        fig, ax = autoe.pred_plot(pred_tr, 0)
-        ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
-        fig, ax = autoe.pred_plot(pred_val, 0)
-        ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
+        # %% PLOT PREDICTIONS
+        # ---------------------------------------------------------------------
+        fig, ax = vae.pred_plot(pred_tr, 0)
+        ax.set_title(f'{vae.RMS.exp_name} Training Data - {ax.get_title()}')
+        fig, ax = vae.pred_plot(pred_val, 0)
+        ax.set_title(f'{vae.RMS.exp_name} Val Data - {ax.get_title()}')
 
-        def hist_scores(scores, metrics: list = None):
-
-            sc = defaultdict(list)
-
-            if metrics is None:
-                metrics = scores[0].keys()
-            for score in scores:
-                for key, score in score.items():
-                    if key in metrics:
-                        sc[key].extend(score)
-
-            for key, score in sc.items():
-                fig, ax = plt.subplots()
-                ax.hist(score, bins=50)
-                ax.set_xlabel(f'{key} error')
-                ax.set_ylabel('No of Occurences')
-                ax.set_title(f'Histogram of training dataset prediciton {key}')
-
-# TODO integrate scatter_scores within the AutoEncoder class
-        def scatter_scores(scores, thr: dict = None, metrics: list = None):
-
-            sc = defaultdict(list)
-
-            if metrics is None:
-                metrics = scores[0].keys()
-            for score in scores:
-                for key, score in score.items():
-                    if key in metrics:
-                        sc[key].extend(score)
-
-            def onclick(event):
-                if event.dblclick:
-                    if event.button == 1:
-                        x = round(event.xdata)
-                        fig, ax_temp = autoe.pred_plot(pred, x)
-                        ax_temp.set_title(f'Cut {x} {ax_temp.get_title()}')
-                        plt.show()
-            
-            for key, score in sc.items():
-                fig, ax = plt.subplots()
-                ax.set_xlabel('Cut Number')
-                ax.set_ylabel(f'{key.upper()}')
-                ax.set_title(f'Scatter of training dataset prediciton {key}')
-                if thresholds is not None and key in thr.keys():
-                    ax.axhline(thr[key], color='r', linestyle='--')
-
-                    # create cmap for plot depending on if the scores is
-                    # above/below the threshold
-                    if key == 'r2':
-                        cmap = ['b' if y > thr[key] else 'r'
-                                for y in sc[key]]
-                    else:
-                        cmap = ['r' if y > thr[key] else 'b'
-                                for y in sc[key]]
-                        
-                    ax.scatter(x=range(len(sc[key])),
-                               y=sc[key],
-                               s=2,
-                               c=cmap)
-                    trans = transforms.blended_transform_factory(
-                        ax.get_yticklabels()[0].get_transform(), ax.transData)
-                    ax.text(0, thr[key], "{:.2f}".format(thr[key]),
-                            color="red",
-                            transform=trans,
-                            ha="right",
-                            va="center"
-                            )
-                    fig.canvas.mpl_connect('button_press_event', onclick)
-
-        hist_scores([scores_tr, scores_val], metrics=['mse'])
-
+        # %% CALC CUTOFFS
+        # ---------------------------------------------------------------------
         def calc_cutoff(scores):
 
             sc = defaultdict(list)
@@ -678,48 +837,16 @@ if __name__ == '__main__':
                     cutoffs[key] = np.mean(score) - np.std(score)
                 else:
                     cutoffs[key] = np.mean(score) + np.std(score)
-                print(f'{key.upper()} cutoff: {cutoffs[key]:.5f}')
+                print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
             return cutoffs
-
+        
         print('\nCutoffs:')
         thresholds = calc_cutoff([scores_tr, scores_val])
 
-        # prediction on whole dataset
-        print('\nWhole Dataset Scores:')
-        pred, scores = autoe.score(autoe.data, tb=False)
-        scatter_scores([scores], thr=thresholds)
+        # %% GENERATE NEW DATA
+        # ---------------------------------------------------------------------
+        _, fig, ax = vae.generate(z=[-2, 2])
 
-        fig, ax = autoe.pred_plot(pred, 130)
-        ax.set_title(f'{autoe.RMS.exp_name} Unseen Data - {ax.get_title()}')
-
-        plt.show()
-
-        # def plot_to_tf_im(figure):
-        #     """Converts the matplotlib plot specified by 'figure' to a PNG
-        #     image and
-        #     returns it. The supplied figure is closed and inaccessible after
-        #     this call."""
-        #     # Save the plot to a PNG in memory.
-        #     buf = io.BytesIO()
-        #     figure.savefig(buf, format='png')
-        #     buf.seek(0)
-        #     # Convert PNG buffer to TF image
-        #     image = tf.image.decode_png(buf.getvalue(), channels=4)
-        #     # Add the batch dimension
-        #     image = tf.expand_dims(image, 0)
-        #     return image
-
-        # tb_writer = tf.summary.create_file_writer(run_name)
-        # with tb_writer.as_default():
-        #     tf.summary.image("Scatter Predicitons", plot_to_tf_im(fig), step=0)
-        #     for key, score in autoe_scores.items():
-        #         step = 0
-        #         for error in score:
-        #             tf.summary.scalar(f'pred_scores/{key}', error, step=step)
-        #             step += 1
-
-        # # prediction plot of cut 110
-        # fig, ax = pred_plot(autoe, d, autoe_pred, 110)
-        # ax.set_title(f'{test} UNSEEN DATA - {ax.get_title()}')
-
-    # plt.show(block=True)
+        # %% PLOT LATENT SPACE
+        # ---------------------------------------------------------------------
+        fig, ax = vae.plot_latent_space()
