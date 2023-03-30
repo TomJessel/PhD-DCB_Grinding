@@ -165,6 +165,9 @@ class RMS:
             self.data = self._process_exp(path)
 
 
+# TODO add method to plot history of loss and val_loss
+# TODO change use of train data to be jsut a list of indices from the split \
+#       so that the data only needs to be saved once.
 class AutoEncoder():
     def __init__(
         self,
@@ -234,31 +237,34 @@ class AutoEncoder():
 
         print(f'\tTraining Data: {self._train_slice}')
         data = self.data.values.T
-        train_data = data[self._train_slice]
+
+        # get indices of training data
+        ind_tr = np.arange(len(data))[self._train_slice]        
 
         self.scaler = MinMaxScaler(feature_range=(0, 1))
 
         if self.random_state is None:
-            x_train, x_test = train_test_split(train_data,
-                                               test_size=val_frac,)
+            ind_tr, ind_val = train_test_split(
+                ind_tr,
+                test_size=val_frac,
+            )
         else:
-            x_train, x_test = train_test_split(train_data,
-                                               test_size=val_frac,
-                                               random_state=self.random_state,)
+            ind_tr, ind_val = train_test_split(
+                ind_tr,
+                test_size=val_frac,
+                random_state=self.random_state,
+            )
 
-        print(f'\tInput train shape: {x_train.shape}')
-        print(f'\tInput val shape: {x_test.shape}')
+        print(f'\tInput train shape: {data[ind_tr].shape}')
+        print(f'\tInput val shape: {data[ind_val].shape}')
 
-        self.scaler.fit(x_train)
-        x_train = self.scaler.transform(x_train)
-        x_test = self.scaler.transform(x_test)
-
-        # scale self.data to be used for predictions
+        # fit scaler to training data and transform all data
+        self.scaler.fit(data[ind_tr])
         self.data = self.scaler.transform(data)
 
-        self._n_inputs = x_train.shape[1]
-        self.train_data = x_train
-        self.val_data = x_test
+        self._n_inputs = data[ind_tr].shape[1]
+        self._ind_tr = ind_tr
+        self._ind_val = ind_val
 
     @staticmethod
     def get_autoencoder(
@@ -609,8 +615,6 @@ class _VariationalAutoEncoder(Model):
         self.add_loss(vae_loss)
         return out_decoder
 
-# TODO set it up so VAE class is subclass of AUTOE class
-
 
 class VariationalAutoEncoder(AutoEncoder):
     def __init__(
@@ -779,9 +783,29 @@ if __name__ == '__main__':
     print()
 
     for test in exps:
-        
+
+        autoe = AutoEncoder(rms[test],
+                            random_state=1,
+                            train_slice=(0, 100),
+                            tb=False,
+                            tb_logdir=rms[test].exp_name + '/neurons',
+                            params={'n_bottleneck': 10,
+                                    'n_size': [64, 64],
+                                    'epochs': 500,
+                                    'loss': 'mse',
+                                    'batch_size': 10,
+                                    # 'activity_regularizer': None,
+                                    }
+                            )
+
+        # autoe.fit(
+        #     x=autoe.train_data,
+        #     val_data=autoe.val_data,
+        #     verbose=0,
+        # )
+
         vae = VariationalAutoEncoder(rms[test],
-                                     tb=True,
+                                     tb=False,
                                      tb_logdir=rms[test].exp_name,
                                      train_slice=(0, 100),
                                      random_state=1,
@@ -792,11 +816,10 @@ if __name__ == '__main__':
                                              }
                                      )
 
-        vae.fit(x=vae.train_data,
-                val_data=vae.val_data,
+        vae.fit(x=vae.data[vae._ind_tr],
+                val_data=vae.data[vae._ind_val],
                 verbose=0,
                 )
-
 
         # %% MODEL SUMMARY
         # ---------------------------------------------------------------------
@@ -807,9 +830,9 @@ if __name__ == '__main__':
         # %% SCORE THE MODEL ON TRAINING, VALIDATION AND ALL DATA
         # ---------------------------------------------------------------------
         print('\nTraining Scores:')
-        pred_tr, scores_tr = vae.score(vae.train_data)
+        pred_tr, scores_tr = vae.score(vae.data[vae._ind_tr])
         print('\nValidation Scores:')
-        pred_val, scores_val = vae.score(vae.val_data)
+        pred_val, scores_val = vae.score(vae.data[vae._ind_val])
         print('\nWhole Dataset Scores:')
         pred_data, scores_data = vae.score(vae.data)
 
