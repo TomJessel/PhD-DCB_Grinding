@@ -196,7 +196,7 @@ class AutoEncoder():
         self._train_slice = np.s_[train_slice[0]:train_slice[1]]
         self.random_state = random_state
         self._tb = tb
-        self._tb_logdir = tb_logdir
+        self._tb_logdir = TB_DIR.joinpath('AUTOE', tb_logdir)
 
         if params is None:
             params = {}
@@ -796,6 +796,7 @@ if __name__ == '__main__':
                 val_data=vae.val_data,
                 verbose=0,
                 )
+
 
         # %% MODEL SUMMARY
         # ---------------------------------------------------------------------
