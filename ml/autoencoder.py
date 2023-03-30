@@ -9,8 +9,6 @@
 """
 # %%
 import os
-
-import mplcursors
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from textwrap import dedent
 from typing import Any, Union
@@ -19,6 +17,7 @@ import matplotlib as mpl
 # mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib import transforms
+import mplcursors
 import pandas as pd
 from collections import defaultdict
 import numpy as np
@@ -850,5 +849,3 @@ if __name__ == '__main__':
         # %% PLOT LATENT SPACE
         # ---------------------------------------------------------------------
         fig, ax = vae.plot_latent_space()
-
-# %%
