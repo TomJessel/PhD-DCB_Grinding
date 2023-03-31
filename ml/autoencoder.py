@@ -19,7 +19,6 @@ import matplotlib.pyplot as plt
 from matplotlib import transforms
 import mplcursors
 import pandas as pd
-from collections import defaultdict
 import numpy as np
 from tqdm.auto import tqdm
 import multiprocessing as mp
@@ -1068,26 +1067,7 @@ if __name__ == '__main__':
 
         # %% CALC CUTOFFS
         # ---------------------------------------------------------------------
-        def calc_cutoff(scores):
-
-            sc = defaultdict(list)
-
-            for score in scores:
-                for key, score in score.items():
-                    sc[key].extend(score)
-
-            cutoffs = {}
-            for key, score in sc.items():
-                # check if the scores should be trying to inc or dec
-                if key == 'r2':
-                    cutoffs[key] = np.mean(score) - np.std(score)
-                else:
-                    cutoffs[key] = np.mean(score) + np.std(score)
-                print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
-            return cutoffs
-        
-        print('\nCutoffs:')
-        thresholds = calc_cutoff([scores_tr, scores_val])
+        vae.thres
 
         # %% PLOT SCORES ON SCATTER
         # ---------------------------------------------------------------------
