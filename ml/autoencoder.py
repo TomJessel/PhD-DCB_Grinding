@@ -14,7 +14,7 @@ from textwrap import dedent
 from typing import Any, Union
 import tensorflow as tf
 import matplotlib as mpl
-# mpl.use('TkAgg')
+mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib import transforms
 import mplcursors
@@ -205,7 +205,9 @@ class AutoEncoder():
             params = {}
         self.params = params
 
+        # pre-process data and get the train and val indices
         self.pre_process()
+
         self.model = self.initialise_model(**self.params)
         print(f'\n{self.run_name}')
         # self.model.initialize(X=self.train_data)
@@ -231,15 +233,11 @@ class AutoEncoder():
         """
         print('Pre-Processing Data:')
 
-        # First split off Test data based on slice from self._train_slice
-        # to let the model only be trained ona  portion of the data.
-        # i.e. first 100 cuts
-
         print(f'\tTraining Data: {self._train_slice}')
         data = self.data.values.T
 
         # get indices of training data
-        ind_tr = np.arange(len(data))[self._train_slice]        
+        ind_tr = np.arange(len(data))[self._train_slice]
 
         self.scaler = MinMaxScaler(feature_range=(0, 1))
 
@@ -265,6 +263,28 @@ class AutoEncoder():
         self._n_inputs = data[ind_tr].shape[1]
         self._ind_tr = ind_tr
         self._ind_val = ind_val
+
+    @property
+    def train_data(self):
+        """
+        Return the training data.
+        """
+        try:
+            return self.data[self._ind_tr]
+        except AttributeError:
+            print('Data not pre-processed yet!')
+            return None
+    
+    @property
+    def val_data(self):
+        """
+        Return the validation data.
+        """
+        try:
+            return self.data[self._ind_val]
+        except AttributeError:
+            print('Data not pre-processed yet!')
+            return None
 
     @staticmethod
     def get_autoencoder(
@@ -784,19 +804,19 @@ if __name__ == '__main__':
 
     for test in exps:
 
-        autoe = AutoEncoder(rms[test],
-                            random_state=1,
-                            train_slice=(0, 100),
-                            tb=False,
-                            tb_logdir=rms[test].exp_name + '/neurons',
-                            params={'n_bottleneck': 10,
-                                    'n_size': [64, 64],
-                                    'epochs': 500,
-                                    'loss': 'mse',
-                                    'batch_size': 10,
-                                    # 'activity_regularizer': None,
-                                    }
-                            )
+        # autoe = AutoEncoder(rms[test],
+        #                     random_state=1,
+        #                     train_slice=(0, 100),
+        #                     tb=False,
+        #                     tb_logdir=rms[test].exp_name + '/neurons',
+        #                     params={'n_bottleneck': 10,
+        #                             'n_size': [64, 64],
+        #                             'epochs': 500,
+        #                             'loss': 'mse',
+        #                             'batch_size': 10,
+        #                             # 'activity_regularizer': None,
+        #                             }
+        #                     )
 
         # autoe.fit(
         #     x=autoe.train_data,
@@ -816,8 +836,8 @@ if __name__ == '__main__':
                                              }
                                      )
 
-        vae.fit(x=vae.data[vae._ind_tr],
-                val_data=vae.data[vae._ind_val],
+        vae.fit(x=vae.train_data,
+                val_data=vae.val_data,
                 verbose=0,
                 )
 
@@ -830,9 +850,9 @@ if __name__ == '__main__':
         # %% SCORE THE MODEL ON TRAINING, VALIDATION AND ALL DATA
         # ---------------------------------------------------------------------
         print('\nTraining Scores:')
-        pred_tr, scores_tr = vae.score(vae.data[vae._ind_tr])
+        pred_tr, scores_tr = vae.score(vae.train_data)
         print('\nValidation Scores:')
-        pred_val, scores_val = vae.score(vae.data[vae._ind_val])
+        pred_val, scores_val = vae.score(vae.val_data)
         print('\nWhole Dataset Scores:')
         pred_data, scores_data = vae.score(vae.data)
 
