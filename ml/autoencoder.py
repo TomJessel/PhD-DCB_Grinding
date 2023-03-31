@@ -849,7 +849,7 @@ class VariationalAutoEncoder(AutoEncoder):
         
         self._tb_logdir = TB_DIR.joinpath('VAE', self._tb_logdir)
 
-        layers = n_size + [latent_dim] + n_size[::-1]
+        layers = n_size + ['Z'] + n_size[::-1]
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         self.run_name = f'VAE-{self.RMS.exp_name}-E-{epochs}-L-{layers}-T-{t}'
 
@@ -939,7 +939,7 @@ class VariationalAutoEncoder(AutoEncoder):
         if plot_fig:
             fig, ax = plt.subplots()
             ax.plot(gen.T)
-            ax.set_title(f'Generated input from latent space - Z({z})')
+            ax.set_title(f'Generated input - Z({z[0]:.3f}, {z[1]:.3f})')
             return gen, fig, ax
         return gen
     
@@ -954,9 +954,17 @@ class VariationalAutoEncoder(AutoEncoder):
             fig (plt.figure): Figure object.
             ax (plt.axes): Axes object.
         """
+        def onclick(event):
+            if event.dblclick:
+                if event.button == 1:
+                    self.generate(z=[event.xdata, event.ydata])
+                    plt.show()
+
         encoded = self.model.model_.encoder.predict(self.data, verbose=0)
         z_mean, z_log_sigma, _ = encoded
         
+        labels = [f'Cut {i}' for i in range(len(self.data))]
+
         fig, ax = plt.subplots()
         s = ax.scatter(z_mean[:, 0], z_mean[:, 1],
                        c=range(len(z_mean[:, 0])),
@@ -965,13 +973,20 @@ class VariationalAutoEncoder(AutoEncoder):
         ax.set_title('Latent space')
         cbar = plt.colorbar(s)
         cbar.set_label('Cut No.')
+        mplcursors.cursor(ax, highlight=True, hover=2).connect(
+            "add", lambda sel: sel.annotation.set_text(
+                f'{labels[sel.index]}' +
+                f' MSE: {self.scores["mse"][sel.index]:.5f}'
+            )
+        )
+        fig.canvas.mpl_connect('button_press_event', onclick)
         return fig, ax
 
 
 if __name__ == '__main__':
 
     # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
-    exps = ['Test 8']
+    exps = ['Test 7']
 
     rms = {}
     for test in exps:
@@ -984,7 +999,7 @@ if __name__ == '__main__':
     print()
 
     for test in exps:
-
+        '''
         # autoe = AutoEncoder(rms[test],
         #                     random_state=1,
         #                     train_slice=(0, 100),
@@ -1004,6 +1019,7 @@ if __name__ == '__main__':
         #     val_data=autoe.val_data,
         #     verbose=0,
         # )
+        '''
 
         vae = VariationalAutoEncoder(rms[test],
                                      tb=False,
@@ -1030,8 +1046,8 @@ if __name__ == '__main__':
         # %% MODEL SUMMARY
         # ---------------------------------------------------------------------
         vae.model.model_.summary()
-        vae.model.model_.encoder.summary()
-        vae.model.model_.decoder.summary()
+        # vae.model.model_.encoder.summary()
+        # vae.model.model_.decoder.summary()
 
         # %% SCORE THE MODEL ON TRAINING, VALIDATION AND ALL DATA
         # ---------------------------------------------------------------------
@@ -1084,3 +1100,5 @@ if __name__ == '__main__':
         # %% PLOT LATENT SPACE
         # ---------------------------------------------------------------------
         fig, ax = vae.plot_latent_space()
+
+        plt.show()
