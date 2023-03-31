@@ -165,9 +165,6 @@ class RMS:
             self.data = self._process_exp(path)
 
 
-# TODO add method to plot history of loss and val_loss
-# TODO change use of train data to be jsut a list of indices from the split \
-#       so that the data only needs to be saved once.
 class AutoEncoder():
     def __init__(
         self,
@@ -287,7 +284,7 @@ class AutoEncoder():
             return None
 
     @staticmethod
-    def get_autoencoder(
+    def _get_autoencoder(
         n_inputs: int,
         n_bottleneck: int,
         n_size: list[int],
@@ -431,7 +428,7 @@ class AutoEncoder():
                 )
 
         model = BaseWrapper(
-            model=self.get_autoencoder,
+            model=self._get_autoencoder,
             model__n_inputs=self._n_inputs,
             model__n_bottleneck=n_bottleneck,
             model__n_size=n_size,
@@ -569,6 +566,24 @@ class AutoEncoder():
         ax.plot(x_pred.T, label='Predicition')
         ax.legend()
         ax.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
+        return fig, ax
+
+    def loss_plot(self):
+        """
+        Plot the loss and validation loss over epochs.
+
+        Returns:
+            fig, ax: Matplotlib figure and axis.
+        """
+        if hasattr(self.model, 'history_') is False:
+            raise ValueError('Model has not been fit yet.')
+
+        fig, ax = plt.subplots()
+        ax.plot(self.model.history_['loss'], label='loss')
+        ax.plot(self.model.history_['val_loss'], label='val_loss')
+        ax.legend()
+        ax.set_xlabel('Epochs')
+        ax.set_ylabel('Loss')
         return fig, ax
 
 
@@ -839,7 +854,12 @@ if __name__ == '__main__':
         vae.fit(x=vae.train_data,
                 val_data=vae.val_data,
                 verbose=0,
+                use_multiprocessing=True,
                 )
+
+        # %% PLOT LOSS
+        # ---------------------------------------------------------------------
+        vae.loss_plot()
 
         # %% MODEL SUMMARY
         # ---------------------------------------------------------------------
