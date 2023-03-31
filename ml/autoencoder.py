@@ -198,6 +198,10 @@ class AutoEncoder():
         self._tb = tb
         self._tb_logdir = TB_DIR.joinpath('AUTOE', tb_logdir)
 
+        # attributes to be set later for predictionsi and scores on whole data
+        self.pred = None
+        self.scores = None
+
         if params is None:
             params = {}
         self.params = params
@@ -474,18 +478,20 @@ class AutoEncoder():
 
     def score(
             self,
-            x: np.ndarray,
+            label: str = None,
+            x: np.ndarray = None,
             tb: bool = True,
             print_score: bool = True,
     ) -> tuple[tuple[np.ndarray, np.ndarray], dict]:
         """
         Score the model on the inputted data.
 
-        Scores the model based on predictions made from the input data, will
-        also log to tensorboard if the self._tb flag is set to True, and
-        print to the console if the print_score flag is set to True.
+        Predicts the model on the inputted data and calculates the scores,
+        as well as doing it for all the initiliased dataset.
 
         Args:
+            label (str, optional): Label of the data to score the model on \
+                (train, val, dataset).
             x (np.ndarray): Input data to score the model on.
             tb (bool, optional): Log to tensorboard. Defaults to True.
             print_score (bool, optional): Print the scores. Defaults to True.
@@ -495,13 +501,50 @@ class AutoEncoder():
               prediction) and a dictionary of scores.
 
         """
-        pred = self.model.predict(x, verbose=0)
 
-        mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
-        mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
-        r2 = r2_score(x.T, pred.T, multioutput='raw_values')
+        label_hash = {
+            'train': self._ind_tr,
+            'val': self._ind_val,
+            'dataset': np.arange(self.data.shape[0]),
+        }
 
-        scores = {'mae': mae, 'mse': mse, 'r2': r2}
+        if x is None and label is None:
+            raise ValueError('Must provide either x or label for scoring.')
+        elif x is not None and label is not None:
+            raise ValueError('Cannot provide both x and label for scoring.')
+
+        if self.pred is None:
+            pred = self.model.predict(self.data, verbose=0)
+            self.pred = pred
+
+        if self.scores is None:
+            mae = mean_absolute_error(self.data.T,
+                                      self.pred.T,
+                                      multioutput='raw_values',
+                                      )
+            mse = mean_squared_error(self.data.T,
+                                     self.pred.T,
+                                     multioutput='raw_values',
+                                     )
+            r2 = r2_score(self.data.T,
+                          self.pred.T,
+                          multioutput='raw_values',
+                          )
+            self.scores = {'mae': mae, 'mse': mse, 'r2': r2}
+
+        if x is not None:
+            pred = self.model.predict(x, verbose=0)
+            mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
+            mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
+            r2 = r2_score(x.T, pred.T, multioutput='raw_values')
+            scores = {'mae': mae, 'mse': mse, 'r2': r2}
+
+        if label is not None and label in label_hash.keys():
+            x = self.data[label_hash[label]]
+            pred = self.pred[label_hash[label]]
+            scores = {k: v[label_hash[label]] for k, v in self.scores.items()}
+        elif label is not None and label not in label_hash.keys():
+            raise KeyError(f'Label {label} not found in label_hash.')
 
         if self._tb and tb:
             tb_writer = tf.summary.create_file_writer(
@@ -536,9 +579,13 @@ class AutoEncoder():
                 )
 
         if print_score:
-            print(f'\tMAE: {np.mean(mae):.5f}')
-            print(f'\tMSE: {np.mean(mse):.5f}')
-            print(f'\tR2: {np.mean(r2):.5f}')
+            if label is not None:
+                print(f'\n{label.capitalize()} Scores:')
+            else:
+                print('\nScores:')
+            print(f'\tMAE: {np.mean(scores["mae"]):.5f}')
+            print(f'\tMSE: {np.mean(scores["mse"]):.5f}')
+            print(f'\tR2: {np.mean(scores["r2"]):.5f}')
         return (x, pred), scores
 
     def pred_plot(self, input: tuple, no: int):
@@ -584,6 +631,31 @@ class AutoEncoder():
         ax.legend()
         ax.set_xlabel('Epochs')
         ax.set_ylabel('Loss')
+        return fig, ax
+
+    def hist_scores(self, metrics: list = None):
+        """
+        Plot histograms of the scores from the training and validation data.
+
+        Args:
+            metrics (list): List of metrics to plot. Default is all.
+        
+        Returns:
+            fig, ax: Matplotlib figure and axis.
+        """
+        if self.scores is None:
+            self.score('dataset', print_score=False)
+
+        if metrics is None:
+            metrics = ['mae', 'mse', 'r2']
+
+        fig, ax = plt.subplots(len(metrics), 1, squeeze=False)
+        for i, metric in enumerate(metrics):
+            ax[i, 0].hist(self.scores[metric][self._train_slice],
+                          bins=40, label=metric)
+            ax[i, 0].legend()
+            ax[i, 0].set_xlabel(f'{metric.upper()} score')
+            ax[i, 0].set_ylabel('Frequency')
         return fig, ax
 
 
@@ -869,12 +941,13 @@ if __name__ == '__main__':
 
         # %% SCORE THE MODEL ON TRAINING, VALIDATION AND ALL DATA
         # ---------------------------------------------------------------------
-        print('\nTraining Scores:')
-        pred_tr, scores_tr = vae.score(vae.train_data)
-        print('\nValidation Scores:')
-        pred_val, scores_val = vae.score(vae.val_data)
-        print('\nWhole Dataset Scores:')
-        pred_data, scores_data = vae.score(vae.data)
+        pred_tr, scores_tr = vae.score('train')
+        pred_val, scores_val = vae.score('val')
+        pred_data, scores_data = vae.score('dataset')
+
+        # %% HISTOGRAM OF SCORES
+        # ---------------------------------------------------------------------
+        fig, ax = vae.hist_scores(['mse'])
 
         # %% PLOT PREDICTIONS
         # ---------------------------------------------------------------------
