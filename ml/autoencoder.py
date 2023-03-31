@@ -622,7 +622,7 @@ class AutoEncoder():
             print(f'\tR2: {np.mean(scores["r2"]):.5f}')
         return (x, pred), scores
 
-    def pred_plot(self, input: tuple, no: int):
+    def pred_plot(self, no: int, input: tuple = None):
         """
         Plot prediction vs real data for a given cut.
 
@@ -633,8 +633,12 @@ class AutoEncoder():
         Returns:
             fig, ax: Matplotlib figure and axis.
         """
-        pred_input = input[0][no, :].reshape(-1, self._n_inputs)
-        x_pred = input[1][no, :].reshape(-1, self._n_inputs)
+        if input is not None:
+            pred_input = input[0][no, :].reshape(-1, self._n_inputs)
+            x_pred = input[1][no, :].reshape(-1, self._n_inputs)
+        else:
+            pred_input = self.data[no, :].reshape(-1, self._n_inputs)
+            x_pred = self.pred[no, :].reshape(-1, self._n_inputs)
 
         pred_input = self.scaler.inverse_transform(pred_input)
         x_pred = self.scaler.inverse_transform(x_pred)
@@ -690,6 +694,62 @@ class AutoEncoder():
             ax[i, 0].legend()
             ax[i, 0].set_xlabel(f'{metric.upper()} score')
             ax[i, 0].set_ylabel('Frequency')
+        return fig, ax
+
+    def scatter_scores(self, metrics: list = None):
+        """
+        Plot scatter plots of the scores from the training and validation data.
+
+        Args:
+            metrics (list): List of metrics to plot. Default is all.
+        
+        Returns:
+            fig, ax: Matplotlib figure and axis.
+        """
+
+        def onclick(event):
+            if event.dblclick:
+                x = round(event.xdata)
+                fig, ax = self.pred_plot(x)
+                ax.set_title(f'Cut {x} {ax.get_title()}')
+                plt.show()
+
+        if self.scores is None:
+            self.score('dataset', print_score=False)
+
+        if metrics is None:
+            metrics = self.scores.keys()
+
+        if hasattr(self, "thres") is False:
+            self.thres
+        
+        for i, metric in enumerate(metrics):
+            fig, ax = plt.subplots()
+            ax.axhline(self.thres[metric], color='r', linestyle='--')
+            if metric == 'r2':
+                cmap = ['b' if y > self.thres[metric] else 'r'
+                        for y in self.scores[metric]]
+            else:
+                cmap = ['r' if y > self.thres[metric] else 'b'
+                        for y in self.scores[metric]]
+
+            ax.scatter(x=range(len(self.scores[metric])),
+                       y=self.scores[metric],
+                       s=2,
+                       label=metric,
+                       c=cmap
+                       )
+            trans = transforms.blended_transform_factory(
+                ax.get_yticklabels()[0].get_transform(), ax.transData)
+            ax.text(0, self.thres[metric], f'{self.thres[metric]:.3f}',
+                    color="red",
+                    transform=trans,
+                    ha="right",
+                    va="center"
+                    )
+            ax.set_xlabel('Cut number')
+            ax.set_ylabel(f'{metric.upper()} score')
+            fig.canvas.mpl_connect('button_press_event', onclick)
         return fig, ax
 
 
@@ -985,9 +1045,9 @@ if __name__ == '__main__':
 
         # %% PLOT PREDICTIONS
         # ---------------------------------------------------------------------
-        fig, ax = vae.pred_plot(pred_tr, 0)
+        fig, ax = vae.pred_plot(vae._ind_tr[0])
         ax.set_title(f'{vae.RMS.exp_name} Training Data - {ax.get_title()}')
-        fig, ax = vae.pred_plot(pred_val, 0)
+        fig, ax = vae.pred_plot(vae._ind_val[0])
         ax.set_title(f'{vae.RMS.exp_name} Val Data - {ax.get_title()}')
 
         # %% CALC CUTOFFS
@@ -1012,6 +1072,10 @@ if __name__ == '__main__':
         
         print('\nCutoffs:')
         thresholds = calc_cutoff([scores_tr, scores_val])
+
+        # %% PLOT SCORES ON SCATTER
+        # ---------------------------------------------------------------------
+        fig, ax = vae.scatter_scores()
 
         # %% GENERATE NEW DATA
         # ---------------------------------------------------------------------
