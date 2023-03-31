@@ -197,6 +197,7 @@ class AutoEncoder():
         self.random_state = random_state
         self._tb = tb
         self._tb_logdir = TB_DIR.joinpath('AUTOE', tb_logdir)
+        self._thres = None
 
         # attributes to be set later for predictionsi and scores on whole data
         self.pred = None
@@ -286,6 +287,39 @@ class AutoEncoder():
         except AttributeError:
             print('Data not pre-processed yet!')
             return None
+
+    @property
+    def thres(self):
+        """
+        Return the threshold values for the scores. Calculated if not already.
+        """
+        if self._thres is None:
+            self._thres = self._get_cutoffs()
+        return self._thres
+
+    def _get_cutoffs(self):
+        """
+        Method to get the cutoff values from the training slice scores
+
+        Returns:
+            cutoffs (dict): Dictionary of cutoff values for each score.
+        """
+        try:
+            sc = {k: v[self._train_slice] for k, v in self.scores.items()}
+        except AttributeError:
+            print('Scores not calculated yet! Score then re-run.')
+            return None
+
+        cutoffs = {}
+        print('\nCutoffs:')
+        for key, score in sc.items():
+            # check if the scores should be trying to inc or dec
+            if key == 'r2':
+                cutoffs[key] = np.mean(score) - np.std(score)
+            else:
+                cutoffs[key] = np.mean(score) + np.std(score)
+            print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
+        return cutoffs
 
     @staticmethod
     def _get_autoencoder(
