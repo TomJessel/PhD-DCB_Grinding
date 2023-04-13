@@ -441,7 +441,6 @@ class AE:
         ax.set_xticklabels(xticks_labels)
         return fig
 
-
     def rolling_rms(self, fno: Union[int, tuple], plot_fig: bool = True) -> \
             Union[np.ndarray, None]:
         """
@@ -561,11 +560,19 @@ class AE:
         fig, ax = plt.subplots()
         ax.plot(t, sig, linewidth=1)
         ax.axhline(triggers['trig y-val'], color='r', linewidth=1, alpha=0.5)
-        ax.axvline(triggers['trig st'] * ts, color='r', linewidth=1, alpha=0.5)
-        ax.axvline(triggers['trig end'] * ts, color='r', linewidth=1, alpha=0.5)
+        ax.axvline(triggers['trig st'] * ts,
+                   color='r', linewidth=1.5, alpha=0.5, linestyle='--')
+        ax.axvline(triggers['trig end'] * ts,
+                   color='r', linewidth=1.5, alpha=0.5, linestyle='--')
         ax.set_title(filename)
         ax.autoscale(enable=True, axis='x', tight=True)
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Voltage (V)')
         fig.show()
         return fig
+
+
+if __name__ == '__main__':
+    import resources
+    exp = resources.load('Test 8')
+    exp.ae.plot_triggers(10)
