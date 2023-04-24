@@ -95,7 +95,7 @@ def trigger_st(
         d: Union[np.ndarray, list],
         chunk_size: int = 100_000,
         diff_change: float = 1.75E-6,
-) -> List[int, float]:
+) -> List[Union[int, float]]:
     """
     Find the index of the first trigger point based on change in gradient over\
      a chunk size.
@@ -379,7 +379,7 @@ class AE:
         # print(f'Completed File {fno}...')
         return k, r, a, sk
 
-    def _triggers(self, fno: int) -> List[int, int, float]:
+    def _triggers(self, fno: int) -> List[Union[int, float]]:
         """
         Compute the start and end trigger indicies, as well as the y-value at\
             those points.
