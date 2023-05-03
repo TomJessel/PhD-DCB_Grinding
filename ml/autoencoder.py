@@ -16,7 +16,7 @@ import tensorflow as tf
 # import matplotlib as mpl
 # mpl.use('TkAgg')
 import matplotlib.pyplot as plt
-from matplotlib import transforms
+# from matplotlib import transforms
 import mplcursors
 import pandas as pd
 import numpy as np
@@ -695,7 +695,7 @@ class AutoEncoder():
             ax[i, 0].set_ylabel('Frequency')
         return fig, ax
 
-    def scatter_scores(self, metrics: list = None):
+    def scatter_scores(self, metrics: list = None, plt_ax=None):
         """
         Plot scatter plots of the scores from the training and validation data.
 
@@ -721,10 +721,21 @@ class AutoEncoder():
 
         if hasattr(self, "thres") is False:
             self.thres
-        
+
+        if plt_ax is None:
+            fig, ax = plt.subplots(len(metrics), 1,
+                                   figsize=(7.5, 5),
+                                   sharex=True
+                                   )
+            try:
+                ax = ax.ravel()
+            except AttributeError:
+                ax = [ax]
+        else:
+            ax = [plt_ax]
+
         for i, metric in enumerate(metrics):
-            fig, ax = plt.subplots()
-            ax.axhline(self.thres[metric], color='r', linestyle='--')
+            ax[i].axhline(self.thres[metric], color='r', linestyle='--')
             if metric == 'r2':
                 cmap = ['b' if y > self.thres[metric] else 'r'
                         for y in self.scores[metric]]
@@ -732,23 +743,28 @@ class AutoEncoder():
                 cmap = ['r' if y > self.thres[metric] else 'b'
                         for y in self.scores[metric]]
 
-            ax.scatter(x=range(len(self.scores[metric])),
-                       y=self.scores[metric],
-                       s=2,
-                       label=metric,
-                       c=cmap
-                       )
-            trans = transforms.blended_transform_factory(
-                ax.get_yticklabels()[0].get_transform(), ax.transData)
-            ax.text(0, self.thres[metric], f'{self.thres[metric]:.3f}',
-                    color="red",
-                    transform=trans,
-                    ha="right",
-                    va="center"
-                    )
-            ax.set_xlabel('Cut number')
-            ax.set_ylabel(f'{metric.upper()} score')
+            ax[i].scatter(x=range(len(self.scores[metric])),
+                          y=self.scores[metric],
+                          s=2,
+                          label=metric,
+                          c=cmap
+                          )
+            # trans = transforms.blended_transform_factory(
+            #     ax[i].get_yticklabels()[0].get_transform(), ax[i].transData)
+            # ax[i].text(0, self.thres[metric], f'{self.thres[metric]:.3f}',
+            #            color="red",
+            #            transform=trans,
+            #            ha="right",
+            #            va="center"
+            #            )
+            ax[i].set_ylabel(f'{metric.upper()} score')
+        ax[-1].set_xlabel('Cut number')
+        
+        try:
             fig.canvas.mpl_connect('button_press_event', onclick)
+        except UnboundLocalError:
+            return ax
+
         return fig, ax
 
 
@@ -1081,4 +1097,4 @@ if __name__ == '__main__':
         # ---------------------------------------------------------------------
         fig, ax = vae.plot_latent_space()
 
-        plt.show()
+        plt.show(block=True)
