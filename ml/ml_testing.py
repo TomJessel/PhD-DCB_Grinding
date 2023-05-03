@@ -11,7 +11,8 @@ tf.get_logger().setLevel('ERROR')
 import multiprocessing
 __spec__ = None
 
-def pred_plot(y: np.ndarray, y_pred: np.ndarray, title:str = ''):
+
+def pred_plot(y: np.ndarray, y_pred: np.ndarray, title: str = ''):
     fig, ax = plt.subplots(1, 2)
     ax[0].scatter(y, y_pred)
 
@@ -21,7 +22,6 @@ def pred_plot(y: np.ndarray, y_pred: np.ndarray, title:str = ''):
     # xmax = 0.68
     # xmin = 0.6
     
-
     # ax[0].set_xlim([xmin, xmax])
     # ax[0].set_ylim([xmin, xmax])
 
@@ -34,17 +34,18 @@ def pred_plot(y: np.ndarray, y_pred: np.ndarray, title:str = ''):
     ax[0].set_aspect('equal')
     ax[0].set_xlabel('Actual Y / mm')
     ax[0].set_ylabel('Predicted Y /mm')
-    ax[0].set_title(f'{title} - Predictions');
+    ax[0].set_title(f'{title} - Predictions')
     
-    diff = (y - y_pred)*1000
+    diff = (y - y_pred) * 1000
 
     ax[1].hist(diff, bins=30)
     ax[1].set_xlabel('Prediction Error / um')
     ax[1].set_ylabel('No Occurances')
-    ax[1].set_title(f'{title} - Histogram');
+    ax[1].set_title(f'{title} - Histogram')
 
     fig.tight_layout()
     fig.show()
+
 
 if __name__ == "__main__":
     try:
@@ -116,10 +117,10 @@ if __name__ == "__main__":
                                   },
                           )
 
-    #lstm_reg.cv(n_splits=10)
+    # lstm_reg.cv(n_splits=10)
     lstm_reg.fit(validation_split=0.2, verbose=0)
     lstm_reg.score(plot_fig=False)
 
-    y =lstm_reg.val_data[1]
-    y_pred =lstm_reg.model.predict(lstm_reg.val_data[0], verbose=0)
+    y = lstm_reg.val_data[1]
+    y_pred = lstm_reg.model.predict(lstm_reg.val_data[0], verbose=0)
     pred_plot(y, y_pred, 'LSTM')
