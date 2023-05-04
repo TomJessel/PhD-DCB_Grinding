@@ -653,7 +653,7 @@ class AutoEncoder():
         ax.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
         return fig, ax
 
-    def loss_plot(self):
+    def loss_plot(self, plt_ax=None):
         """
         Plot the loss and validation loss over epochs.
 
@@ -663,13 +663,20 @@ class AutoEncoder():
         if hasattr(self.model, 'history_') is False:
             raise ValueError('Model has not been fit yet.')
 
-        fig, ax = plt.subplots()
+        if plt_ax is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = plt_ax
+
         ax.plot(self.model.history_['loss'], label='loss')
         ax.plot(self.model.history_['val_loss'], label='val_loss')
         ax.legend()
         ax.set_xlabel('Epochs')
         ax.set_ylabel('Loss')
-        return fig, ax
+        if plt_ax is None:
+            return fig, ax
+        else:
+            return ax
 
     def hist_scores(self, metrics: list = None):
         """
