@@ -173,6 +173,7 @@ class AutoEncoder():
         params: dict = None,
         train_slice=(0, 100),
         random_state=None,
+        val_frac: float = 0.1,
     ):
         """
         AuotoEncoder class.
@@ -198,7 +199,7 @@ class AutoEncoder():
         self._tb_logdir = TB_DIR.joinpath('AUTOE', tb_logdir)
         self._thres = None
 
-        # attributes to be set later for predictionsi and scores on whole data
+        # attributes to be set later for predictions and scores on whole data
         self.pred = None
         self.scores = None
 
@@ -207,7 +208,7 @@ class AutoEncoder():
         self.params = params
 
         # pre-process data and get the train and val indices
-        self.pre_process()
+        self.pre_process(val_frac=val_frac)
 
         self.model = self.initialise_model(**self.params)
         print(f'\n{self.run_name}')
