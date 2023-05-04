@@ -622,7 +622,7 @@ class AutoEncoder():
             print(f'\tR2: {np.mean(scores["r2"]):.5f}')
         return (x, pred), scores
 
-    def pred_plot(self, no: int, input: tuple = None):
+    def pred_plot(self, no: int, input: tuple = None, plt_ax=None):
         """
         Plot prediction vs real data for a given cut.
 
@@ -646,12 +646,18 @@ class AutoEncoder():
         mse = mean_squared_error(pred_input, x_pred)
         mae = mean_absolute_error(pred_input, x_pred)
 
-        fig, ax = plt.subplots()
+        if plt_ax is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = plt_ax
         ax.plot(pred_input.T, label='Real')
         ax.plot(x_pred.T, label='Predicition')
         ax.legend()
         ax.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
-        return fig, ax
+        if plt_ax is None:
+            return fig, ax
+        else:
+            return ax
 
     def loss_plot(self, plt_ax=None):
         """
