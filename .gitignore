@@ -11,3 +11,4 @@ ML.log
 /.vscode/
 .ipynb_checkpoints
 *.pdf
+/models/
