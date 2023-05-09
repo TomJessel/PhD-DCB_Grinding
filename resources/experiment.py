@@ -223,8 +223,9 @@ class Experiment:
         """
         Save Experiment obj to the data location folder as a '.pickle' file.
         """
-        save_loc = f'{self.dataloc}/Test {self.test_info.testno}.pickle'
-        with open(save_loc, 'wb') as f:
+        save_path = pathlib.Path(self.dataloc.replace('\\', '/'))
+        save_path = save_path.joinpath(f'Test {self.test_info.testno}.pickle')
+        with save_path.open('wb') as f:
             pickle.dump(self, f)
 
     def update(self) -> None:
