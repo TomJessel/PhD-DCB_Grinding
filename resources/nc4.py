@@ -7,7 +7,7 @@
 
 @Modify Time      @Author    @Version    @Description
 ------------      -------    --------    -----------
-22/08/2022 13:46   tomhj      1.0         File which handles NC4 operations within experiment object
+22/08/2022 13:46   tomhj      1.0         File which handles NC4 operations
 """
 
 import os
@@ -36,10 +36,10 @@ def compute_shift(zipped: tuple[Any, Any]) -> int:
     Use fft correlation to compute the shift between two signals.
 
     Args:
-        zipped: Zipped tuple containing the signals to compare between each other.
+        zipped: Zip tuple containing the signals to compare between each other.
 
     Returns:
-        Integer representing the number of samples of shift between the signals.
+        Int representing the number of samples of shift between the signals.
     """
     x = zipped[0]
     y = zipped[1]
@@ -64,12 +64,13 @@ class NC4:
 
         Args:
             files: File loactions for each NC4 TDMS file.
-            testinfo: Test info obj, containing testing info for the experiment.
+            testinfo: Test info obj, containing test info for the experiment.
             dcb: DCB obj, containing info about the DCB used for the test.
             fs: Sample rate for the NC4 acquisition during the test.
         """
         self.theta = None
-        self.radius = pd.Series(np.nan, index=np.arange(len(files))) # todo change these to None and condition for updating to if none or [0] is none
+        self.radius = pd.Series(np.nan, index=np.arange(len(files)))
+        # todo change to None and cond for updating to if none or [0] is none
         self.form_error = pd.Series(np.nan, index=np.arange(len(files)))
         self.runout = pd.Series(np.nan, index=np.arange(len(files)))
         self.peak_radius = pd.Series(np.nan, index=np.arange(len(files)))
@@ -98,19 +99,25 @@ class NC4:
             for channel in group.channels():
                 data = channel[:]
         if not data.dtype == float:
-            data = (data.astype(np.float) * prop.get('Gain')) + prop.get('Offset')
+            data = (
+                data.astype(np.float) * prop.get('Gain')
+            ) + prop.get('Offset')
         return data
 
     def process(self) -> None:
         """
-        Function to process the NC4 data from a voltage to radius and compute useful features.
+        Function to process the NC4 data from a voltage to radius and \
+            compute features.
         """
         # print('Processing NC4 data...')
         # st1 = time.time()
         with multiprocessing.Pool() as pool:
-            results = list(tqdm(pool.imap(self._sampleandpos, range(len(self._files)), chunksize=10),
-                                total=len(self._files),
-                                desc='NC4- Sampling'))
+            results = list(tqdm(pool.imap(
+                self._sampleandpos,
+                range(len(self._files)),
+                chunksize=10),
+                total=len(self._files),
+                desc='NC4- Sampling'))
         pool.close()
         # en = time.time()
         # print(f'Sampling done {en - st1:.1f} s...')
@@ -156,14 +163,24 @@ class NC4:
             st = np.argmin(radii[0, 0:int(self._fs)])
             rpy = 4
             clip = 0.5
-            radius = radii[:, np.arange(st, st + (radii.shape[1]) / (rpy - (2 * clip)), dtype=int)]
-            mean_radius, peak_radius, runout, form_error = self._fitcircles(radius)
+            radius = radii[
+                :, np.arange(
+                    st, st + (radii.shape[1]) / (rpy - (2 * clip)), dtype=int
+                )
+            ]
+            mean_radius, peak_radius, runout, form_error = self._fitcircles(
+                radius
+            )
             return mean_radius, peak_radius, runout, form_error
 
         self.theta = 2 * np.pi * np.arange(0, 1, 1 / self._fs)
 
         if np.isnan(self.mean_radius[0]):
-            self.mean_radius[0], self.peak_radius[0], self.runout[0], self.form_error[0] = _compute_nc4(fno=0)
+            (self.mean_radius[0],
+             self.peak_radius[0],
+             self.runout[0],
+             self.form_error[0]
+             ) = _compute_nc4(fno=0)
 
         index = len(self._files) - 1
         if index > 0:
@@ -173,7 +190,8 @@ class NC4:
             self.runout[index] = runout[0]
             self.form_error[index] = form_error[0]
 
-        wear = (self.mean_radius.iloc[-1] - self.mean_radius.iloc[0]) / self.mean_radius.iloc[0] * 100
+        wear = (self.mean_radius.iloc[-1] - self.mean_radius.iloc[0])
+        wear = wear / self.mean_radius.iloc[0] * 100
 
         print('-' * 60)
         print(f'NC4 - File {index}:')
@@ -192,16 +210,25 @@ class NC4:
         dataloc = PureWindowsPath(self._testinfo.dataloc)
         path = f'{dataloc.as_posix()}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.png'
-        pic_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.pickle'
+        pic_name = f'{path}/Test {self._testinfo.testno} ' \
+                   f'- NC4 Attributes.pickle'
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
 
         fig, ax_r = plt.subplots()
-        self.mean_radius.dropna().plot(color='C0', label='Mean Radius')
-        self.peak_radius.dropna().plot(color='C1', label='Peak Radius')
+        self.mean_radius.dropna().plot(color='C0',
+                                       label='Mean Radius'
+                                       )
+        self.peak_radius.dropna().plot(color='C1',
+                                       label='Peak Radius'
+                                       )
         ax_e = ax_r.twinx()
-        self.runout.dropna().multiply(1000).plot(color='C2', label='Runout')
-        self.form_error.dropna().multiply(1000).plot(color='C3', label='Form Error')
+        self.runout.dropna().multiply(1000).plot(color='C2',
+                                                 label='Runout'
+                                                 )
+        self.form_error.dropna().multiply(1000).plot(color='C3',
+                                                     label='Form Error'
+                                                     )
 
         ax_r.set_title(f'Test No: {self._testinfo.testno} - NC4 Attributes')
         ax_r.autoscale(enable=True, axis='x', tight=True)
@@ -228,7 +255,8 @@ class NC4:
     
     def plot_xy(self, fno: tuple = None, step: int = 1) -> None:
         """
-        Plot full radius measurement around tool circumference, for a slice or all measurements.
+        Plot full radius measurement around tool circumference, \
+            for a slice or all measurements.
 
         Args:
             fno: Tuple of start and stop indices for slice of files to plot.
@@ -269,7 +297,11 @@ class NC4:
             lbl = range(len(self._files))[slice_n]
             n = 0
             for r in radius:
-                ax.plot(self.theta, r, label=f'File {lbl[n]:03.0f}', linewidth=0.5)
+                ax.plot(self.theta,
+                        r,
+                        label=f'File {lbl[n]:03.0f}',
+                        linewidth=0.5
+                        )
                 n += 1
             ax.set_xlabel('Angle (rad)')
             ax.set_ylabel('Radius (mm)')
@@ -298,7 +330,8 @@ class NC4:
         dataloc = PureWindowsPath(self._testinfo.dataloc)
         path = f'{dataloc.as_posix()}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Radius Surf.png'
-        pic_name = f'{path}/Test {self._testinfo.testno} - NC4 Radius Surf.pickle'
+        pic_name = f'{path}/Test {self._testinfo.testno} '\
+                   f'- NC4 Radius Surf.pickle'
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
         try:
@@ -313,9 +346,17 @@ class NC4:
             r = np.array(self.radius, dtype=float)
             x = np.array(self.theta, dtype=float)
             y = np.array(self._datano, dtype=float)
-            surf = ax.pcolormesh(x, y, r, cmap='jet', rasterized=True, shading='nearest')
+            surf = ax.pcolormesh(x,
+                                 y,
+                                 r,
+                                 cmap='jet',
+                                 rasterized=True,
+                                 shading='nearest'
+                                 )
             fig.colorbar(surf, label='Radius (mm)')
-            ax.set_title(f'Test No: {self._testinfo.testno} - NC4 Radius Surface')
+            ax.set_title(
+                f'Test No: {self._testinfo.testno} - NC4 Radius Surface'
+            )
             ax.set_ylabel('Measurement Number')
             ax.set_xlabel('Angle (rad)')
             try:
@@ -329,15 +370,20 @@ class NC4:
                     pickle.dump(fig, f)
         plt.show()
 
-    def _sampleandpos(self, fno: int) -> [list[float], list[float], list[float], list[float]]:
+    def _sampleandpos(
+            self,
+            fno: int
+    ) -> tuple[list, list, list, list]:
         """
-        Load in NC4 voltage data and select most appropriate section of the signal to carry forward.
+        Load in NC4 voltage data and select most appropriate section of \
+            the signal to carry forward.
 
         Args:
             fno: File number to sample from.
 
         Returns:
-            A tuple containing the signal sample and y position for both the positive and negative signal.
+            A tuple containing the signal sample and y position for both the \
+                positive and negative signal.
         """
         data = self.readNC4(fno)
         filt = 50
@@ -359,7 +405,9 @@ class NC4:
         vfilter = uniform_filter1d(data, size=filt)
         if scale == 1:
             datarange = (np.amax(vfilter), np.amin(vfilter))
-            voltage = 5 * ((vfilter - datarange[1]) / (datarange[0] - datarange[1]))
+            voltage = 5 * (
+                (vfilter - datarange[1]) / (datarange[0] - datarange[1])
+            )
         else:
             voltage = vfilter
 
@@ -367,9 +415,14 @@ class NC4:
         vsec = np.empty(shape=(nosections, seclensamples), dtype=object)
         for sno in range(nosections):
             if sno <= (nosections - 1) / 2:
-                vsec[sno][:] = voltage[(sno * seclensamples):((sno + 1) * seclensamples)]
+                vsec[sno][:] = voltage[
+                    (sno * seclensamples):((sno + 1) * seclensamples)
+                ]
             else:
-                vsec[sno][:] = voltage[((sno * seclensamples) + gapsamples):(((sno + 1) * seclensamples) + gapsamples)]
+                vsec[sno][:] = voltage[
+                    ((sno * seclensamples) + gapsamples):
+                    (((sno + 1) * seclensamples) + gapsamples)
+                ]
 
         vsample = vsec[:, vs:ve]
         voff = np.sum((vsample - 2.5) ** 2, axis=1)
@@ -394,22 +447,29 @@ class NC4:
         Returns:
             List of converting values to radius.
         """
-        pval = [-0.000341717477186167, 0.00459433449011791, -0.0237307202784755, 0.0585315537400639,
-                -0.0766338436136931, 5.15045955887124]
+        pval = [-0.000341717477186167,
+                0.00459433449011791,
+                -0.0237307202784755,
+                0.0585315537400639,
+                -0.0766338436136931,
+                5.15045955887124
+                ]
+
         d = self._dcb.diameter
         rad = np.polyval(pval, x[0]) - 5.1 + (d / 2) + x[1]
         return rad
 
-    def sigtorad(self, p: Any, n: Any) -> [list[float], list[float]]:
+    def sigtorad(self, p: Any, n: Any) -> tuple[list[float], list[float]]:
         """
         Multiprocessing function to convert signals to radius.
 
         Args:
-            p: Zipped obj containing postive NC4 signal and the y position of the signal.
-            n: Zipped obj containing negative NC4 signal and the y position of the signal.
+            p: Zip containing postive NC4 signal and the y position.
+            n: Zip containing negative NC4 signal and the y position.
 
         Returns:
-            Tuple containing a list of the converted postive signal and converted negative signal.
+            Tuple containing a list of the converted postive signal and \
+                converted negative signal.
         """
         # Converting to Radii rather then Voltage
         with multiprocessing.Pool() as pool:
@@ -423,7 +483,9 @@ class NC4:
         return prad, nrad
 
     @staticmethod
-    def _alignposneg(prad: Union[list, np.ndarray], nrad: Union[list, np.ndarray]) -> np.ndarray:
+    def _alignposneg(prad: Union[list, np.ndarray],
+                     nrad: Union[list, np.ndarray]
+                     ) -> np.ndarray:
         """
         Combine the pos and neg halfs of the signal together.
 
@@ -442,9 +504,12 @@ class NC4:
             lag = [compute_shift(radzeros[0])]
         else:
             with multiprocessing.Pool() as pool:
-                lag = list(tqdm(pool.imap(compute_shift, radzeros, chunksize=10),
-                                total=len(radzeros),
-                                desc='NC4- Merge pn'))
+                lag = list(tqdm(pool.imap(
+                    compute_shift,
+                    radzeros,
+                    chunksize=10),
+                    total=len(radzeros),
+                    desc='NC4- Merge pn'))
             pool.close()
         # print('Finished lags')
         nrad = np.array([np.roll(row, -x) for row, x in zip(nrad, lag)])
@@ -478,11 +543,18 @@ class NC4:
         st = np.argmin(radii[0, 0:int(self._fs)])
         rpy = 4
         clip = 0.5
-        radius = radii[:, np.arange(st, st + (radii.shape[1]) / (rpy - (2 * clip)), dtype=int)]
+        radius = radii[
+            :,
+            np.arange(
+                st, st + (radii.shape[1]) / (rpy - (2 * clip)), dtype=int
+            )
+        ]
         # self.radius = radius
         return radius
 
-    def _fitcircles(self, radius: np.ndarray) -> tuple[ndarray, ndarray, ndarray, ndarray]:
+    def _fitcircles(self,
+                    radius: np.ndarray
+                    ) -> tuple[ndarray, ndarray, ndarray, ndarray]:
         """
         Fit a circle to each NC4 measurements and return its properties.
 
@@ -490,7 +562,8 @@ class NC4:
             radius: Array of radius to calc attributes for
 
         Returns:
-            List of tuples containing the x and y coords, the radius of the circle and the variance.
+            List of tuples containing the x and y coords, the radius of the \
+                circle and the variance.
         """
         theta = self.theta
         x = np.array([np.multiply(r, np.sin(theta)) for r in radius])
@@ -500,14 +573,25 @@ class NC4:
             circle = [circle_fit.hyper_fit(xy[0])]
         else:
             with multiprocessing.Pool() as pool:
-                circle = list(tqdm(pool.imap(circle_fit.hyper_fit, xy, chunksize=10),
-                                   total=len(xy),
-                                   desc='NC4- Calc att'))
+                circle = list(tqdm(pool.imap(
+                    circle_fit.hyper_fit,
+                    xy,
+                    chunksize=10),
+                    total=len(xy),
+                    desc='NC4- Calc att'))
             pool.close()
-        runout = np.array([2 * (np.sqrt(x[0] ** 2 + x[1] ** 2)) for x in circle])
-        mean_radius = np.array([x[2] for x in circle])
-        peak_radius = np.array([np.max(rad) for rad in radius])
-        form_error = np.array([(np.max(rad) - np.min(rad)) for rad in radius])
+        runout = np.array(
+            [2 * (np.sqrt(x[0] ** 2 + x[1] ** 2)) for x in circle]
+        )
+        mean_radius = np.array(
+            [x[2] for x in circle]
+        )
+        peak_radius = np.array(
+            [np.max(rad) for rad in radius]
+        )
+        form_error = np.array(
+            [(np.max(rad) - np.min(rad)) for rad in radius]
+        )
         return mean_radius, peak_radius, runout, form_error
 
     def update(self, files: Union[list[str], tuple[str]]) -> None:
