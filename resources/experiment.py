@@ -7,7 +7,9 @@
 
 @Modify Time      @Author    @Version    @Desciption
 ------------      -------    --------    -----------
-22/08/2022 13:46   tomhj      1.0         File containing code to produce and operate experiment objects
+22/08/2022 13:46   tomhj      1.0         File containing code to produce and
+                                          operate experiment objects
+
 """
 
 import datetime
@@ -18,7 +20,7 @@ import pathlib
 import re
 from pathlib import PureWindowsPath, Path
 from tkinter.filedialog import askdirectory, askopenfilename
-import tkinter as tk
+# import tkinter as tk
 import pickle
 from typing import Union
 
@@ -157,7 +159,7 @@ class DCB:
 class Experiment:
     def __init__(self, dataloc: str, date: datetime.date, ae_files: tuple[str], nc4_files: tuple[str]) -> None:
         """
-        Experiment Class, including AE class, NC4 class, test_info and features.
+        Experiment Class, including AE & NC4 class, test_info and features.
 
         Args:
             dataloc: Folder path of the experiment folder.
@@ -191,34 +193,31 @@ class Experiment:
         Update the Experiment class with new files.
         """
         dataloc = self.test_info.dataloc
+        # check if there are new tdms files in teh data folder
         if glob.glob(os.path.join(dataloc, "*.tdms")):
             print('-' * 60)
             print(f'Updating experiemnt obj - {datetime.datetime.now()}')
             ae_path = os.path.join(dataloc, 'AE', 'TDMS')
             nc4_path = os.path.join(dataloc, 'NC4', 'TDMS')
+            
+            # if files end in MHz, move and rename them to AE folder
             if glob.glob(os.path.join(dataloc, "*MHz.tdms")):
                 _move_files(dataloc, ae_path, '*MHz.tdms')
-                # print('Moving new AE files...')
                 ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
                 _sort_rename(ae_files, ae_path)
                 ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
                 self.ae.update(tuple(ae_files))
-            # else:
-            #     print('No new AE files')
 
+            # if files end in kHz, move and rename them to NC4 folder
             if glob.glob(os.path.join(dataloc, "*kHz.tdms")):
-                # print("Moving new NC4 files...")
                 _move_files(dataloc, nc4_path, '*kHz.tdms')
                 nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
                 _sort_rename(nc4_files, nc4_path)
                 nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
                 self.nc4.update(tuple(nc4_files))
-            # else:
-            #     print('No new NC4 files.')
 
             no_nc4 = len(self.nc4._files)
             no_ae = len(self.ae._files)
-            # print('-' * 60)
             print(f'No. Files: AE-{no_ae} NC4-{no_nc4}')
             self.save()
 
@@ -342,9 +341,9 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
 
     if file is None:
         try:
-            root = tk.Tk()
+            # root = tk.Tk()
             file_path = askopenfilename(defaultextension='pickle')
-            root.withdraw()
+            # root.withdraw()
             if not file_path:
                 raise NotADirectoryError
             with open(file_path, 'rb') as f:
@@ -383,7 +382,10 @@ Known file locations are : {f_locs.keys()}')
     return data
 
 
-def create_obj(folder: str = None, process: bool = False) -> Union[Experiment, None]:
+def create_obj(
+        folder: str = None,
+        process: bool = False
+) -> Union[Experiment, None]:
     """
     Creates experiment obj for test from test folder, selected either by GUI or path input.
 
@@ -428,9 +430,9 @@ def create_obj(folder: str = None, process: bool = False) -> Union[Experiment, N
     # import file names and directories of AE and NC4
     if folder is None:
         try:
-            root = tk.Tk()
+            # root = tk.Tk()
             folder_path = askdirectory(title='Select test folder:')
-            root.withdraw()
+            # root.withdraw()
             if not folder_path:
                 raise NotADirectoryError
         except NotADirectoryError:
@@ -449,11 +451,14 @@ def create_obj(folder: str = None, process: bool = False) -> Union[Experiment, N
     # setup file paths and create folder if needed
     folder_path = os.path.normpath(folder_path)
     folder_path = os.path.relpath(folder_path)
+
     ae_path = os.path.join(folder_path, 'AE', 'TDMS')
     nc4_path = os.path.join(folder_path, 'NC4', 'TDMS')
+
     folder_exist_create(ae_path)
     folder_exist_create(nc4_path)
 
+    # move files to correct folders and rename according to date
     if glob.glob(os.path.join(folder_path, "*MHz.tdms")):
         print("Moving AE files...")
         _move_files(folder_path, ae_path, '*MHz.tdms')
@@ -465,10 +470,13 @@ def create_obj(folder: str = None, process: bool = False) -> Union[Experiment, N
         _move_files(folder_path, nc4_path, '*kHz.tdms')
     nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
     _sort_rename(nc4_files, nc4_path)
+
     # collect data for exp obj
     ae_files = tuple(glob.glob(os.path.join(ae_path, "*.tdms")))
     nc4_files = tuple(glob.glob(os.path.join(nc4_path, "*.tdms")))
+    
     date = getdate(ae_files, nc4_files)
+
     obj = Experiment(folder_path, date, ae_files, nc4_files)
     if process:
         obj.nc4.process()

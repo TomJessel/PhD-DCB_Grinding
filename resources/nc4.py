@@ -23,13 +23,12 @@ import math
 from scipy.ndimage.filters import uniform_filter1d
 from scipy import signal
 import circle_fit
-import matplotlib as mpl
+# import matplotlib as mpl
 # mpl.use("TkAgg")
 import matplotlib.pyplot as plt
 import mplcursors
 import pickle
 import pandas as pd
-
 
 
 def compute_shift(zipped: tuple[Any, Any]) -> int:
@@ -182,13 +181,14 @@ class NC4:
         print(f'\tRunout = {self.runout.iloc[-1] * 1000:.3f} um')
         print(f'\tWear = {wear:.3f} %')
         print('-' * 60)
-        self.plot_att()
+        fig = self.plot_att()
+        return fig
 
     def plot_att(self) -> None:
         """
         Plot NC4 features for each measurement.
         """
-        mpl.use("TkAgg")
+        # mpl.use("TkAgg")
         dataloc = PureWindowsPath(self._testinfo.dataloc)
         path = f'{dataloc.as_posix()}/Figures'
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.png'
@@ -223,10 +223,10 @@ class NC4:
             with open(pic_name, 'wb') as f:
                 pickle.dump(fig, f)
         mplcursors.cursor(hover=2)
-        fig.show()
+        plt.show()
         return fig
     
-    def plot_xy(self, fno: tuple[int, int] = None, step:int = 1) -> None:
+    def plot_xy(self, fno: tuple = None, step: int = 1) -> None:
         """
         Plot full radius measurement around tool circumference, for a slice or all measurements.
 
@@ -286,7 +286,7 @@ class NC4:
                 with open(pic_name, 'wb') as f:
                     pickle.dump(fig, f)
         mplcursors.cursor(multiple=True)
-        fig.show()
+        plt.show()
         return fig
 
     def plot_surf(self) -> None:
@@ -327,7 +327,7 @@ class NC4:
             except IOError:
                 with open(pic_name, 'wb') as f:
                     pickle.dump(fig, f)
-        fig.show()
+        plt.show()
 
     def _sampleandpos(self, fno: int) -> [list[float], list[float], list[float], list[float]]:
         """
