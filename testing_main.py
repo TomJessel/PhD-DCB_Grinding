@@ -7,7 +7,8 @@
 
 @Modify Time      @Author    @Version    @Desciption
 ------------      -------    --------    -----------
-09/11/2022 11:08   tomhj      1.0         File for quickly setting up console for checking testing data
+09/11/2022 11:08   tomhj      1.0         File for quickly setting up console
+                                          for checking testing data
 """
 
 import resources
@@ -41,11 +42,14 @@ def update(_exp: resources.experiment.Experiment = None):
         _exp.save()
 
 
-def main() -> resources.experiment.Experiment:
+def main(exp_name: str = None) -> resources.experiment.Experiment:
     try:
-        _exp = resources.load()
+        if exp_name is not None:
+            _exp = resources.load(exp_name)
+        else:
+            _exp = resources.load()
     except NotADirectoryError:
-        _exp = resources.experiment.create_obj()
+        _exp = resources.experiment.create_obj(process=False)
 
     print(f'{"-" * 22}TESTING EXP FILE{"-" * 22}')
     print(_exp)
