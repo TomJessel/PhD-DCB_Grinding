@@ -81,30 +81,50 @@ def _sort_rename(files: list[str], path: str) -> None:
 class TestInfo:
     def __init__(self, dataloc: str) -> None:
         """
-        Class to store data about the experiment from the experiment "TESTING INFO.txt" file.
+        Class to store data about the experiment from "TESTING INFO.txt" file.
 
         Args:
-            dataloc: Location of the experiment folder, to find the "TESTING INFO.txt" file.
+            dataloc: Location of the exp folder, for "TESTING INFO.txt" file.
         """
         self.dataloc = dataloc
         infofile = os.path.join(dataloc, 'TESTING INFO.txt')
         try:
-            data = pd.read_table(infofile, delimiter='\t', header=None, skiprows=(0, 1))
+            data = pd.read_table(infofile,
+                                 delimiter='\t',
+                                 header=None,
+                                 skiprows=(0, 1)
+                                 )
         except FileNotFoundError as err:
             print(f'{err} \nNo "TESTING INFO.txt" file found!!')
         else:
             self.testno = int(data.iloc[0][1])
             self.date = datetime.datetime.strptime(data.iloc[1][1], '%d %b %Y')
-            self.pre_amp = PreAmp(float(data.iloc[5][1]), data.iloc[6][1], data.iloc[7][1])
+            self.pre_amp = PreAmp(float(data.iloc[5][1]),
+                                  data.iloc[6][1],
+                                  data.iloc[7][1]
+                                  )
             self.sensor = data.iloc[9][1]
-            self.acquisition = (float(data.iloc[11][1]) * 1E6, float(data.iloc[12][1]) * 1E3)
-            self.dcb = DCB(float(data.iloc[14][1]), float(data.iloc[15][1]), data.iloc[16][1])
-            self.grindprop = GrindProp(float(data.iloc[18][1]), float(data.iloc[19][1]), float(data.iloc[20][1]),
-                                       float(data.iloc[21][1]))
+            self.acquisition = (
+                float(data.iloc[11][1]) * 1E6, float(data.iloc[12][1]) * 1E3
+            )
+            self.dcb = DCB(float(data.iloc[14][1]),
+                           float(data.iloc[15][1]),
+                           data.iloc[16][1]
+                           )
+            self.grindprop = GrindProp(float(data.iloc[18][1]),
+                                       float(data.iloc[19][1]),
+                                       float(data.iloc[20][1]),
+                                       float(data.iloc[21][1])
+                                       )
 
 
 class GrindProp:
-    def __init__(self, feedrate: float, doc_ax: float, doc_rad: float, v_spindle: float) -> None:
+    def __init__(self,
+                 feedrate: float,
+                 doc_ax: float,
+                 doc_rad: float,
+                 v_spindle: float
+                 ) -> None:
         """
         Class to store data about the grinding properties.
 
@@ -153,11 +173,19 @@ class DCB:
 
     def gritsizeset(self):
         grainsizes = pd.read_csv('reference/grainsizes.csv')
-        self.grainsize = float(grainsizes.iloc[np.where(grainsizes['Mesh'] == self.grit)]['AvgGrainSize'])
+        self.grainsize = float(
+            grainsizes.iloc[
+                np.where(grainsizes['Mesh'] == self.grit)]['AvgGrainSize']
+        )
 
 
 class Experiment:
-    def __init__(self, dataloc: str, date: datetime.date, ae_files: tuple[str], nc4_files: tuple[str]) -> None:
+    def __init__(self,
+                 dataloc: str,
+                 date: datetime.date,
+                 ae_files: tuple[str],
+                 nc4_files: tuple[str]
+                 ) -> None:
         """
         Experiment Class, including AE & NC4 class, test_info and features.
 
@@ -170,14 +198,24 @@ class Experiment:
         self.test_info = TestInfo(dataloc)
         self.date = date
         self.dataloc = dataloc
-        self.ae = AE(ae_files, self.test_info.pre_amp, self.test_info,  self.test_info.acquisition[0])
-        self.nc4 = NC4(nc4_files, self.test_info, self.test_info.dcb, self.test_info.acquisition[1])
+        self.ae = AE(ae_files,
+                     self.test_info.pre_amp,
+                     self.test_info,
+                     self.test_info.acquisition[0]
+                     )
+        self.nc4 = NC4(nc4_files,
+                       self.test_info,
+                       self.test_info.dcb,
+                       self.test_info.acquisition[1]
+                       )
         self.features = pd.DataFrame
 
     def __repr__(self):
         no_nc4 = len(self.nc4._files)
         no_ae = len(self.ae._files)
-        rep = f'Test No: {self.test_info.testno}\nDate: {self.date}\nData: {self.dataloc}\n' \
+        rep = f'Test No: {self.test_info.testno}\n' \
+              f'Date: {self.date}\n' \
+              f'Data: {self.dataloc}\n' \
               f'No. Files: AE-{no_ae} NC4-{no_nc4}'
         return rep
 
@@ -185,7 +223,8 @@ class Experiment:
         """
         Save Experiment obj to the data location folder as a '.pickle' file.
         """
-        with open(f'{self.dataloc}/Test {self.test_info.testno}.pickle', 'wb') as f:
+        save_loc = f'{self.dataloc}/Test {self.test_info.testno}.pickle'
+        with open(save_loc, 'wb') as f:
             pickle.dump(self, f)
 
     def update(self) -> None:
@@ -231,7 +270,7 @@ class Experiment:
             plotfig: Option to plot a figure.
 
         Returns:
-            Correlation coefficients for each freq bin compared to NC4 measurements.
+            Correlation coefficients for each freq bin compared to NC4 atts.
 
         """
 
@@ -267,17 +306,28 @@ class Experiment:
         mpl.use('TkAgg')
         dataloc = PureWindowsPath(self.test_info.dataloc)
         path = f'{dataloc.as_posix()}/Figures/'
-        png_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.png'
-        pic_name = f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.pickle'
+        png_name = (
+            f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.png'
+        )
+        pic_name = (
+            f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.pickle'
+        )
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
-        r = np.stack([self.nc4.mean_radius, self.nc4.peak_radius, self.nc4.runout, self.nc4.form_error])
+        r = np.stack([self.nc4.mean_radius,
+                      self.nc4.peak_radius,
+                      self.nc4.runout,
+                      self.nc4.form_error
+                      ])
         f = np.array(self.ae.fft[freq])
         f = f.transpose()
-        coeff = np.corrcoef(f, r[:,-np.shape(f)[1]:])[:-4, -4:]
+        coeff = np.corrcoef(f, r[:, -np.shape(f)[1]:])[:-4, -4:]
         fig = []
         if plotfig:
-            freq = np.arange(0, self.test_info.acquisition[0] / 2, freq, dtype=int) / 1000
+            freq = np.arange(0,
+                             self.test_info.acquisition[0] / 2,
+                             freq, dtype=int
+                             ) / 1000
             fig = plot(freq, coeff)
             mplcursors.cursor(multiple=True)
             try:
@@ -299,8 +349,19 @@ class Experiment:
         Returns:
             DataFrame: Features of experiment
         """
-        cols = ["RMS", 'Kurtosis', 'Amplitude', 'Skewness', 'Freq 10 kHz', 'Freq 35 kHz', 'Freq 134 kHz',
-                'Mean radius', 'Peak radius', 'Radius diff', 'Runout', 'Form error']
+        cols = ["RMS",
+                'Kurtosis',
+                'Amplitude',
+                'Skewness',
+                'Freq 10 kHz',
+                'Freq 35 kHz',
+                'Freq 134 kHz',
+                'Mean radius',
+                'Peak radius',
+                'Radius diff',
+                'Runout',
+                'Form error'
+                ]
 
         rms = self.ae.rms
         kurt = self.ae.kurt
@@ -309,18 +370,30 @@ class Experiment:
 
         f = np.array(self.ae.fft[1000])
         f = f.T
-        f_35: np.array = f[35]
-        f_10: np.array = f[10]
-        f_134: np.array = f[134]
+        f_35 = f[35]
+        f_10 = f[10]
+        f_134 = f[134]
 
-        mean_rad: np.array = self.nc4.mean_radius[1:]
-        peak_rad = self.nc4.peak_radius[1:]
+        mean_rad = np.array(self.nc4.mean_radius[1:])
+        peak_rad = np.array(self.nc4.peak_radius[1:])
         rad_diff = np.diff(self.nc4.mean_radius)
-        run_out: np.array = self.nc4.runout[1:]
-        form_err: np.array = self.nc4.form_error[1:]
+        run_out = np.array(self.nc4.runout[1:])
+        form_err = np.array(self.nc4.form_error[1:])
 
-        m: np.array = np.stack((rms, kurt, amp, skew, f_10, f_35, f_134, mean_rad, peak_rad, rad_diff, run_out, form_err), axis=0)
-        df: pd.DataFrame = pd.DataFrame(m.T, columns=cols)
+        m = np.stack((rms,
+                      kurt,
+                      amp,
+                      skew,
+                      f_10,
+                      f_35,
+                      f_134,
+                      mean_rad,
+                      peak_rad,
+                      rad_diff,
+                      run_out,
+                      form_err
+                      ), axis=0)
+        df = pd.DataFrame(m.T, columns=cols)
         print(f'Feature DF of Test {self.test_info.testno}:')
         print(df.head())
         self.features = df
@@ -354,7 +427,7 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
     else:
         dirs = Path.cwd().parts
         i = dirs.index('Acoustic-Emission')
-        path_ae = os.path.join(*dirs[:i+1])
+        path_ae = os.path.join(*dirs[:i + 1])
         path_base = Path(path_ae).parent.parent
         path_res = pathlib.PurePath(path_ae).joinpath("resources")
         f_locs = pd.read_csv(fr"{path_res}/reference/Test obj locations.txt",
@@ -369,8 +442,10 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
         except KeyError:
             # print(f'File location of {file} not saved in load function.')
             # print(f'Known file locations are : {f_locs}')
-            raise NotADirectoryError(f'File location of {file} not saved in load function. \
-Known file locations are : {f_locs.keys()}')
+            raise NotADirectoryError(
+                f'File location of {file} not saved in load function.' +
+                f' Known file locations are : {f_locs.keys()}'
+            )
     if process:
         try:
             getattr(data.NC4, 'radius')
@@ -387,14 +462,16 @@ def create_obj(
         process: bool = False
 ) -> Union[Experiment, None]:
     """
-    Creates experiment obj for test from test folder, selected either by GUI or path input.
+    Creates experiment obj for test from test folder, selected either by GUI \
+        or path input.
 
     Args:
-        folder: Test file path to create obj from, if blank will open GUI to select folder.
+        folder: Test file path to create obj from, if blank will open GUI \
+            to select folder.
         process: Option to process AE and NC4 data on creation of obj.
 
     Returns:
-        Experiment obj containing storage for AE & NC4 data, and relevant features.
+        Experiment obj containing storage for AE & NC4 data, and relevant feat.
     """
 
     def folder_exist_create(path: str) -> None:
@@ -409,7 +486,9 @@ def create_obj(
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
 
-    def getdate(AE_f: Union[list[str], tuple[str]], NC4_f: Union[list[str], tuple[str]]) -> datetime.date:
+    def getdate(AE_f: Union[list[str], tuple[str]],
+                NC4_f: Union[list[str], tuple[str]]
+                ) -> datetime.date:
         """
         Find the date of the first AE file, or first NC4 file if no AE data.
 
