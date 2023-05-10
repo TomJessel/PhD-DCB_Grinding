@@ -172,7 +172,7 @@ class DCB:
         self.gritsizeset()
 
     def gritsizeset(self):
-        grainsizes = pd.read_csv('reference/grainsizes.csv')
+        grainsizes = pd.read_csv('resources/reference/grainsizes.csv')
         self.grainsize = float(
             grainsizes.iloc[
                 np.where(grainsizes['Mesh'] == self.grit)]['AvgGrainSize']
