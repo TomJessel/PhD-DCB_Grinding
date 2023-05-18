@@ -13,11 +13,9 @@
 import multiprocessing
 import os
 from functools import partial
-from pathlib import PureWindowsPath, Path
+from pathlib import Path
 from typing import List, Tuple, Any, Union
 
-# import matplotlib as mpl
-# mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import mplcursors
 import numpy as np
@@ -27,7 +25,18 @@ from scipy.stats import kurtosis
 from scipy.stats import skew
 from tqdm import tqdm
 from scipy.signal import hilbert, butter, filtfilt
-# mpl.use('TkAgg')
+
+PLATFORM = os.name
+if PLATFORM == 'posix':
+    ONEDRIVE_PATH = Path(
+        r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents/PHD/'
+    )
+    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('AE/PYTHON/Acoustic-Emission')
+elif PLATFORM == 'nt':
+    ONEDRIVE_PATH = Path(
+        r'C:\Users\tomje\OneDrive - Cardiff University\Documents\PHD\AE'
+    )
+    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('PYTHON/Acoustic-Emission')
 
 
 def butter_filter(
@@ -231,18 +240,15 @@ class AE:
             data: AE data from the TDMS file.
 
         """
-        dirs = Path.cwd().parts
-        i = dirs.index('Acoustic-Emission')
-        path_ae = os.path.join(*dirs[: i + 1])
-        filepath = PureWindowsPath(os.path.join(path_ae, self._files[fno]))
-        test = TdmsFile.read(filepath.as_posix())
+        filepath = ONEDRIVE_PATH.joinpath(self._files[fno])
+        test = TdmsFile.read(filepath)
         prop = test.properties
         data = []
         for group in test.groups():
             for channel in group.channels():
                 data = channel[:]
         if not data.dtype == float:
-            data = (data.astype(np.float) * prop.get('Gain')) + prop.get(
+            data = (data.astype(np.float64) * prop.get('Gain')) + prop.get(
                 'Offset'
             )
         if not self._pre_amp.gain == 40:
@@ -265,7 +271,6 @@ class AE:
         t = np.arange(0, n) * ts
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        # mpl.use("TkAgg")
         fig, ax = plt.subplots()
         ax.plot(t, signal, linewidth=1)
         ax.set_title(filename)
@@ -292,7 +297,6 @@ class AE:
 
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        # mpl.use('TkAgg')
         fig, ax = plt.subplots()
         ax.plot(f / 1000, p)
         ax.set_title(
@@ -553,7 +557,6 @@ class AE:
             v_rms = calc_roll_rms(fno)
             n = v_rms.size
             t = np.arange(0, n) * ts
-            # mpl.use('TkAgg')
             if plot_fig:
                 fig, ax = plt.subplots()
                 ax.plot(t, v_rms, linewidth=0.75)
@@ -574,8 +577,8 @@ class AE:
             ax.set_ylabel('RMS (V)')
             writer = PillowWriter(fps=1)
             n = 40_000_000  # number of points to plot
-            dataloc = PureWindowsPath(self._testinfo.dataloc)
-            path = f'{dataloc.as_posix()}/Figures/'
+            dataloc = ONEDRIVE_PATH.joinpath(self._testinfo.dataloc)
+            path = dataloc.joinpath('Figures/')
             name = f'{path}Test {self._testinfo.testno} - Rolling RMS.gif'
             with writer.saving(fig, name, 200):
                 for no in range(fno[0], fno[1]):
@@ -635,9 +638,3 @@ class AE:
         ax.set_ylabel('Voltage (V)')
         fig.show()
         return fig
-
-
-if __name__ == '__main__':
-    import resources
-    exp = resources.load('Test 8')
-    exp.ae.plot_triggers(10)
