@@ -121,7 +121,10 @@ class RMS:
 
         # load in exp for this obj
         global exp
-        exp = resources.load(self.exp_name)
+        try:
+            exp = resources.load(self.exp_name)
+        except NotADirectoryError:
+            exp = resources.load()
 
         # get no of AE files in exp dataset
         fnos = range(len(exp.ae._files))
