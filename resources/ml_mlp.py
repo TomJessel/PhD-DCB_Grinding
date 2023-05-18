@@ -11,11 +11,10 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import multiprocessing
-import platform
 import time
 from textwrap import dedent
 from typing import Any, Dict, Iterable, List, Union, Tuple
-
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -118,21 +117,14 @@ class Base_Model:
             file path to AE folder
 
         """
-        import os
-        import re
-
-        dirname = os.path.dirname(__file__)
-
-        regex_folder = re.compile("(tomje)")
-        result = regex_folder.search(dirname)
-        PLATFORM = platform.system()
-        if PLATFORM == 'Windows':
-            filename = dirname[:result.end()] + r"\Documents\PhD\AE"
-        elif PLATFORM == 'Linux':
-            filename = dirname[:result.end()] + r"/ml"
-        else:
-            filename = dirname[:result.end()] + r"\Documents\PhD\AE"
-        filename = os.path.abspath(filename)
+        platform = os.name
+        if platform == 'nt':
+            filename = Path.cwd().parents[1]
+        elif platform == 'posix':
+            onedrive = Path(
+                r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents'
+            )
+            filename = onedrive.joinpath('PHD/AE')
         return filename
 
     def pre_process(self):

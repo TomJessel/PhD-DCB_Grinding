@@ -40,10 +40,12 @@ import resources
 platform = os.name
 if platform == 'nt':
     DATA_DIR = Path.cwd().parents[1].joinpath('Testing', 'RMS')
+    TB_DIR = Path.cwd().parents[1].joinpath('Tensorboard')
 elif platform == 'posix':
-    DATA_DIR = Path.home().joinpath('Testing', 'RMS')
-
-TB_DIR = Path.home().joinpath(r'ml/Tensorboard')
+    onedrive = Path(r'/mnt/c/Users/tomje/OneDrive - Cardiff University')
+    onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
+    DATA_DIR = onedrive.joinpath('Testing', 'RMS')
+    TB_DIR = onedrive.joinpath('Tensorboard')
 
 
 def _mp_rms_process(fno: int):

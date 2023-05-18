@@ -17,21 +17,19 @@ import fnmatch
 import glob
 import os
 import re
-from pathlib import PureWindowsPath, Path
+from pathlib import Path
 from tkinter.filedialog import askdirectory, askopenfilename
-# import tkinter as tk
 import pickle
 from typing import Union
 
 import numpy as np
 import mplcursors
 import matplotlib as mpl
-# mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from .ae import AE
-from .nc4 import NC4
+from . import ae
+from . import nc4
 
 PLATFORM = os.name
 if PLATFORM == 'posix':
@@ -212,16 +210,16 @@ class Experiment:
         self.test_info = TestInfo(dataloc)
         self.date = date
         self.dataloc = dataloc
-        self.ae = AE(ae_files,
-                     self.test_info.pre_amp,
-                     self.test_info,
-                     self.test_info.acquisition[0]
-                     )
-        self.nc4 = NC4(nc4_files,
-                       self.test_info,
-                       self.test_info.dcb,
-                       self.test_info.acquisition[1]
-                       )
+        self.ae = ae.AE(ae_files,
+                        self.test_info.pre_amp,
+                        self.test_info,
+                        self.test_info.acquisition[0]
+                        )
+        self.nc4 = nc4.NC4(nc4_files,
+                           self.test_info,
+                           self.test_info.dcb,
+                           self.test_info.acquisition[1]
+                           )
         self.features = pd.DataFrame
 
     def __repr__(self):
@@ -239,6 +237,7 @@ class Experiment:
         """
         save_path = ONEDRIVE_PATH.joinpath(self.test_info.dataloc)
         save_path = save_path.joinpath(f'Test {self.test_info.testno}.pickle')
+        save_path = save_path.resolve()
         with save_path.open('wb') as f:
             pickle.dump(self, f)
 
@@ -325,7 +324,6 @@ class Experiment:
 
         freq = 1000
 
-        mpl.use('TkAgg')
         dataloc = self.dataloc
         path = ONEDRIVE_PATH.joinpath(dataloc, 'Figures')
         png_name = (

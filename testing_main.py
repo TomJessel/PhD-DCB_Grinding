@@ -48,7 +48,7 @@ def main(exp_name: str = None) -> resources.experiment.Experiment:
             _exp = resources.load(exp_name)
         else:
             _exp = resources.load()
-    except NotADirectoryError:
+    except FileNotFoundError:
         _exp = resources.experiment.create_obj(process=False)
 
     print(f'{"-" * 22}TESTING EXP FILE{"-" * 22}')
@@ -60,6 +60,6 @@ def main(exp_name: str = None) -> resources.experiment.Experiment:
 
 
 if __name__ == "__main__":
-    exp = main()
+    exp = main('Test 9')
     # check_nc4(exp)
     # check_ae(exp)
