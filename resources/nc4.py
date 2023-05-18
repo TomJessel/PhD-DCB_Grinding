@@ -11,9 +11,8 @@
 """
 
 import os
-from pathlib import PureWindowsPath
 from typing import Any, Union
-
+from pathlib import Path
 from nptdms import TdmsFile
 from numpy import ndarray
 from tqdm import tqdm
@@ -23,12 +22,22 @@ import math
 from scipy.ndimage.filters import uniform_filter1d
 from scipy import signal
 import circle_fit
-# import matplotlib as mpl
-# mpl.use("TkAgg")
 import matplotlib.pyplot as plt
 import mplcursors
 import pickle
 import pandas as pd
+
+PLATFORM = os.name
+if PLATFORM == 'posix':
+    ONEDRIVE_PATH = Path(
+        r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents/PHD/'
+    )
+    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('AE/PYTHON/Acoustic-Emission')
+elif PLATFORM == 'nt':
+    ONEDRIVE_PATH = Path(
+        r'C:\Users\tomje\OneDrive - Cardiff University\Documents\PHD\AE'
+    )
+    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('PYTHON/Acoustic-Emission')
 
 
 def compute_shift(zipped: tuple[Any, Any]) -> int:
@@ -91,8 +100,8 @@ class NC4:
         Returns:
             NC4 data from the file.
         """
-        filepath = PureWindowsPath(self._files[fno])
-        test = TdmsFile.read(filepath.as_posix())
+        filepath = ONEDRIVE_PATH.joinpath(self._files[fno])
+        test = TdmsFile.read(filepath)
         prop = test.properties
         data = []
         for group in test.groups():
@@ -100,7 +109,7 @@ class NC4:
                 data = channel[:]
         if not data.dtype == float:
             data = (
-                data.astype(np.float) * prop.get('Gain')
+                data.astype(np.float64) * prop.get('Gain')
             ) + prop.get('Offset')
         return data
 
@@ -207,8 +216,8 @@ class NC4:
         Plot NC4 features for each measurement.
         """
         # mpl.use("TkAgg")
-        dataloc = PureWindowsPath(self._testinfo.dataloc)
-        path = f'{dataloc.as_posix()}/Figures'
+        dataloc = ONEDRIVE_PATH.joinpath(self._testinfo.dataloc)
+        path = dataloc.joinpath('Figures')
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.png'
         pic_name = f'{path}/Test {self._testinfo.testno} ' \
                    f'- NC4 Attributes.pickle'
@@ -250,7 +259,6 @@ class NC4:
             with open(pic_name, 'wb') as f:
                 pickle.dump(fig, f)
         mplcursors.cursor(hover=2)
-        plt.show()
         return fig
     
     def plot_xy(self, fno: tuple = None, step: int = 1) -> None:
@@ -263,9 +271,8 @@ class NC4:
             step: Step between files of slice.
 
         """
-        # mpl.use('TkAgg')
-        dataloc = PureWindowsPath(self._testinfo.dataloc)
-        path = f'{dataloc.as_posix()}/Figures'
+        dataloc = ONEDRIVE_PATH.joinpath(self._testinfo.dataloc)
+        path = dataloc.joinpath('Figures')
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 XY Plot.png'
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 XY Plot.pickle'
 
@@ -276,10 +283,6 @@ class NC4:
 
         if fno is None:
             radius = self.radius
-            # try:
-            #     with open(pic_name, 'rb') as f:
-            #         fig = pickle.load(f)
-            # except IOError:
             fig, ax = plt.subplots()
             savefig = True
             n = 0
@@ -318,7 +321,6 @@ class NC4:
                 with open(pic_name, 'wb') as f:
                     pickle.dump(fig, f)
         mplcursors.cursor(multiple=True)
-        plt.show()
         return fig
 
     def plot_surf(self) -> None:
@@ -326,9 +328,8 @@ class NC4:
         Plot surface of DCB radius over measurements in time.
 
         """
-        # mpl.use('TkAgg')
-        dataloc = PureWindowsPath(self._testinfo.dataloc)
-        path = f'{dataloc.as_posix()}/Figures'
+        dataloc = ONEDRIVE_PATH.joinpath(self._testinfo.dataloc)
+        path = dataloc.joinpath('Figures')
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Radius Surf.png'
         pic_name = f'{path}/Test {self._testinfo.testno} '\
                    f'- NC4 Radius Surf.pickle'
@@ -339,9 +340,6 @@ class NC4:
                 fig = pickle.load(f)
         except IOError:
             fig = plt.figure()
-            # ax = fig.add_subplot(projection='3d')
-            # x, y = np.meshgrid(self.theta, self._datano)
-            # surf = ax.plot_surface(x, y, self.radius, cmap='jet')
             ax = fig.add_subplot()
             r = np.array(self.radius, dtype=float)
             x = np.array(self.theta, dtype=float)
@@ -368,7 +366,7 @@ class NC4:
             except IOError:
                 with open(pic_name, 'wb') as f:
                     pickle.dump(fig, f)
-        plt.show()
+        return fig
 
     def _sampleandpos(
             self,
