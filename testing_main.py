@@ -12,6 +12,7 @@
 """
 
 import resources
+import matplotlib.pyplot as plt
 
 
 def check_ae(_exp: resources.experiment.Experiment):
@@ -60,6 +61,9 @@ def main(exp_name: str = None) -> resources.experiment.Experiment:
 
 
 if __name__ == "__main__":
-    exp = main('Test 9')
-    # check_nc4(exp)
-    # check_ae(exp)
+    tests = ['Test 5', 'Test 7', 'Test 8', 'Test 9', 'Test 10']
+    for test in tests:
+        exp = main(test)
+        check_nc4(exp)
+        check_ae(exp)
+    plt.show()

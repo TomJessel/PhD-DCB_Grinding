@@ -14,7 +14,7 @@ import multiprocessing
 import time
 from textwrap import dedent
 from typing import Any, Dict, Iterable, List, Union, Tuple
-from pathlib import Path
+from pathlib import PurePosixPath as Path
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt

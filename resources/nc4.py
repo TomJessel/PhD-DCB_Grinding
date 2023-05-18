@@ -12,7 +12,7 @@
 
 import os
 from typing import Any, Union
-from pathlib import Path
+from pathlib import PurePosixPath as Path
 from nptdms import TdmsFile
 from numpy import ndarray
 from tqdm import tqdm

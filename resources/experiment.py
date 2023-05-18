@@ -17,7 +17,7 @@ import fnmatch
 import glob
 import os
 import re
-from pathlib import Path
+from pathlib import PurePosixPath as Path
 from tkinter.filedialog import askdirectory, askopenfilename
 import pickle
 from typing import Union
@@ -237,8 +237,7 @@ class Experiment:
         """
         save_path = ONEDRIVE_PATH.joinpath(self.test_info.dataloc)
         save_path = save_path.joinpath(f'Test {self.test_info.testno}.pickle')
-        save_path = save_path.resolve()
-        with save_path.open('wb') as f:
+        with open(str(save_path), 'wb') as f:
             pickle.dump(self, f)
 
     def update(self) -> None:

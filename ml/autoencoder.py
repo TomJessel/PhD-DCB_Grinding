@@ -30,7 +30,7 @@ from keras.models import Model
 import tensorboard.plugins.hparams.api as hp
 import tensorflow_addons as tfa
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from pathlib import Path
+from pathlib import PurePosixPath as Path
 import time
 from scikeras.wrappers import KerasRegressor, BaseWrapper
 from keras import backend as K

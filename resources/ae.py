@@ -13,7 +13,7 @@
 import multiprocessing
 import os
 from functools import partial
-from pathlib import Path
+from pathlib import PurePosixPath as Path
 from typing import List, Tuple, Any, Union
 
 import matplotlib.pyplot as plt
