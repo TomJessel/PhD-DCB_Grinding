@@ -16,7 +16,6 @@ import datetime
 import fnmatch
 import glob
 import os
-import pathlib
 import re
 from pathlib import PureWindowsPath, Path
 from tkinter.filedialog import askdirectory, askopenfilename
@@ -33,6 +32,18 @@ import pandas as pd
 
 from .ae import AE
 from .nc4 import NC4
+
+PLATFORM = os.name
+if PLATFORM == 'posix':
+    ONEDRIVE_PATH = Path(
+        r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents/PHD/'
+    )
+    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('AE/PYTHON/Acoustic-Emission')
+elif PLATFORM == 'nt':
+    ONEDRIVE_PATH = Path(
+        r'C:\Users\tomje\OneDrive - Cardiff University\Documents\PHD\AE'
+    )
+    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('PYTHON/Acoustic-Emission')
 
 
 def _move_files(src: str, dst: str, ext: str = '*') -> None:
@@ -87,6 +98,7 @@ class TestInfo:
             dataloc: Location of the exp folder, for "TESTING INFO.txt" file.
         """
         self.dataloc = dataloc
+        dataloc = ONEDRIVE_PATH.joinpath(dataloc)
         infofile = os.path.join(dataloc, 'TESTING INFO.txt')
         try:
             data = pd.read_table(infofile,
@@ -172,7 +184,9 @@ class DCB:
         self.gritsizeset()
 
     def gritsizeset(self):
-        grainsizes = pd.read_csv('resources/reference/grainsizes.csv')
+        grainsizes = pd.read_csv(
+            ONEDRIVE_PATH.joinpath('resources/reference/grainsizes.csv')
+        )
         self.grainsize = float(
             grainsizes.iloc[
                 np.where(grainsizes['Mesh'] == self.grit)]['AvgGrainSize']
@@ -223,7 +237,7 @@ class Experiment:
         """
         Save Experiment obj to the data location folder as a '.pickle' file.
         """
-        save_path = pathlib.Path(self.dataloc.replace('\\', '/'))
+        save_path = ONEDRIVE_PATH.joinpath(self.test_info.dataloc)
         save_path = save_path.joinpath(f'Test {self.test_info.testno}.pickle')
         with save_path.open('wb') as f:
             pickle.dump(self, f)
@@ -232,13 +246,14 @@ class Experiment:
         """
         Update the Experiment class with new files.
         """
-        dataloc = self.test_info.dataloc
+        dataloc = self.dataloc
+        dataloc = ONEDRIVE_PATH.joinpath(dataloc)
         # check if there are new tdms files in teh data folder
         if glob.glob(os.path.join(dataloc, "*.tdms")):
             print('-' * 60)
             print(f'Updating experiemnt obj - {datetime.datetime.now()}')
-            ae_path = os.path.join(dataloc, 'AE', 'TDMS')
-            nc4_path = os.path.join(dataloc, 'NC4', 'TDMS')
+            ae_path = dataloc.joinpath('AE/TDMS')
+            nc4_path = dataloc.joinpath('NC4/TDMS')
             
             # if files end in MHz, move and rename them to AE folder
             if glob.glob(os.path.join(dataloc, "*MHz.tdms")):
@@ -246,6 +261,9 @@ class Experiment:
                 ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
                 _sort_rename(ae_files, ae_path)
                 ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
+                ae_files = [
+                    os.path.relpath(f, ONEDRIVE_PATH) for f in ae_files
+                ]
                 self.ae.update(tuple(ae_files))
 
             # if files end in kHz, move and rename them to NC4 folder
@@ -254,6 +272,9 @@ class Experiment:
                 nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
                 _sort_rename(nc4_files, nc4_path)
                 nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
+                nc4_files = [
+                    os.path.relpath(f, ONEDRIVE_PATH) for f in nc4_files
+                ]
                 self.nc4.update(tuple(nc4_files))
 
             no_nc4 = len(self.nc4._files)
@@ -305,8 +326,8 @@ class Experiment:
         freq = 1000
 
         mpl.use('TkAgg')
-        dataloc = PureWindowsPath(self.test_info.dataloc)
-        path = f'{dataloc.as_posix()}/Figures/'
+        dataloc = self.dataloc
+        path = ONEDRIVE_PATH.joinpath(dataloc, 'Figures')
         png_name = (
             f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.png'
         )
@@ -416,7 +437,11 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
     if file is None:
         try:
             # root = tk.Tk()
-            file_path = askopenfilename(defaultextension='pickle')
+            initdir = ONEDRIVE_PATH.parents[1].joinpath('Testing')
+            file_path = askopenfilename(defaultextension='pickle',
+                                        initialdir=initdir,
+                                        title='Select exp file to load',
+                                        )
             # root.withdraw()
             if not file_path:
                 raise NotADirectoryError
@@ -426,16 +451,16 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
             print('No existing exp file selected!')
             raise NotADirectoryError('No existing exp file selected to load!')
     else:
-        dirs = Path.cwd().parts
-        i = dirs.index('Acoustic-Emission')
-        path_ae = os.path.join(*dirs[:i + 1])
-        path_base = Path(path_ae).parent.parent
-        path_res = pathlib.PurePath(path_ae).joinpath("resources")
-        f_locs = pd.read_csv(fr"{path_res}/reference/Test obj locations.txt",
+        path_test_obj = ONEDRIVE_PATH.joinpath(
+            'resources/reference/Test obj locations.txt'
+        )
+        path_ae = ONEDRIVE_PATH.parents[1]
+        f_locs = pd.read_csv(path_test_obj,
                              sep=',',
-                             index_col=0)
+                             index_col=0
+                             )
         f_locs = f_locs.to_dict()['Obj location']
-        f_locs = {k: os.path.join(path_base, v) for k, v in f_locs.items()}
+        f_locs = {k: path_ae.joinpath(v) for k, v in f_locs.items()}
         try:
             file_path = f_locs[file.lower().replace(' ', '')]
             with open(file_path, 'rb') as f:
@@ -529,11 +554,10 @@ def create_obj(
             return
 
     # setup file paths and create folder if needed
-    folder_path = os.path.normpath(folder_path)
-    folder_path = os.path.relpath(folder_path)
+    folder_path = Path(folder_path)
 
-    ae_path = os.path.join(folder_path, 'AE', 'TDMS')
-    nc4_path = os.path.join(folder_path, 'NC4', 'TDMS')
+    ae_path = folder_path.joinpath('AE', 'TDMS')
+    nc4_path = folder_path.joinpath('NC4', 'TDMS')
 
     folder_exist_create(ae_path)
     folder_exist_create(nc4_path)
@@ -556,6 +580,11 @@ def create_obj(
     nc4_files = tuple(glob.glob(os.path.join(nc4_path, "*.tdms")))
     
     date = getdate(ae_files, nc4_files)
+
+    # make file_paths relative
+    folder_path = os.path.relpath(folder_path, ONEDRIVE_PATH)
+    ae_files = tuple(os.path.relpath(f, ONEDRIVE_PATH) for f in ae_files)
+    nc4_files = tuple(os.path.relpath(f, ONEDRIVE_PATH) for f in nc4_files)
 
     obj = Experiment(folder_path, date, ae_files, nc4_files)
     if process:
