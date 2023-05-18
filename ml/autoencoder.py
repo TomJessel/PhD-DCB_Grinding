@@ -37,7 +37,12 @@ from keras import backend as K
 
 import resources
 
-DATA_DIR = Path.home().joinpath(r'Testing/RMS')
+platform = os.name
+if platform == 'nt':
+    DATA_DIR = Path.cwd().parents[1].joinpath('Testing', 'RMS')
+elif platform == 'posix':
+    DATA_DIR = Path.home().joinpath('Testing', 'RMS')
+
 TB_DIR = Path.home().joinpath(r'ml/Tensorboard')
 
 
@@ -87,6 +92,9 @@ def mp_get_rms(fnos: list[int]):
         ))
         pool.close()
         pool.join()
+    # rms = []
+    # for fno in tqdm(fnos, desc='RMS averaging'):
+    #     rms.append(_mp_rms_process(fno))
     return rms
 
 
