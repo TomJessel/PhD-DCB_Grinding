@@ -11,6 +11,7 @@
 """
 
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from typing import Any, Union
 from pathlib import PurePosixPath as Path
 from nptdms import TdmsFile

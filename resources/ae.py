@@ -10,6 +10,8 @@
 22/08/2022 13:46   tomhj      1.0        File which handles AE within exp obj.
 """
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import multiprocessing
 import os
 from functools import partial

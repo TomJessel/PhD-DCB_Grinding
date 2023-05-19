@@ -10,6 +10,7 @@
 22/08/2022 13:46   tomhj      1.0         Main file
 """
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import time
 
 import matplotlib.pyplot as plt

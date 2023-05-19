@@ -10,7 +10,8 @@
 09/11/2022 11:08   tomhj      1.0         File for quickly setting up console
                                           for checking testing data
 """
-
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import resources
 import matplotlib.pyplot as plt
 
@@ -61,9 +62,6 @@ def main(exp_name: str = None) -> resources.experiment.Experiment:
 
 
 if __name__ == "__main__":
-    tests = ['Test 5', 'Test 7', 'Test 8', 'Test 9', 'Test 10']
-    for test in tests:
-        exp = main(test)
-        check_nc4(exp)
-        check_ae(exp)
+    exp = main()
+    update(exp)
     plt.show()

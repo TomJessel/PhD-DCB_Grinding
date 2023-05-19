@@ -12,6 +12,8 @@
 
 """
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import datetime
 import fnmatch
 import glob
@@ -533,7 +535,10 @@ def create_obj(
     if folder is None:
         try:
             # root = tk.Tk()
-            folder_path = askdirectory(title='Select test folder:')
+            initdir = ONEDRIVE_PATH.parents[1].joinpath('Testing')
+            folder_path = askdirectory(initialdir=initdir,
+                                       title='Select test folder:'
+                                       )
             # root.withdraw()
             if not folder_path:
                 raise NotADirectoryError
