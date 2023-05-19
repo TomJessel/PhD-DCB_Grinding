@@ -239,7 +239,8 @@ class Experiment:
         """
         save_path = ONEDRIVE_PATH.joinpath(self.test_info.dataloc)
         save_path = save_path.joinpath(f'Test {self.test_info.testno}.pickle')
-        with open(str(save_path), 'wb') as f:
+        assert os.path.isfile(save_path)
+        with open(fr'{save_path}', 'wb') as f:
             pickle.dump(self, f)
 
     def update(self) -> None:

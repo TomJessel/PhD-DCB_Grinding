@@ -30,18 +30,13 @@ def check_ae(_exp: resources.experiment.Experiment):
 def check_nc4(_exp: resources.experiment.Experiment):
     # print('Checking most recent NC4 file...')
     _exp.nc4.check_last()
-    _exp.save()
 
 
 def update(_exp: resources.experiment.Experiment = None):
     if _exp is None:
-        exp.update()
-        check_nc4(exp)
-        exp.save()
-    else:
-        _exp.update()
-        check_nc4(_exp)
-        _exp.save()
+        _exp = exp
+    _exp.update()
+    check_nc4(_exp)
 
 
 def main(exp_name: str = None) -> resources.experiment.Experiment:
@@ -56,12 +51,11 @@ def main(exp_name: str = None) -> resources.experiment.Experiment:
     print(f'{"-" * 22}TESTING EXP FILE{"-" * 22}')
     print(_exp)
     print('-' * 60)
-    _exp.update()
+    update(_exp)
     _exp.save()
     return _exp
 
 
 if __name__ == "__main__":
-    exp = main()
-    update(exp)
+    exp = main('Test 9')
     plt.show()
