@@ -12,8 +12,6 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from typing import Union, Any
 import multiprocessing as mp
-import matplotlib as mpl
-mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -23,13 +21,13 @@ from tqdm.auto import tqdm
 
 import resources
 
+
 class SurfMeasurements:
-    def __init__(
-            self,
-            rad_mat: np.ndarray,
-            ls: int = 45,
-            lc: int = 1250,
-            ):
+    def __init__(self,
+                 rad_mat: np.ndarray,
+                 ls: int = 45,
+                 lc: int = 1250,
+                 ):
         """
         Class for all things surface measurements
 
@@ -79,21 +77,21 @@ class SurfMeasurements:
         w_dev = w_f - np.mean(w_f)
         r_dev = r_f - np.mean(r_f)
 
-        p_a = (np.sum(np.abs(p_dev)))/len(p_f)
-        w_a = (np.sum(np.abs(w_dev)))/len(w_f)
-        r_a = (np.sum(np.abs(r_dev)))/len(r_f)
+        p_a = (np.sum(np.abs(p_dev))) / len(p_f)
+        w_a = (np.sum(np.abs(w_dev))) / len(w_f)
+        r_a = (np.sum(np.abs(r_dev))) / len(r_f)
 
-        p_q = np.sqrt(np.sum(p_dev**2))/len(p_f)
-        w_q = np.sqrt(np.sum(w_dev**2))/len(w_f)
-        r_q = np.sqrt(np.sum(r_dev**2))/len(r_f)
+        p_q = np.sqrt(np.sum(p_dev**2)) / len(p_f)
+        w_q = np.sqrt(np.sum(w_dev**2)) / len(w_f)
+        r_q = np.sqrt(np.sum(r_dev**2)) / len(r_f)
 
         p_sk = skew(p_dev)
         w_sk = skew(w_dev)
         r_sk = skew(r_dev)
 
-        results = {'p':[p_a, p_q, p_sk],
-                   'w':[w_a, w_q, w_sk],
-                   'r':[r_a, r_q, r_sk],
+        results = {'p': [p_a, p_q, p_sk],
+                   'w': [w_a, w_q, w_sk],
+                   'r': [r_a, r_q, r_sk],
                    }
         return results
 
@@ -140,7 +138,7 @@ class SurfMeasurements:
                                    ])
         return p_f, w_f, r_f, df
 
-    def surf_2d(self, profile:Union[None, str, list[str]]= None):
+    def surf_2d(self, profile: Union[None, str, list[str]] = None):
         """
         Plot 2d map of the whole test.
 
@@ -158,12 +156,13 @@ class SurfMeasurements:
             fig.colorbar(im, ax=ax, label='')
             ax.set_xlabel('')
             ax.set_ylabel('')
+
             def onclick(event):
                 if event.dblclick:
                     if event.button == 1:
                         y = round(event.ydata)
                         values = self.meas_df.iloc[y]
-                        if pro =='p':
+                        if pro == 'p':
                             start_i = 0
                         elif pro == 'w':
                             start_i = 3
@@ -232,6 +231,7 @@ class SurfMeasurements:
 # print(f'W_sk: {w_sk}')
 # print(f'R_sk: {r_sk}')
 # print('\n')
+
 
 if __name__ == "__main__":
 

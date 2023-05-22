@@ -9,3 +9,7 @@ ML.log
 *.xml
 *.iml
 /.vscode/
+.ipynb_checkpoints
+*.pdf
+/models/
+*egg-info/

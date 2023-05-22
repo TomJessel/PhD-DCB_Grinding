@@ -7,16 +7,17 @@
 
 @Modify Time      @Author    @Version    @Description
 ------------      -------    --------    -----------
-22/08/2022 13:46   tomhj      1.0         File which handles AE operations within experiment object
+22/08/2022 13:46   tomhj      1.0        File which handles AE within exp obj.
 """
 
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import multiprocessing
+import os
 from functools import partial
-from pathlib import PureWindowsPath
-from typing import Tuple, Any, Union
+from pathlib import PurePosixPath as Path
+from typing import List, Tuple, Any, Union
 
-import matplotlib as mpl
-mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import mplcursors
 import numpy as np
@@ -26,7 +27,18 @@ from scipy.stats import kurtosis
 from scipy.stats import skew
 from tqdm import tqdm
 from scipy.signal import hilbert, butter, filtfilt
-# mpl.use('TkAgg')
+
+PLATFORM = os.name
+if PLATFORM == 'posix':
+    ONEDRIVE_PATH = Path(
+        r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents/PHD/'
+    )
+    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('AE/PYTHON/Acoustic-Emission')
+elif PLATFORM == 'nt':
+    ONEDRIVE_PATH = Path(
+        r'C:\Users\tomje\OneDrive - Cardiff University\Documents\PHD\AE'
+    )
+    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('PYTHON/Acoustic-Emission')
 
 
 def butter_filter(
@@ -34,7 +46,7 @@ def butter_filter(
         ftype: str = 'low',
         fs: float = 2_000_000,
         order: int = 3,
-        ) -> np.ndarray:
+) -> np.ndarray:
     """
         Apply butterworth filter to input data.
 
@@ -49,7 +61,13 @@ def butter_filter(
 
     """
     data = np.pad(data, pad_width=10_000)
-    b, a = butter(N=order, Wn=10, fs=fs, btype=ftype, analog=False, output='ba')
+    b, a = butter(N=order,
+                  Wn=10,
+                  fs=fs,
+                  btype=ftype,
+                  analog=False,
+                  output='ba'
+                  )
     y = filtfilt(b, a, data)
     return y[10_000:-10_000]
 
@@ -70,7 +88,8 @@ def rms(x: np.ndarray) -> np.ndarray:
 
 def envelope_hilbert(s: Union[np.ndarray, list]) -> np.ndarray:
     """
-    Envelope a signal with the hilbert transform and return the instantaneous amplitude.
+    Envelope a signal with the hilbert transform and return the
+    instantaneous amplitude.
 
     Args:
         s: Input signal to be enveloped
@@ -87,9 +106,10 @@ def trigger_st(
         d: Union[np.ndarray, list],
         chunk_size: int = 100_000,
         diff_change: float = 1.75E-6,
-        ) -> [int, float]:
+) -> List[Union[int, float]]:
     """
-    Find the index of the first trigger point based on change in gradient over a chunk size.
+    Find the index of the first trigger point based on change in gradient over\
+     a chunk size.
 
     Args:
         d: Data to find trigger of.
@@ -97,7 +117,8 @@ def trigger_st(
         diff_change: Threshold for change in gradient to find trigger.
 
     Returns:
-        A tuple comprimising of both the trigger index location and data value at that point.
+        A tuple comprimising of both the trigger index location and data value\
+         at that point.
         [t, t_y]: Trigger index, Data value at trigger point
 
     """
@@ -111,7 +132,10 @@ def trigger_st(
     else:
         ind = [(i * chunk_size) + (chunk_size / 2) for i in range(len(grad))]
         zipped = tuple(zip(ind, np.abs(grad)))
-        trig = sorted([z for z in zipped if z[1] >= diff_change], key=lambda x: x[0], reverse=False)
+        trig = sorted([z for z in zipped if z[1] >= diff_change],
+                      key=lambda x: x[0],
+                      reverse=False
+                      )
 
         t = (trig[0][0])
         t_y = d[int(t)]
@@ -133,8 +157,10 @@ class AE:
 
         Args:
             ae_files: File locations for each AE TDMS file.
-            pre_amp: Pre-Amp object, containing pre-amp info for the experiment.
-            testinfo: Test Info object, containing testing info for the experiment.
+            pre_amp: Pre-Amp object, containing pre-amp info for the\
+                experiment.
+            testinfo: Test Info object, containing testing info for the\
+                experiment.
             fs: Sample rate for the AE acquisition during the test.
         """
         self._files = ae_files
@@ -152,7 +178,8 @@ class AE:
     def volt2db(v: np.ndarray) -> list:
         """Converts array from volts to dB.
 
-        Calculates the equivalent amplitude dB for a given input array, based on typical AE values of; V_ref = 1E-4.
+        Calculates the equivalent amplitude dB for a given input array,\
+            based on typical AE values of; V_ref = 1E-4.
 
         Args:
             v: Voltage array for converting.
@@ -170,10 +197,12 @@ class AE:
 
         Args:
             fno: File number to calculate the fft for.
-            freqres: Resolution of the fft, i.e. the size of averaging for the fft.
+            freqres: Resolution of the fft, i.e. the size of averaging\
+                for the fft.
 
         Returns:
-            fft_mean: FFT of the signal averaged over bands specified by freqres.
+            fft_mean: FFT of the signal averaged over bands specified by\
+                freqres.
 
         """
         length = int(self._fs / freqres)
@@ -213,15 +242,17 @@ class AE:
             data: AE data from the TDMS file.
 
         """
-        filepath = PureWindowsPath(self._files[fno])
-        test = TdmsFile.read(filepath.as_posix())
+        filepath = ONEDRIVE_PATH.joinpath(self._files[fno])
+        test = TdmsFile.read(filepath)
         prop = test.properties
         data = []
         for group in test.groups():
             for channel in group.channels():
                 data = channel[:]
         if not data.dtype == float:
-            data = (data.astype(np.float) * prop.get('Gain')) + prop.get('Offset')
+            data = (data.astype(np.float64) * prop.get('Gain')) + prop.get(
+                'Offset'
+            )
         if not self._pre_amp.gain == 40:
             if self._pre_amp.gain == 20:
                 data = data * 10
@@ -242,7 +273,6 @@ class AE:
         t = np.arange(0, n) * ts
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        # mpl.use("TkAgg")
         fig, ax = plt.subplots()
         ax.plot(t, signal, linewidth=1)
         ax.set_title(filename)
@@ -269,22 +299,25 @@ class AE:
 
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        # mpl.use('TkAgg')
         fig, ax = plt.subplots()
         ax.plot(f / 1000, p)
-        ax.set_title(f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}')
+        ax.set_title(
+            f'Test No: {self._testinfo.testno} - FFT File {filename[-3:]}'
+        )
         ax.autoscale(enable=True, axis='x', tight=True)
         ax.set_xlabel('Frequency (kHz)')
         ax.set_ylabel('Amplitude (dB)')
         ax.grid()
         mplcursors.cursor(hover=True)
         fig.show()
+        return fig, ax
 
     def process(self, trigger: bool = True, FFT: bool = False) -> None:
         """
         Process the AE data calculating the crucial features.
 
-        Multiprocessing function to process AE data saving the common features wihtin the AE object, with the options
+        Multiprocessing function to process AE data saving the common features\
+                within the AE object, with the options
         to calculate between the trigger points and calculate the 1kHz fft.
 
         Args:
@@ -294,11 +327,16 @@ class AE:
         """
         with multiprocessing.Pool(processes=20) as pool:
             if self.trig_points.empty and trigger:
-                trigs = list(tqdm(pool.imap(self._triggers, range(len(self._files))),
+                trigs = list(tqdm(pool.imap(self._triggers,
+                                            range(len(self._files))
+                                            ),
                                   total=len(self._files),
                                   desc='Triggers'))
                 self.trig_points = pd.DataFrame(trigs,
-                                                columns=['trig st', 'trig end', 'trig y-val'],
+                                                columns=['trig st',
+                                                         'trig end',
+                                                         'trig y-val'
+                                                         ],
                                                 )
             # print('Calculating results...')
             results = list(tqdm(pool.imap(self._calc, range(len(self._files))),
@@ -316,22 +354,26 @@ class AE:
         if 1000 not in self.fft or FFT:
             with multiprocessing.Pool(processes=20) as pool:
                 # print('Calculating FFT with 1kHz bins...')
-                fft = list(tqdm(pool.imap(partial(self._fftcalc, freqres=1000), range(len(self._files))),
+                fft = list(tqdm(pool.imap(partial(self._fftcalc, freqres=1000),
+                                          range(len(self._files))
+                                          ),
                                 total=len(self._files),
                                 desc='Calc FFT 1 kHz'))
                 p = self.volt2db(np.array(fft))
                 self.fft[1000] = p
         pool.close()
 
-    def _calc(self, fno: int) -> [np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def _calc(self, fno: int) -> List[np.ndarray]:
         """
-        Function for multiprocessing to calculate all the time driven AE results of an AE signal.
+        Function for multiprocessing to calculate all the time driven AE\
+            results of an AE signal.
 
         Args:
             fno: File number to calculate features for.
 
         Returns:
-            A tuple containg the kurtosis, rms, amplitude and skewness of the signal (k, r, a, sk)
+            A tuple containg the kurtosis, rms, amplitude and skewness of the\
+            signal (k, r, a, sk)
         """
         data = self.readAE(fno)
         trig = self.trig_points.loc[fno]
@@ -343,15 +385,17 @@ class AE:
         # print(f'Completed File {fno}...')
         return k, r, a, sk
 
-    def _triggers(self, fno: int) -> [int, int, float]:
+    def _triggers(self, fno: int) -> List[Union[int, float]]:
         """
-        Compute the start and end trigger indicies, as well as the y-value at those points.
+        Compute the start and end trigger indicies, as well as the y-value at\
+            those points.
 
         Args:
             fno: File number to find the triggers of.
 
         Returns:
-            A tuple containing the start index, end index, and y value (trig_st, trig_end, trig_y_val).
+            A tuple containing the start index, end index, and y value\
+            (trig_st, trig_end, trig_y_val).
 
         """
         sig = self.readAE(fno)
@@ -365,12 +409,24 @@ class AE:
         else:
             trig_st = trig + 100_000
             en_trig2 = envelope_hilbert(sig[-6_000_000:])
-            fil_trig2 = butter_filter(data=en_trig2, fs=self._fs, order=3, ftype='low')
-            trig_end = (5_900_000 - np.argmax(fil_trig2[100_000:] < trig_y_val))
+            fil_trig2 = butter_filter(data=en_trig2,
+                                      fs=self._fs,
+                                      order=3,
+                                      ftype='low'
+                                      )
+            trig_end = (
+                5_900_000 - np.argmax(fil_trig2[100_000:] < trig_y_val)
+            )
             if trig_end == 5_900_000:
                 en_trig2 = envelope_hilbert(sig[6_000_000:-6_000_000])
-                fil_trig2 = butter_filter(data=en_trig2, fs=self._fs, order=3, ftype='low')
-                trig_end = 6_100_000 + (np.argmax(fil_trig2[100_000:] < trig_y_val))
+                fil_trig2 = butter_filter(data=en_trig2,
+                                          fs=self._fs,
+                                          order=3,
+                                          ftype='low'
+                                          )
+                trig_end = 6_100_000 + (np.argmax(
+                    fil_trig2[100_000:] < trig_y_val
+                ))
             else:
                 trig_end = len(sig) - trig_end
         return trig_st, trig_end, trig_y_val
@@ -392,16 +448,22 @@ class AE:
             p = self.fft[freqres]
         else:
             with multiprocessing.Pool() as pool:
-                fft = list(tqdm(pool.imap(partial(self._fftcalc, freqres=freqres), range(len(self._files))),
-                                total=len(self._files),
-                                desc=f'Calc FFT  {freqres / 1000} kHz'))
+                fft = list(tqdm(
+                    pool.imap(partial(self._fftcalc, freqres=freqres),
+                              range(len(self._files))),
+                    total=len(self._files),
+                    desc=f'Calc FFT  {freqres / 1000} kHz'))
                 p = self.volt2db(np.array(fft))
             self.fft[freqres] = p
 
         if freqlim is None:
-            freqlim = {'lowlim': int(0 / freqres), 'uplim': int(self._fs / (2 * freqres))}
+            freqlim = {'lowlim': int(0 / freqres),
+                       'uplim': int(self._fs / (2 * freqres))
+                       }
         else:
-            freqlim = {'lowlim': int(freqlim[0] / freqres), 'uplim': int(freqlim[1] / freqres)}
+            freqlim = {'lowlim': int(freqlim[0] / freqres),
+                       'uplim': int(freqlim[1] / freqres)
+                       }
         f = np.arange(0, self._fs / 2, freqres, dtype=int)
         n = np.arange(0, len(self._files))
         p = np.array(p)
@@ -421,14 +483,23 @@ class AE:
     def fft_2d_surf(self, freqlim: Union[None, list] = None):
         p = np.array(self.fft[1000])
         if freqlim is None:
-            freqlim = {'lowlim': int(0 / 1000), 'uplim': int(self._fs / (2 * 1000))}
+            freqlim = {'lowlim': int(0 / 1000),
+                       'uplim': int(self._fs / (2 * 1000))
+                       }
         else:
-            freqlim = {'lowlim': int(freqlim[0] / 1000), 'uplim': int(freqlim[1] / 1000)}
+            freqlim = {'lowlim': int(freqlim[0] / 1000),
+                       'uplim': int(freqlim[1] / 1000)
+                       }
         p = p[:, freqlim['lowlim']:freqlim['uplim']]
 
         fig, ax = plt.subplots()
-        im = ax.imshow(p, origin='lower', interpolation='bilinear', aspect='auto', cmap='jet')
-        fig.colorbar(im, ax=ax, label='Amplitude (dB)') 
+        im = ax.imshow(p,
+                       origin='lower',
+                       interpolation='bilinear',
+                       aspect='auto',
+                       cmap='jet'
+                       )
+        fig.colorbar(im, ax=ax, label='Amplitude (dB)')
         ax.set_xlabel('Frequency (kHz)')
         ax.set_ylabel('Measurement No')
         xticks = ax.get_xticks()
@@ -437,17 +508,19 @@ class AE:
         ax.set_xticklabels(xticks_labels)
         return fig
 
-
-    def rolling_rms(self, fno: Union[int, tuple]) -> Union[np.ndarray, None]:
+    def rolling_rms(self, fno: Union[int, tuple], plot_fig: bool = True) -> \
+            Union[np.ndarray, None]:
         """
         Produces either a figure or mp4/gif of the specified files.
 
         Args:
-            fno: File numeber to produce the rolling rms for. For figure single int input.
+            fno: File numeber to produce the rolling rms for. For figure\
+            single int input.
                 For gif/mp4 tuple of start and end file.
 
         Returns:
-            Array of the rolling rms of the selected file. Only with single input file.
+            Array of the rolling rms of the selected file.\
+            Only with single input file.
         """
         import moviepy.editor as mp
         from matplotlib.animation import PillowWriter
@@ -486,15 +559,15 @@ class AE:
             v_rms = calc_roll_rms(fno)
             n = v_rms.size
             t = np.arange(0, n) * ts
-            # mpl.use('TkAgg')
-            fig, ax = plt.subplots()
-            ax.plot(t, v_rms, linewidth=0.75)
-            ax.set_xlabel('Time (s)')
-            ax.set_ylabel('RMS (s)')
-            ax.set_title(f'File {fno} - Rolling RMS')
-            ax.autoscale(enable=True, axis='x', tight=True)
-            mplcursors.cursor(multiple=True)
-            fig.show()
+            if plot_fig:
+                fig, ax = plt.subplots()
+                ax.plot(t, v_rms, linewidth=0.75)
+                ax.set_xlabel('Time (s)')
+                ax.set_ylabel('RMS (s)')
+                ax.set_title(f'File {fno} - Rolling RMS')
+                ax.autoscale(enable=True, axis='x', tight=True)
+                mplcursors.cursor(multiple=True)
+                fig.show()
             return v_rms
         elif type(fno) is tuple:
             # Code to create a gif of the RMS plots
@@ -506,8 +579,8 @@ class AE:
             ax.set_ylabel('RMS (V)')
             writer = PillowWriter(fps=1)
             n = 40_000_000  # number of points to plot
-            dataloc = PureWindowsPath(self._testinfo.dataloc)
-            path = f'{dataloc.as_posix()}/Figures/'
+            dataloc = ONEDRIVE_PATH.joinpath(self._testinfo.dataloc)
+            path = dataloc.joinpath('Figures/')
             name = f'{path}Test {self._testinfo.testno} - Rolling RMS.gif'
             with writer.saving(fig, name, 200):
                 for no in range(fno[0], fno[1]):
@@ -530,7 +603,8 @@ class AE:
 
     def plot_triggers(self, fno: int) -> None:
         """
-        Plot calculated trigger points of the file on the hibert enveloped and lowpass filtered AE signal
+        Plot calculated trigger points of the file on the hibert enveloped\
+            and lowpass filtered AE signal
 
         Args:
             fno: File number to show triggers
@@ -547,7 +621,8 @@ class AE:
         ts = 1 / self._fs
         n = len(sig)
         t = np.arange(0, n) * ts
-        filename = f'Test {fno:03d} - Triggers of enveloped & filtered AE signal'
+        filename = f'Test {fno:03d} - Triggers of enveloped & filtered\
+            AE signal'
 
         en_sig = envelope_hilbert(sig)
         sig = butter_filter(data=en_sig, fs=self._fs, order=3, ftype='low')
@@ -555,8 +630,10 @@ class AE:
         fig, ax = plt.subplots()
         ax.plot(t, sig, linewidth=1)
         ax.axhline(triggers['trig y-val'], color='r', linewidth=1, alpha=0.5)
-        ax.axvline(triggers['trig st'] * ts, color='r', linewidth=1, alpha=0.5)
-        ax.axvline(triggers['trig end'] * ts, color='r', linewidth=1, alpha=0.5)
+        ax.axvline(triggers['trig st'] * ts,
+                   color='r', linewidth=1.5, alpha=0.5, linestyle='--')
+        ax.axvline(triggers['trig end'] * ts,
+                   color='r', linewidth=1.5, alpha=0.5, linestyle='--')
         ax.set_title(filename)
         ax.autoscale(enable=True, axis='x', tight=True)
         ax.set_xlabel('Time (s)')

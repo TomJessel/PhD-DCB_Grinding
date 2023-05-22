@@ -7,10 +7,13 @@
 
 @Modify Time      @Author    @Version    @Desciption
 ------------      -------    --------    -----------
-09/11/2022 11:08   tomhj      1.0         File for quickly setting up console for checking testing data
+09/11/2022 11:08   tomhj      1.0         File for quickly setting up console
+                                          for checking testing data
 """
-
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import resources
+import matplotlib.pyplot as plt
 
 
 def check_ae(_exp: resources.experiment.Experiment):
@@ -27,35 +30,32 @@ def check_ae(_exp: resources.experiment.Experiment):
 def check_nc4(_exp: resources.experiment.Experiment):
     # print('Checking most recent NC4 file...')
     _exp.nc4.check_last()
-    _exp.save()
 
 
 def update(_exp: resources.experiment.Experiment = None):
     if _exp is None:
-        exp.update()
-        check_nc4(exp)
-        exp.save()
-    else:
-        _exp.update()
-        check_nc4(_exp)
-        _exp.save()
+        _exp = exp
+    _exp.update()
+    check_nc4(_exp)
 
 
-def main() -> resources.experiment.Experiment:
+def main(exp_name: str = None) -> resources.experiment.Experiment:
     try:
-        _exp = resources.load()
-    except NotADirectoryError:
-        _exp = resources.experiment.create_obj()
+        if exp_name is not None:
+            _exp = resources.load(exp_name)
+        else:
+            _exp = resources.load()
+    except FileNotFoundError:
+        _exp = resources.experiment.create_obj(process=False)
 
     print(f'{"-" * 22}TESTING EXP FILE{"-" * 22}')
     print(_exp)
     print('-' * 60)
-    _exp.update()
+    update(_exp)
     _exp.save()
     return _exp
 
 
 if __name__ == "__main__":
-    exp = main()
-    # check_nc4(exp)
-    # check_ae(exp)
+    exp = main('Test 8')
+    plt.show()

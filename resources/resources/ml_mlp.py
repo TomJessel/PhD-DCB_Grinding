@@ -11,11 +11,10 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import multiprocessing
-import platform
 import time
 from textwrap import dedent
 from typing import Any, Dict, Iterable, List, Union, Tuple
-
+from pathlib import PurePosixPath as Path
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -25,7 +24,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from tqdm.auto import tqdm
 
-import tensorflow as tf # noqa: E402
+import tensorflow as tf  # noqa: E402
 import tensorflow_addons as tfa  # noqa: E402
 import tensorboard.plugins.hparams.api as hp
 from tensorboard.backend.event_processing import event_accumulator
@@ -34,11 +33,12 @@ tf.config.set_visible_devices([], 'GPU')
 from absl import logging
 logging.set_verbosity(logging.ERROR)
 
-from keras.layers import Dense, Dropout, LSTM # noqa: E402
+from keras.layers import Dense, Dropout, LSTM  # noqa: E402
 from keras.models import Sequential  # noqa: E402
 from keras.optimizers import Adam  # noqa: E402
 
 import resources  # noqa: E402
+
 
 def parse_tensorboard(path: str, scalars: list[str]):
     """
@@ -47,7 +47,7 @@ def parse_tensorboard(path: str, scalars: list[str]):
     Args:
        path: Path containing TB files
        scalars: List of scalars in the TB logs
-    
+
     Returns:
 
     """
@@ -55,7 +55,7 @@ def parse_tensorboard(path: str, scalars: list[str]):
         path,
         size_guidance={'tensors': 0},
     )
-    _absorb_print = ea.Reload()
+    ea.Reload()
     # make sure the scalars are in the event accumulator tags
     assert all(
         s in ea.Tags()["tensors"] for s in scalars
@@ -67,6 +67,7 @@ def parse_tensorboard(path: str, scalars: list[str]):
         'step')
         for scalar in scalars}
     return pd.concat(results.values(), axis=1)
+
 
 class Base_Model:
     def __init__(
@@ -116,21 +117,14 @@ class Base_Model:
             file path to AE folder
 
         """
-        import os
-        import re
-
-        dirname = os.path.dirname(__file__)
-
-        regex_folder = re.compile("(tomje)")
-        result = regex_folder.search(dirname)
-        PLATFORM = platform.system()
-        if PLATFORM == 'Windows':
-            filename = dirname[:result.end()] + r"\Documents\PhD\AE"
-        elif PLATFORM == 'Linux':
-            filename = dirname[:result.end()] + r"/ml"
-        else:
-            filename = dirname[:result.end()] + r"\Documents\PhD\AE"
-        filename = os.path.abspath(filename)
+        platform = os.name
+        if platform == 'nt':
+            filename = Path.cwd().parents[1]
+        elif platform == 'posix':
+            onedrive = Path(
+                r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents'
+            )
+            filename = onedrive.joinpath('PHD/AE')
         return filename
 
     def pre_process(self):
@@ -398,11 +392,10 @@ class Base_Model:
                     enumerate(cv.split(X))]
 
         with multiprocessing.Pool(processes=20, maxtasksperchild=1) as pool:
-            outputs = list(tqdm(pool.imap(
-                                    self._cv_model_star, 
-                                    cv_items,
-                                    chunksize=1,
-                                    ),
+            outputs = list(tqdm(pool.imap(self._cv_model_star,
+                                          cv_items,
+                                          chunksize=1,
+                                          ),
                                 total=len(cv_items),
                                 desc='CV Model'
                                 ))
@@ -473,9 +466,9 @@ class Base_Model:
                 step = 0
                 step = tf.convert_to_tensor(step, dtype=tf.int64)
                 for score in scores:
-                    tf.summary.scalar('cv_iter/mae',score['MAE'],step=step)
-                    tf.summary.scalar('cv_iter/mse',score['MSE'],step=step)
-                    tf.summary.scalar('cv_iter/r2',score['r2'],step=step)
+                    tf.summary.scalar('cv_iter/mae', score['MAE'], step=step)
+                    tf.summary.scalar('cv_iter/mse', score['MSE'], step=step)
+                    tf.summary.scalar('cv_iter/r2', score['r2'], step=step)
                     step += 1
         return _cv_score
 
@@ -485,6 +478,8 @@ class MLP_Model(Base_Model):
             self,
             # params: Dict = None,
             tb_logdir: str = '',
+            random_state: int = None,
+            shuffle: bool = True,
             **kwargs,
     ):
         """
@@ -509,7 +504,9 @@ class MLP_Model(Base_Model):
         self.tb_log_dir = os.path.join(self.tb_log_dir, 'MLP', tb_logdir)
 
         if self.main_df is not None:
-            self.pre_process()
+            self.pre_process(random_state=random_state,
+                             shuffle=shuffle,
+                             )
             self.model = self.initialise_model(**self.params)
         else:
             print('Choose data file to import as main_df')
@@ -517,6 +514,8 @@ class MLP_Model(Base_Model):
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
+            random_state: int = None,
+            shuffle: bool = True,
     ) -> Tuple[Tuple[Any, Any], Tuple[Any, Any]]:
         """
         Pre-process the data for training an MLP model
@@ -535,20 +534,24 @@ class MLP_Model(Base_Model):
 
         """
         scaler = MinMaxScaler()
+        
+        train, test = train_test_split(self.main_df,
+                                       test_size=val_frac,
+                                       random_state=random_state,
+                                       shuffle=shuffle,
+                                       )
+        
+        train_y = train[[self.target]].to_numpy()
+        train_x = train.drop(columns=self.target).to_numpy()
+        test_y = test[[self.target]].to_numpy()
+        test_x = test.drop(columns=self.target).to_numpy()
 
-        train, test = train_test_split(self.main_df, test_size=val_frac)
+        train_x = scaler.fit_transform(train_x)
+        test_x = scaler.transform(test_x)
 
-        for col in self.main_df.columns:
-            if col not in self.target:
-                train[col] = scaler.fit_transform(train[[col]])
-                test[col] = scaler.transform(test[[col]])
-        train.dropna(inplace=True)
-        test.dropna(inplace=True)
-
-        self.train_data = (train.drop(columns=self.target),
-                           train[[self.target]])
-        self.val_data = (test.drop(columns=self.target),
-                         test[[self.target]])
+        self.train_data = (train_x, train_y)
+        self.val_data = (test_x, test_y)
+        self.scaler = scaler
         return self.train_data, self.val_data
 
     @staticmethod
@@ -649,7 +652,10 @@ class MLP_Model(Base_Model):
         Returns: A KerasRegressor into the model attribute
 
         """
-        no_features = pd.DataFrame.to_numpy(self.train_data[0]).shape[1]
+        try:
+            no_features = pd.DataFrame.to_numpy(self.train_data[0]).shape[1]
+        except AttributeError:
+            no_features = self.train_data[0].shape[1]
 
         # tensorboard set-up
         logdir = self.tb_log_dir
@@ -678,7 +684,6 @@ class MLP_Model(Base_Model):
                     hp_params,
                     trial_id=self._run_name.split(self.tb_log_dir)[1][1:]
                 )
-            # callbacks.append(hp.KerasCallback(self._run_name, hp_params, self._run_name))
 
         model = KerasRegressor(
             model=self.build_mod,
@@ -767,7 +772,7 @@ class Linear_Model(Base_Model):
         from sklearn.linear_model import LinearRegression
         model = LinearRegression(**params)
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        self._run_name = os.path.join(self.tb_log_dir,f'Lin_Reg-{t}')
+        self._run_name = os.path.join(self.tb_log_dir, f'Lin_Reg-{t}')
         return model
 
     def score(
@@ -824,8 +829,12 @@ class Linear_Model(Base_Model):
             print(f'{self._run_name.split(self.tb_log_dir)[1][1:]}')
             print('Validation Scores:')
             print('-' * 65)
-            print(f'MAE = {np.abs(_test_score["test_MAE"].mean()) * 1000:.3f} um')
-            print(f'MSE = {np.abs(_test_score["test_MSE"].mean()) * 1_000_000:.3f} um^2')
+            print(
+                f'MAE = {np.abs(_test_score["test_MAE"].mean()) * 1e3:.3f}um'
+            )
+            print(
+                f'MSE = {np.abs(_test_score["test_MSE"].mean()) * 1e6:.3f}um^2'
+            )
             print(f'R^2 = {np.mean(_test_score["test_r2"].mean()):.3f}')
             # print('-' * 65)
 
@@ -889,6 +898,8 @@ class MLP_Win_Model(Base_Model):
             self,
             # params: Dict = None,
             tb_logdir: str = '',
+            random_state: int = None,
+            shuffle: bool = True,
             **kwargs,
     ):
         """
@@ -916,7 +927,9 @@ class MLP_Win_Model(Base_Model):
         self.tb_log_dir = os.path.join(self.tb_log_dir, 'MLP_WIN', tb_logdir)
 
         if self.main_df is not None:
-            self.pre_process()
+            self.pre_process(random_state=random_state,
+                             shuffle=shuffle,
+                             )
             self.model = self.initialise_model(**self.params)
         else:
             print('Choose data file to import as main_df')
@@ -924,6 +937,8 @@ class MLP_Win_Model(Base_Model):
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
+            random_state: int = None,
+            shuffle: bool = True,
     ) -> Tuple[List[Any], List[Any]]:
         """
         Pre-process the data for training an MLP Win model
@@ -971,34 +986,38 @@ class MLP_Win_Model(Base_Model):
         # save index and pos of the train test split
         train_i, test_i = train_test_split(indx,
                                            test_size=val_frac,
-                                           shuffle=True
+                                           shuffle=shuffle,
+                                           random_state=random_state,
                                            )
 
         scaler = MinMaxScaler()
         m_df = self.main_df
 
-        # scale the data transforming only on the training data and fitting \
-        # on test data
-        for col in self.main_df.columns:
-            if col not in self.target:
-                m_df[col][train_i] = scaler.fit_transform(
-                    m_df[col][train_i].values.reshape(-1, 1)).squeeze()
-                m_df[col][test_i] = scaler.transform(
-                    m_df[col][test_i].values.reshape(-1, 1)).squeeze()
+        y = m_df[self.target].to_numpy()
+        X = m_df.drop(columns=self.target).to_numpy()
+
+        scaler.fit(X[train_i])
+        X = scaler.transform(X)
+        self.scaler = scaler
+
+        Xy = np.column_stack((X, y))
+        m_df = pd.DataFrame(Xy, columns=m_df.columns)
 
         # window the dataset
         m_df = sequence_data(m_df.values)
+        m_df = pd.DataFrame(m_df, columns=['features', 'target'])
+        m_df.index += self.seq_len - 1
 
         # index position of the end of each dataframe
         # todo need to change to get automatically
-        df_ends = [211, 374, 550, 708]
+        df_ends = np.cumsum([207, 159, 172, 154])
 
         # try to remove overlapping
         # indicies of data to remove from model
-        del_indx = list(range(0, self.seq_len)) + \
-            list(range(df_ends[0], (df_ends[0] + self.seq_len))) + \
-            list(range(df_ends[1], (df_ends[1] + self.seq_len))) + \
-            list(range(df_ends[2], (df_ends[2] + self.seq_len)))
+        del_indx = list(range(0, (self.seq_len - 1))) + \
+            list(range(df_ends[0], (df_ends[0] + (self.seq_len - 1)))) + \
+            list(range(df_ends[1], (df_ends[1] + (self.seq_len - 1)))) + \
+            list(range(df_ends[2], (df_ends[2] + (self.seq_len - 1))))
         indx = np.delete(indx, del_indx)
 
         # split data set indicies into train and test
@@ -1008,20 +1027,20 @@ class MLP_Win_Model(Base_Model):
                        if element not in del_indx]
 
         # separate the train and test datasets
-        train = [m_df[np.where(indx == j)[0][0]] for j in temp_train_i]
-        test = [m_df[np.where(indx == j)[0][0]] for j in temp_test_i]
+        train = m_df.loc[temp_train_i, :]
+        test = m_df.loc[temp_test_i, :]
 
         train_X = []
         train_y = []
 
-        for X, y in train:
+        for X, y in train.values:
             train_X.append(X)
             train_y.append(y)
 
         test_X = []
         test_y = []
 
-        for X, y in test:
+        for X, y in test.values:
             test_X.append(X)
             test_y.append(y)
 
@@ -1033,8 +1052,8 @@ class MLP_Win_Model(Base_Model):
         self.train_data = [train_X, train_y]
         self.val_data = [test_X, test_y]
         # reshape feature data for MLP win model input
-        self._no_features = (self.train_data[0].shape[1] *
-                             self.train_data[0].shape[2])
+        self._no_features = (self.train_data[0].shape[1] * self.train_data[0]
+                             .shape[2])
         self.train_data[0] = self.train_data[0].reshape(
             (self.train_data[0].shape[0], self._no_features))
         self.val_data[0] = self.val_data[0].reshape(
@@ -1185,6 +1204,9 @@ class LSTM_Model(Base_Model):
             self,
             # params: Dict = None,
             tb_logdir: str = '',
+            random_state: int = None,
+            shuffle: bool = True,
+            val_frac: float = 0.2,
             **kwargs,
     ):
         """
@@ -1209,7 +1231,10 @@ class LSTM_Model(Base_Model):
         self.tb_log_dir = os.path.join(self.tb_log_dir, 'LSTM', tb_logdir)
 
         if self.main_df is not None:
-            self.pre_process()
+            self.pre_process(val_frac=val_frac,
+                             random_state=random_state,
+                             shuffle=shuffle,
+                             )
             self.model = self.initialise_model(**self.params)
         else:
             print('Choose data file to import as main_df')
@@ -1217,6 +1242,8 @@ class LSTM_Model(Base_Model):
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
+            random_state: int = None,
+            shuffle: bool = True,
     ) -> Tuple[List[Any], List[Any]]:
         """
         Pre-process the data for training an LSTM model
@@ -1264,34 +1291,39 @@ class LSTM_Model(Base_Model):
         # save index and pos of the train test split
         train_i, test_i = train_test_split(indx,
                                            test_size=val_frac,
-                                           shuffle=True
+                                           shuffle=shuffle,
+                                           random_state=random_state,
                                            )
 
         scaler = MinMaxScaler()
         m_df = self.main_df
 
-        # scale the data transforming only on the training data and fitting \
-        # on test data
-        for col in self.main_df.columns:
-            if col not in self.target:
-                m_df[col][train_i] = scaler.fit_transform(
-                    m_df[col][train_i].values.reshape(-1, 1)).squeeze()
-                m_df[col][test_i] = scaler.transform(
-                    m_df[col][test_i].values.reshape(-1, 1)).squeeze()
+        y = m_df[self.target].to_numpy()
+        X = m_df.drop(columns=self.target).to_numpy()
+
+        scaler.fit(X[train_i])
+        X = scaler.transform(X)
+        self.scaler = scaler
+
+        Xy = np.column_stack((X, y))
+        m_df = pd.DataFrame(Xy, columns=m_df.columns)
 
         # window the dataset
         m_df = sequence_data(m_df.values)
+        m_df = pd.DataFrame(m_df, columns=['features', 'target'])
+        m_df.index += self.seq_len - 1
 
         # index position of the end of each dataframe
         # todo need to change to get automatically
-        df_ends = [211, 374, 550, 708]
+        # df_ends = [211, 374, 550, 708]
+        df_ends = np.cumsum([207, 159, 172, 154])
 
         # try to remove overlapping
         # indicies of data to remove from model
-        del_indx = list(range(0, self.seq_len)) + \
-            list(range(df_ends[0], (df_ends[0] + self.seq_len))) + \
-            list(range(df_ends[1], (df_ends[1] + self.seq_len))) + \
-            list(range(df_ends[2], (df_ends[2] + self.seq_len)))
+        del_indx = list(range(0, (self.seq_len - 1))) + \
+            list(range(df_ends[0], (df_ends[0] + (self.seq_len - 1)))) + \
+            list(range(df_ends[1], (df_ends[1] + (self.seq_len - 1)))) + \
+            list(range(df_ends[2], (df_ends[2] + (self.seq_len - 1))))
         indx = np.delete(indx, del_indx)
 
         # split data set indicies into train and test
@@ -1301,20 +1333,20 @@ class LSTM_Model(Base_Model):
                        if element not in del_indx]
 
         # separate the train and test datasets
-        train = [m_df[np.where(indx == j)[0][0]] for j in temp_train_i]
-        test = [m_df[np.where(indx == j)[0][0]] for j in temp_test_i]
+        train = m_df.loc[temp_train_i, :]
+        test = m_df.loc[temp_test_i, :]
 
         train_X = []
         train_y = []
 
-        for X, y in train:
+        for X, y in train.values:
             train_X.append(X)
             train_y.append(y)
 
         test_X = []
         test_y = []
 
-        for X, y in test:
+        for X, y in test.values:
             test_X.append(X)
             test_y.append(y)
 
@@ -1329,6 +1361,7 @@ class LSTM_Model(Base_Model):
         # print(f'Test data shape:\t{test_X.shape}')
         self._no_features = (self.train_data[0].shape[1:])
         return self.train_data, self.val_data
+
     @staticmethod
     def build_mod(
             no_features,
@@ -1572,22 +1605,22 @@ if __name__ == "__main__":
     # NO_NODES = [16, 32, 64]
 
     # MLP MODEL
-    mlp_reg = MLP_Model(feature_df=main_df,
-                        target='Mean radius',
-                        tb=True,
-                        tb_logdir='func_test',
-                        params={'epochs': 1000,
-                                'no_nodes': 128,
-                                'dropout': 0.01,
-                                'loss': 'mse',
-                                'init_mode': 'he_normal',
-                                'no_layers': 3,
-                                },
-                        )
+    # mlp_reg = MLP_Model(feature_df=main_df,
+    #                     target='Mean radius',
+    #                     tb=True,
+    #                     tb_logdir='func_test',
+    #                     params={'epochs': 1000,
+    #                             'no_nodes': 128,
+    #                             'dropout': 0.01,
+    #                             'loss': 'mse',
+    #                             'init_mode': 'he_normal',
+    #                             'no_layers': 3,
+    #                             },
+    #                     )
 
-    mlp_reg.cv(n_splits=10)
-    mlp_reg.fit(validation_split=0.2, verbose=0)
-    mlp_reg.score(plot_fig=False)
+    # mlp_reg.cv(n_splits=10)
+    # mlp_reg.fit(validation_split=0.2, verbose=0)
+    # mlp_reg.score(plot_fig=False)
 
     # # MLP WINDOW MODEL
     # mlp_win_reg = MLP_Win_Model(feature_df=main_df,
@@ -1605,19 +1638,21 @@ if __name__ == "__main__":
     # mlp_win_reg.fit(validation_split=0.2, verbose=0)
     # mlp_win_reg.score(plot_fig=False)
     #
-    # # LSTM MODEL
-    # lstm_reg = LSTM_Model(feature_df=main_df,
-    #                       target='Mean radius',
-    #                       tb=True,
-    #                       tb_logdir='hparam test',
-    #                       params={'seq_len': 10,
-    #                               'loss': 'mae',
-    #                               'epochs': 100,
-    #                               'no_layers': 2,
-    #                               'no_dense': 1,
-    #                               'no_nodes': 64,
-    #                               },
-    #                       )
+    # LSTM MODEL
+    lstm_reg = LSTM_Model(feature_df=main_df,
+                          target='Mean radius',
+                          tb=False,
+                          tb_logdir='hparam test',
+                          params={'seq_len': 15,
+                                  'loss': 'mae',
+                                  'epochs': 100,
+                                  'no_layers': 2,
+                                  'no_dense': 1,
+                                  'no_nodes': 64,
+                                  },
+                          random_state=42,
+                          )
+    
     # lstm_reg.cv(n_splits=10)
     # lstm_reg.fit(validation_split=0.2, verbose=0)
     # lstm_reg.score(plot_fig=False)
@@ -1635,7 +1670,7 @@ if __name__ == "__main__":
 # todo add logger compatibility to log progress and scores
 # todo mlp_window for removing overlap needs to get positions of overlaps to
 # work from end index of dfs so it is automatic
-# todo add random state for pre-process and cv
+# todo add random state for cv
 # todo add reduceLROnPlateau callback
 # todo add early stopping callback
 # https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/

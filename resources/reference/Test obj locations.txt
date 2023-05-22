@@ -6,3 +6,4 @@ test5,Testing/22_08_03_grit1000/Test 5.pickle
 test7,Testing/22_11_07_weartest_1000/Test 7.pickle
 test8,Testing/22_11_09_weartest_1000/Test 8.pickle
 test9,Testing/22_11_30_weartest_1000/Test 9.pickle
+test10,Testing/23_05_15_OWL_Probe_test/Test 10.pickle
