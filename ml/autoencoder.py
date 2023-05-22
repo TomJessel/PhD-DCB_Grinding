@@ -39,8 +39,10 @@ import resources
 
 platform = os.name
 if platform == 'nt':
-    DATA_DIR = Path.cwd().parents[1].joinpath('Testing', 'RMS')
-    TB_DIR = Path.cwd().parents[1].joinpath('Tensorboard')
+    onedrive = Path(r'C:\Users\tomje\OneDrive - Cardiff University')
+    onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
+    DATA_DIR = onedrive.joinpath('Testing', 'RMS')
+    TB_DIR = onedrive.joinpath('Tensorboard')
 elif platform == 'posix':
     onedrive = Path(r'/mnt/c/Users/tomje/OneDrive - Cardiff University')
     onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
