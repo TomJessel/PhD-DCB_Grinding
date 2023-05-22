@@ -12,3 +12,4 @@ ML.log
 .ipynb_checkpoints
 *.pdf
 /models/
+*egg-info/
