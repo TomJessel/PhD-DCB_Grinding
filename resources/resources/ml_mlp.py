@@ -119,7 +119,8 @@ class Base_Model:
         """
         platform = os.name
         if platform == 'nt':
-            filename = Path.cwd().parents[1]
+            onedrive = Path(r'C:\Users\tomje\OneDrive - Cardiff University')
+            filename = onedrive.joinpath('Documents/PHD/AE')
         elif platform == 'posix':
             onedrive = Path(
                 r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents'
@@ -157,7 +158,7 @@ class Base_Model:
                 y = self.train_data[1]
 
         print('-' * 65)
-        print(f'{self._run_name.split(self.tb_log_dir)[1][1:]}')
+        print(f'{self._run_name.split(self.tb_log_dir)[1][0:]}')
 
         self.model.fit(X=X, y=y, **kwargs)
 
@@ -1316,14 +1317,15 @@ class LSTM_Model(Base_Model):
         # index position of the end of each dataframe
         # todo need to change to get automatically
         # df_ends = [211, 374, 550, 708]
-        df_ends = np.cumsum([207, 159, 172, 154])
+        # df_ends = np.cumsum([207, 159, 172, 154])
 
-        # try to remove overlapping
-        # indicies of data to remove from model
-        del_indx = list(range(0, (self.seq_len - 1))) + \
-            list(range(df_ends[0], (df_ends[0] + (self.seq_len - 1)))) + \
-            list(range(df_ends[1], (df_ends[1] + (self.seq_len - 1)))) + \
-            list(range(df_ends[2], (df_ends[2] + (self.seq_len - 1))))
+        # # try to remove overlapping
+        # # indicies of data to remove from model
+        del_indx = list(range(0, (self.seq_len - 1)))
+        # del_indx = list(range(0, (self.seq_len - 1))) + \
+        #     list(range(df_ends[0], (df_ends[0] + (self.seq_len - 1)))) + \
+        #     list(range(df_ends[1], (df_ends[1] + (self.seq_len - 1)))) + \
+        #     list(range(df_ends[2], (df_ends[2] + (self.seq_len - 1))))
         indx = np.delete(indx, del_indx)
 
         # split data set indicies into train and test
