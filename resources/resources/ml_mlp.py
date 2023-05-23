@@ -473,6 +473,25 @@ class Base_Model:
                     step += 1
         return _cv_score
 
+    def loss_plot(self,
+                  ax: plt.Axes = None,
+                  ) -> Any:
+         
+        if hasattr(self.model, 'history_') is False:
+            raise ValueError('Model has not been fit yet.')
+        
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = ax.get_figure()
+        
+        ax.plot(self.model.history_['loss'], label='Loss')
+        ax.plot(self.model.history_['val_loss'], label='Val Loss')
+        ax.legend()
+        ax.set_xlabel('Epochs')
+        ax.set_ylabel('Loss')
+        return fig, ax
+
 
 class MLP_Model(Base_Model):
     def __init__(
