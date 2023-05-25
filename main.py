@@ -11,16 +11,12 @@
 """
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import time
 
 import matplotlib.pyplot as plt
-import mplcursors
-import numpy as np
 import pandas as pd
 import seaborn as sns
-import tensorflow as tf
 
-import resources
+from resources import load, ae
 
 
 def corr_matrix(df: pd.DataFrame, save_fig: bool = True):
@@ -39,7 +35,7 @@ def corr_matrix(df: pd.DataFrame, save_fig: bool = True):
     plt.show()
     if save_fig:
         path = f'{exp.test_info.dataloc}/Figures'
-        png_name = f'{path}/Test {exp.test_info.testno} - Correlation Matrix.png'
+        png_name = f'{path}/Test {exp.test_info.testno}-Correlation Matrix.png'
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
         fig.savefig(png_name, dpi=200)
@@ -56,43 +52,5 @@ def corr_pairplot(df: pd.DataFrame, save_fig: bool = True):
 
 
 if __name__ == '__main__':
-    exp = resources.load(file='Test 5')
-    exp.correlation()
-    exp = resources.load(file='Test 7')
-    exp.correlation()
-    exp = resources.load(file='Test 8')
-    exp.correlation()
-    exp = resources.load(file='Test 9')
-    exp.correlation()
-    # dataframe = exp.features.drop(columns=['Runout', 'Form error']).drop([0, 1, 23, 24])
-    #
-    # logdir = 'ml-results/logs/MLP/CV/'
-    # run_name = f'{logdir}MLP-{time.strftime("%Y%m%d-%H%M%S", time.localtime())}'
-    # tb_writer = tf.summary.create_file_writer(run_name)
-    #
-    # pipe = resources.create_pipeline(
-    #     model=resources.get_regression,
-    #     model__init_mode='glorot_normal',
-    #     model__dropout=0.1,
-    #     model__hidden_layer_sizes=(30, 30),
-    #     optimizer='adam',
-    #     optimizer__learning_rate=0.001,
-    #     loss='mae',
-    #     metrics=['MAE', 'MSE'],
-    #     batch_size=10,
-    #     epochs=500,
-    #     verbose=0,
-    #     callbacks=[tf.keras.callbacks.TensorBoard(log_dir=run_name, histogram_freq=1)]
-    # )
-    #
-    #
-    # X_train, X_test, y_train, y_test = resources.split_dataset(dataframe)
-    #
-    # pipe, train_scores = resources.score_train(model=pipe, Xdata=X_train, ydata=y_train)
-    #
-    # pipe.fit(X_train, y_train, mlp_reg__validation_split=0.2)
-    # resources.train_history(pipe)
-    #
-    # test_score = resources.score_test(pipe, X_test, y_test)
-    # c = corr_matrix(feat.drop([0, 1, 23, 24]), save_fig=False)
-    # corr_pairplot(feat.drop([0, 1, 23, 24]), save_fig=False)
+    rms = ae.RMS('Test 9')
+    rms.data

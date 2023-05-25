@@ -27,6 +27,9 @@ from scipy.stats import kurtosis
 from scipy.stats import skew
 from tqdm import tqdm
 from scipy.signal import hilbert, butter, filtfilt
+import tkinter as tk
+import glob
+
 
 PLATFORM = os.name
 if PLATFORM == 'posix':
@@ -640,3 +643,122 @@ class AE:
         ax.set_ylabel('Voltage (V)')
         fig.show()
         return fig
+
+
+class RMS:
+    def __init__(self,
+                 exp_obj: str = None,
+                 pre_amp_gain: int = 20,
+                 ) -> None:
+        
+        self._data = None
+        self._folder = None
+        self._pre_amp_gain = pre_amp_gain
+
+        if type(exp_obj) is str:
+            ref_test_loc = ONEDRIVE_PATH.joinpath(
+                'resources/reference/Test obj locations.txt'
+            )
+            f_locs = pd.read_csv(ref_test_loc, sep=',', index_col=0)
+            f_locs = f_locs.to_dict()['Obj location']
+            f_locs = {k: ONEDRIVE_PATH.parents[1].joinpath(v)
+                      for k, v in f_locs.items()}
+            try:
+                self._folder = f_locs[exp_obj.lower().replace(' ', '')].parent
+            except KeyError:
+                print('Test object not found in reference file')
+                exp_obj = None
+
+        if exp_obj is None:
+            folder = tk.filedialog.askdirectory(
+                title="Select the experiment's folder",
+                initialdir=ONEDRIVE_PATH.parents[1].joinpath('Testing'),
+                mustexist=True,
+            )
+            self._folder = Path(folder)
+
+    @property
+    def data(self) -> pd.DataFrame:
+        if self._data is not None:
+            return self._data
+        else:
+            self._data = self._get_data()
+            # self._data = self._process_rms()
+            return self._data
+        
+    def _get_data(self) -> pd.DataFrame:
+        try:
+            file = self._folder.joinpath('AE_RMS.csv')
+            return pd.read_csv(file)
+        except FileNotFoundError:
+            print(f'Processing RMS data for {self._folder.parts[-1]}')
+            return self._process_rms()
+
+    def _process_rms(self) -> pd.DataFrame:
+        assert os.path.exists(self._folder.joinpath('AE'))
+        self._aefiles = glob.glob(os.path.join(self._folder, 'AE/TDMS/*.tdms'))
+        no_files = len(self._aefiles)
+        fnos = range(no_files)
+
+        with multiprocessing.Pool() as pool:
+            rms = list(tqdm(pool.imap(self._calc_rms, fnos),
+                            total=no_files,
+                            desc='Calculating RMS',
+                            ))
+        pool.close()
+        m = min([r.shape[0] for r in rms])
+        rms = [r[:m] for r in rms]
+        rms = np.array(rms)
+
+        data = pd.DataFrame(rms.T)
+        data.to_csv(self._folder.joinpath('AE_RMS.csv'),
+                    index=False,
+                    encoding='utf-8',
+                    )
+        print(f'AE RMS data saved to {self._folder.joinpath("AE_RMS.csv")}')
+        return data
+
+    def _readAE(self, fno: int) -> np.ndarray:
+        """
+        Read the AE data from the specified file
+
+        Args:
+            fno: File number to read
+
+        Returns:
+            AE data as a numpy array
+
+        """
+        file = self._aefiles[fno]
+        test = TdmsFile(file)
+        prop = test.properties
+        data = []
+        for group in test.groups():
+            for channel in group.channels():
+                data = channel[:]
+        if not data.dtype == float:
+            data = (data.astype(np.float64) * prop.get('Gain')) + prop.get(
+                'Offset'
+            )
+        if not self._pre_amp_gain == 40:
+            if self._pre_amp_gain == 20:
+                data = data * 10
+            elif self._pre_amp_gain == 60:
+                data = data / 10
+        return data
+
+    def _calc_rms(self, fno: int) -> np.ndarray:
+        sig = self._readAE(fno)
+        avg_size = 100000
+        sig = pd.DataFrame(sig)
+        sig = sig.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
+        sig = np.array(sig)[500000 - 1:]
+        avg_sig = np.nanmean(np.pad(sig.astype(float),
+                                    ((0, avg_size - sig.size % avg_size),
+                                     (0, 0)
+                                     ),
+                                    mode='constant',
+                                    constant_values=np.NaN
+                                    )
+                             .reshape(-1, avg_size), axis=1)
+        return avg_sig
