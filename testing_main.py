@@ -45,7 +45,7 @@ def main(exp_name: str = None) -> resources.experiment.Experiment:
             _exp = resources.load(exp_name)
         else:
             _exp = resources.load()
-    except FileNotFoundError:
+    except NotADirectoryError:
         _exp = resources.experiment.create_obj(process=False)
 
     print(f'{"-" * 22}TESTING EXP FILE{"-" * 22}')
