@@ -8,7 +8,7 @@
 16/01/2023 10:03   tomhj      1.0         N/A
 """
 
-from resources.ml_mlp import MLP_Win_Model
+from resources import MLP_Win_Model
 import resources
 
 import gc
@@ -16,6 +16,7 @@ import pandas as pd
 import tensorflow as tf
 tf.get_logger().setLevel('ERROR')
 import multiprocessing
+
 
 def opt_model_score(mod):
     mod.cv(n_splits=10, n_repeats=10)
@@ -67,16 +68,16 @@ if __name__ == "__main__":
                         'loss': 'mse',
                         'no_nodes': 128,
                         'seq_len': 5,
-                        'dropout':dropout,
+                        'dropout': dropout,
                         'batch_size': batch_size,
                         'no_layers': no_layers,
                         'init_mode': init_mode,
                     }
                     ml_win_reg = MLP_Win_Model(feature_df=main_df,
-                                          target='Mean radius',
-                                          tb=True,
-                                          tb_logdir='hparam_test_2',
-                                          params=hparams
-                                          )
+                                               target='Mean radius',
+                                               tb=True,
+                                               tb_logdir='hparam_test_2',
+                                               params=hparams
+                                               )
                     opt_model_score(ml_win_reg)
                     gc.collect()

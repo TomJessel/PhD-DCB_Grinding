@@ -19,8 +19,6 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.stats import skew
 from tqdm.auto import tqdm
 
-import resources
-
 
 class SurfMeasurements:
     def __init__(self,
@@ -231,19 +229,3 @@ class SurfMeasurements:
 # print(f'W_sk: {w_sk}')
 # print(f'R_sk: {r_sk}')
 # print('\n')
-
-
-if __name__ == "__main__":
-
-    LS = 45
-    LC = 1250
-
-    exp5 = resources.load('Test 5')
-    exp7 = resources.load('Test 7')
-    exp8 = resources.load('Test 8')
-    exp9 = resources.load('Test 9')
-
-    surf5 = SurfMeasurements(exp5.nc4.radius, ls=LS, lc=LC)
-    surf7 = SurfMeasurements(exp7.nc4.radius, ls=LS, lc=LC)
-    surf8 = SurfMeasurements(exp8.nc4.radius, ls=LS, lc=LC)
-    surf9 = SurfMeasurements(exp9.nc4.radius, ls=LS, lc=LC)

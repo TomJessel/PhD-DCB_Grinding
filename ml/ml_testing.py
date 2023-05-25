@@ -1,8 +1,8 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import resources
-from resources.ml_mlp import LSTM_Model, MLP_Model
-from resources.surf_meas import SurfMeasurements
+from resources import LSTM_Model, MLP_Model, MLP_WIN_Model # noqa
+from resources import SurfMeasurements # noqa
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -68,6 +68,7 @@ if __name__ == "__main__":
     # surf7 = SurfMeasurements(exp7.nc4.radius, ls=45, lc=1250)
     # surf8 = SurfMeasurements(exp8.nc4.radius, ls=45, lc=1250)
     # surf9 = SurfMeasurements(exp9.nc4.radius, ls=45, lc=1250)
+
     # # combine surface and AE dataframes
     # surfs = [surf5, surf7, surf8, surf9]
     # data = zip(dfs, surfs)
@@ -81,13 +82,13 @@ if __name__ == "__main__":
     main_df = main_df.drop(columns=[
         # 'Mean radius', 'Pa', 'Pq', 'Psk', 'Wa', 'Wq', 'Wsk', 'Ra', 'Rsk',
         'Runout', 'Form error', 'Peak radius', 'Radius diff'
-        ]).drop([0, 1, 2, 3])
+    ]).drop([0, 1, 2, 3])
     main_df.reset_index(drop=True, inplace=True)
     # print(main_df.head())
 
     lstm_reg = LSTM_Model(feature_df=main_df,
                           target='Mean radius',
-                          tb=True,
+                          tb=False,
                           tb_logdir='early-stopping',
                           params={'loss': 'mse',
                                   'epochs': 1500,
@@ -99,28 +100,28 @@ if __name__ == "__main__":
                                   'seq_len': 10,
                                   'no_dense': 1,
                                   # 'callbacks': [
-                                      # tf.keras.callbacks.EarlyStopping(
-                                      #     monitor='loss',
-                                      #     patience=100,
-                                      #     mode='min',
-                                      #     start_from_epoch=100,
-                                      # ),
-                                      # tf.keras.callbacks.ReduceLROnPlateau(
-                                      #     monitor='val_loss',
-                                      #     mode='min',
-                                      #     factor=0.8,
-                                      #     verbose=1,
-                                      #     cooldown=50,
-                                      #     patience=100,
-                                      # ),
+                                  #     tf.keras.callbacks.EarlyStopping(
+                                  #         monitor='loss',
+                                  #         patience=100,
+                                  #         mode='min',
+                                  #         start_from_epoch=100,
+                                  #     ),
+                                  #     tf.keras.callbacks.ReduceLROnPlateau(
+                                  #         monitor='val_loss',
+                                  #         mode='min',
+                                  #         factor=0.8,
+                                  #         verbose=1,
+                                  #         cooldown=50,
+                                  #         patience=100,
+                                  #     ),
                                   # ],
                                   },
                           )
 
     # lstm_reg.cv(n_splits=10)
-    lstm_reg.fit(validation_split=0.2, verbose=0)
-    lstm_reg.score(plot_fig=False)
+    # lstm_reg.fit(validation_split=0.2, verbose=0)
+    # lstm_reg.score(plot_fig=False)
 
-    y = lstm_reg.val_data[1]
-    y_pred = lstm_reg.model.predict(lstm_reg.val_data[0], verbose=0)
-    pred_plot(y, y_pred, 'LSTM')
+    # y = lstm_reg.val_data[1]
+    # y_pred = lstm_reg.model.predict(lstm_reg.val_data[0], verbose=0)
+    # pred_plot(y, y_pred, 'LSTM')

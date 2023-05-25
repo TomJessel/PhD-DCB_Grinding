@@ -37,8 +37,6 @@ from keras.layers import Dense, Dropout, LSTM  # noqa: E402
 from keras.models import Sequential  # noqa: E402
 from keras.optimizers import Adam  # noqa: E402
 
-import resources  # noqa: E402
-
 
 def parse_tensorboard(path: str, scalars: list[str]):
     """
@@ -158,7 +156,7 @@ class Base_Model:
                 y = self.train_data[1]
 
         print('-' * 65)
-        print(f'{self._run_name.split(self.tb_log_dir)[1][0:]}')
+        print(f'{self._run_name.split(self.tb_log_dir)[1][1:]}')
 
         self.model.fit(X=X, y=y, **kwargs)
 
@@ -1596,102 +1594,3 @@ class LSTM_Model(Base_Model):
             # tf.summary.text('Model Info', lines, step=0)
             # Code to output Tensorboard hyperparams
             tf.summary.text('Model Info', hp, step=1)
-
-
-if __name__ == "__main__":
-    __spec__ = None
-    multiprocessing.set_start_method("spawn")
-
-    print('START')
-    exp5 = resources.load('Test 5')
-    exp7 = resources.load('Test 7')
-    exp8 = resources.load('Test 8')
-    exp9 = resources.load('Test 9')
-
-    dfs = [exp5.features.drop([23, 24]),
-           exp7.features,
-           exp8.features,
-           exp9.features
-           ]
-
-    main_df = pd.concat(dfs)
-    main_df = main_df.drop(
-        columns=['Runout', 'Form error', 'Peak radius', 'Radius diff']).drop(
-            [0, 1, 2, 3])
-    main_df.reset_index(drop=True, inplace=True)
-
-# HPARAM ATTEMPT
-
-    # EPOCHS = [50, 100, 150]
-    # NO_NODES = [16, 32, 64]
-
-    # MLP MODEL
-    # mlp_reg = MLP_Model(feature_df=main_df,
-    #                     target='Mean radius',
-    #                     tb=True,
-    #                     tb_logdir='func_test',
-    #                     params={'epochs': 1000,
-    #                             'no_nodes': 128,
-    #                             'dropout': 0.01,
-    #                             'loss': 'mse',
-    #                             'init_mode': 'he_normal',
-    #                             'no_layers': 3,
-    #                             },
-    #                     )
-
-    # mlp_reg.cv(n_splits=10)
-    # mlp_reg.fit(validation_split=0.2, verbose=0)
-    # mlp_reg.score(plot_fig=False)
-
-    # # MLP WINDOW MODEL
-    # mlp_win_reg = MLP_Win_Model(feature_df=main_df,
-    #                             target='Mean radius',
-    #                             tb=True,
-    #                             tb_logdir='hparam test',
-    #                             params={'seq_len': 15,
-    #                                     'loss': 'mae',
-    #                                     'epochs': 100,
-    #                                     'no_layers': 3,
-    #                                     'no_nodes': 64,
-    #                                     },
-    #                             )
-    # mlp_win_reg.cv(n_splits=10)
-    # mlp_win_reg.fit(validation_split=0.2, verbose=0)
-    # mlp_win_reg.score(plot_fig=False)
-    #
-    # LSTM MODEL
-    lstm_reg = LSTM_Model(feature_df=main_df,
-                          target='Mean radius',
-                          tb=False,
-                          tb_logdir='hparam test',
-                          params={'seq_len': 15,
-                                  'loss': 'mae',
-                                  'epochs': 100,
-                                  'no_layers': 2,
-                                  'no_dense': 1,
-                                  'no_nodes': 64,
-                                  },
-                          random_state=42,
-                          )
-    
-    # lstm_reg.cv(n_splits=10)
-    # lstm_reg.fit(validation_split=0.2, verbose=0)
-    # lstm_reg.score(plot_fig=False)
-    #
-    # # MULTIPLE LINEAR MODEL
-    # lin_reg = Linear_Model(feature_df=main_df, target='Mean radius')
-    # lin_reg.fit()
-    # lin_reg.score()
-
-    print('-' * 65)
-    print('END')
-
-# TODOS
-# todo try loss of r2 instead of MAE or MSE
-# todo add logger compatibility to log progress and scores
-# todo mlp_window for removing overlap needs to get positions of overlaps to
-# work from end index of dfs so it is automatic
-# todo add random state for cv
-# todo add reduceLROnPlateau callback
-# todo add early stopping callback
-# https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learning-model-performance/
