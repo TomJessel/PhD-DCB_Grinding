@@ -1,7 +1,7 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import resources
-from resources import LSTM_Model, MLP_Model, MLP_WIN_Model # noqa
+from resources import LSTM_Model, MLP_Model, MLP_Win_Model # noqa
 from resources import SurfMeasurements # noqa
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -86,12 +86,14 @@ if __name__ == "__main__":
     main_df.reset_index(drop=True, inplace=True)
     # print(main_df.head())
 
+    #%% Create Model
+    # --------------------------------
     lstm_reg = LSTM_Model(feature_df=main_df,
                           target='Mean radius',
-                          tb=False,
-                          tb_logdir='early-stopping',
+                          tb=True,
+                          tb_logdir='model_checkpoints_test',
                           params={'loss': 'mse',
-                                  'epochs': 1500,
+                                  'epochs': 400,
                                   'no_layers': 3,
                                   'no_nodes': 128,
                                   'batch_size': 10,
@@ -117,11 +119,36 @@ if __name__ == "__main__":
                                   # ],
                                   },
                           )
-
+    #%% Cross-validation of Model
+    # --------------------------------
     # lstm_reg.cv(n_splits=10)
-    # lstm_reg.fit(validation_split=0.2, verbose=0)
-    # lstm_reg.score(plot_fig=False)
 
+    #%% Add Model Checkpoint Callback
+    # --------------------------------
+    lstm_reg.model.callbacks.append(
+        tf.keras.callbacks.ModelCheckpoint(
+            filepath=lstm_reg._run_name + '.h5',
+            monitor='val_loss',
+            mode='min',
+            save_best_only=True,
+            save_weights_only=True,
+        )
+    )
+
+    #%% Train Model
+    # --------------------------------
+    lstm_reg.fit(validation_split=0.2, verbose=0)
+
+    #%% Load Best Model
+    # --------------------------------
+    lstm_reg.model.model_.load_weights(lstm_reg._run_name + '.h5')
+
+    #%% Score Model
+    # --------------------------------
+    lstm_reg.score(plot_fig=False)
+
+    #%% Plot Predictions
+    # --------------------------------
     # y = lstm_reg.val_data[1]
     # y_pred = lstm_reg.model.predict(lstm_reg.val_data[0], verbose=0)
     # pred_plot(y, y_pred, 'LSTM')
