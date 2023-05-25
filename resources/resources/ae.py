@@ -259,7 +259,7 @@ class AE:
         if not self._pre_amp.gain == 40:
             if self._pre_amp.gain == 20:
                 data = data * 10
-            elif self._pre_amp == 60:
+            elif self._pre_amp.gain == 60:
                 data = data / 10
         return data
 

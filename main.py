@@ -11,6 +11,8 @@
 """
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import warnings
+warnings.filterwarnings('ignore')
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -52,5 +54,5 @@ def corr_pairplot(df: pd.DataFrame, save_fig: bool = True):
 
 
 if __name__ == '__main__':
-    rms = ae.RMS('Test 9')
+    rms = ae.RMS('Test 5')
     rms.data
