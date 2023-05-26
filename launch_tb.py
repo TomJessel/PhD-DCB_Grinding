@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from tensorboard import program
@@ -46,4 +47,7 @@ def launch_tb(log_dir):
 
 
 if __name__ == '__main__':
-    launch_tb(sys.argv[1])
+    if len(sys.argv) > 1:
+        launch_tb(sys.argv[1])
+    else:
+        launch_tb(input('Logdir: '))
