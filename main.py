@@ -19,8 +19,10 @@ from resources import load, ae
 
 if __name__ == '__main__':
     exp = load('Test 9')
-    exp.ae.plotAE(157)
-
     rms = ae.RMS('Test 9')
-    rms.plot_rms(157)
+
+    fig, ax = plt.subplots(2, 1)
+    ax[0] = exp.ae.plotAE(150, ax=ax[0])
+    ax[1] = rms.plot_rms(150, ax=ax[1])
+
     plt.show()

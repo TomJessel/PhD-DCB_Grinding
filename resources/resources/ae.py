@@ -263,20 +263,24 @@ class AE:
                 data = data / 10
         return data
 
-    def plotAE(self, fno: int) -> None:
+    def plotAE(self, fno: int, ax: plt.axes = None) -> Any:
         """
         Plot AE from file number.
 
         Args:
             fno: File number to plot the AE of.
         """
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = ax.get_figure()
+
         signal = self.readAE(fno)
         ts = 1 / self._fs
         n = len(signal)
         t = np.arange(0, n) * ts
         filename = self._files[fno].partition('_202')[0]
         filename = filename[-8:]
-        fig, ax = plt.subplots()
         ax.plot(t, signal, linewidth=1)
         ax.set_title(filename)
         ax.autoscale(enable=True, axis='x', tight=True)
@@ -284,6 +288,7 @@ class AE:
         ax.set_ylabel('Voltage (V)')
         mplcursors.cursor(multiple=True)
         fig.show()
+        return fig, ax
 
     def plotfft(self, fno: int, freqres: float = 1000) -> None:
         """
@@ -790,6 +795,7 @@ class RMS:
                     label=f'RMS {n}'
                     )
         ax.set_ylabel('RMS (V)')
+        ax.autoscale(enable=True, axis='x', tight=True)
         if len(fno) > 1:
             ax.legend(bbox_to_anchor=(1.04, 0.5), loc='center left')
         else:
