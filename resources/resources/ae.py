@@ -677,6 +677,13 @@ class RMS:
             )
             self._folder = Path(folder)
 
+        self.no_files = self.data.shape[1]
+
+        print('-' * 50)
+        print(f'Loaded RMS data for "{self._folder.parts[-1]}"')
+        print(f'Number of files: {self.no_files}')
+        print('-' * 50)
+
     @property
     def data(self) -> pd.DataFrame:
         if self._data is not None:
@@ -762,3 +769,30 @@ class RMS:
                                     )
                              .reshape(-1, avg_size), axis=1)
         return avg_sig
+
+    def plot_rms(self,
+                 fno: Union[int, list, tuple],
+                 ax: plt.axes = None
+                 ) -> Any:
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = ax.get_figure()
+
+        if type(fno) is tuple or type(fno) is list:
+            fno = range(*fno)
+
+        fno = [fno] if type(fno) is int else fno
+
+        for n in fno:
+            ax.plot(self.data.iloc[:, n],
+                    linewidth=0.75,
+                    label=f'RMS {n}'
+                    )
+        ax.set_ylabel('RMS (V)')
+        if len(fno) > 1:
+            ax.legend(bbox_to_anchor=(1.04, 0.5), loc='center left')
+        else:
+            ax.legend()
+        fig.tight_layout()
+        return fig, ax
