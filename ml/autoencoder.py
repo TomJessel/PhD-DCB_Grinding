@@ -438,7 +438,8 @@ class AutoEncoder():
         self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
         layers = n_size + [n_bottleneck] + n_size[::-1]
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        self.run_name = f'AUTOE-{self.RMS.exp_name}-E-{epochs}-L-{layers}-{t}'
+        self.run_name = f'AUTOE-{self.RMS.exp_name.replace(" ", "_")}-' \
+                        f'E-{epochs}-L-{layers}-{t}'
 
         if callbacks is None:
             callbacks = []
@@ -800,7 +801,6 @@ class AutoEncoder():
 class _VariationalAutoEncoder(Model):
     def __init__(self, input_dim, latent_dim, n_size):
         super().__init__()
-        # TODO change to work with n_size to allow for dynamic layers
         self.input_dim = input_dim
         self.latent_dim = latent_dim
         self.n_size = n_size

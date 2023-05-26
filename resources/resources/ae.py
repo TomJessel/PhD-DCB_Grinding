@@ -29,6 +29,7 @@ from tqdm import tqdm
 from scipy.signal import hilbert, butter, filtfilt
 import tkinter as tk
 import glob
+import re
 
 
 PLATFORM = os.name
@@ -659,6 +660,7 @@ class RMS:
         self._data = None
         self._folder = None
         self._pre_amp_gain = pre_amp_gain
+        self.exp_name = 'Test_99'
 
         if type(exp_obj) is str:
             ref_test_loc = ONEDRIVE_PATH.joinpath(
@@ -681,11 +683,17 @@ class RMS:
                 mustexist=True,
             )
             self._folder = Path(folder)
+        
+        files = [f for f in list(os.walk(self._folder))[0][2]]
+        for f in files:
+            if re.search(r'Test \d.pickle', f):
+                self.exp_name = f.split('.pickle')[0]
 
         self.no_files = self.data.shape[1]
 
         print('-' * 50)
         print(f'Loaded RMS data for "{self._folder.parts[-1]}"')
+        print(f'Experiemnt No: {self.exp_name}')
         print(f'Number of files: {self.no_files}')
         print('-' * 50)
 

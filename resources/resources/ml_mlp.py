@@ -1152,6 +1152,7 @@ class MLP_Win_Model(Base_Model):
             with tb_writer.as_default():
                 hp_params = self.params
                 hp_params['seq_len'] = self.seq_len
+                hp_params.pop('callbacks', None)
                 hp.hparams(
                     hp_params,
                     trial_id=self._run_name.split(self.tb_log_dir)[1][1:]
@@ -1333,17 +1334,23 @@ class LSTM_Model(Base_Model):
 
         # index position of the end of each dataframe
         # todo need to change to get automatically
-        # df_ends = [211, 374, 550, 708]
-        # df_ends = np.cumsum([207, 159, 172, 154])
+        df_ends = [211, 374, 550, 708]
+        df_ends = np.cumsum([207, 159, 172, 154])
 
         # # try to remove overlapping
         # # indicies of data to remove from model
         del_indx = list(range(0, (self.seq_len - 1)))
-        # del_indx = list(range(0, (self.seq_len - 1))) + \
-        #     list(range(df_ends[0], (df_ends[0] + (self.seq_len - 1)))) + \
-        #     list(range(df_ends[1], (df_ends[1] + (self.seq_len - 1)))) + \
-        #     list(range(df_ends[2], (df_ends[2] + (self.seq_len - 1))))
         indx = np.delete(indx, del_indx)
+
+        del_indx_overlap = (
+            list(range(df_ends[0], (df_ends[0] + (self.seq_len - 1)))) +
+            list(range(df_ends[1], (df_ends[1] + (self.seq_len - 1)))) +
+            list(range(df_ends[2], (df_ends[2] + (self.seq_len - 1))))
+        )
+        try:
+            indx = np.delete(indx, del_indx_overlap)
+        except IndexError:
+            print('Overlapping sections between exps not removed!')
 
         # split data set indicies into train and test
         temp_train_i = [element for element in train_i
@@ -1522,6 +1529,7 @@ class LSTM_Model(Base_Model):
             with tb_writer.as_default():
                 hp_params = self.params
                 hp_params['seq_len'] = self.seq_len
+                hp_params.pop('callbacks', None)
                 hp.hparams(
                     hp_params,
                     trial_id=self._run_name.split(self.tb_log_dir)[1][1:]
