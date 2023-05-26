@@ -37,7 +37,7 @@ def launch_tb(log_dir):
     print(f'Logdir: {log_dir}')
     print(f"TensorBoard started at:\n  {url}")
     try:
-        get_ipython().__class__.__name__
+        get_ipython().__class__.__name__  # type: ignore
         pass
     except NameError:
         try:
