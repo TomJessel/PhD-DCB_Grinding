@@ -17,6 +17,7 @@ from typing import Any, Dict, Iterable, List, Union, Tuple
 from pathlib import PurePosixPath as Path
 import numpy as np
 import pandas as pd
+from collections import deque
 from matplotlib import pyplot as plt
 from scikeras.wrappers import KerasRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -952,6 +953,28 @@ class MLP_Win_Model(Base_Model):
         else:
             print('Choose data file to import as main_df')
 
+    def sequence_data(self, d: np.ndarray):
+        """
+        Applies window effect to change feature to include previous \
+        self.seq_len features
+
+        Args:
+            d: array of features and targets
+
+        Returns:
+            tuple containing the windowed data and answer
+        """
+        seq_data = []
+        seq_len = self.seq_len
+        prev_points = deque(maxlen=seq_len)
+
+        for i in d:
+            # todo change this to adapt if multiple targets
+            prev_points.append([n for n in i[:-1]])
+            if len(prev_points) == seq_len:
+                seq_data.append([np.array(prev_points), i[-1]])
+        return seq_data
+
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
@@ -974,30 +997,6 @@ class MLP_Win_Model(Base_Model):
             for the training and validation sets.
 
         """
-
-        from collections import deque
-
-        def sequence_data(d: np.ndarray):
-            """
-            Applies window effect to change feature to include previous \
-            self.seq_len features
-
-            Args:
-                d: array of features and targets
-
-            Returns:
-                tuple containing the windowed data and answer
-            """
-            seq_data = []
-            seq_len = self.seq_len
-            prev_points = deque(maxlen=seq_len)
-
-            for i in d:
-                # todo change this to adapt if multiple targets
-                prev_points.append([n for n in i[:-1]])
-                if len(prev_points) == seq_len:
-                    seq_data.append([np.array(prev_points), i[-1]])
-            return seq_data
 
         # 4* seqlen for removing overlap
         indx = np.arange(len(self.main_df))
@@ -1022,7 +1021,7 @@ class MLP_Win_Model(Base_Model):
         m_df = pd.DataFrame(Xy, columns=m_df.columns)
 
         # window the dataset
-        m_df = sequence_data(m_df.values)
+        m_df = self.sequence_data(m_df.values)
         m_df = pd.DataFrame(m_df, columns=['features', 'target'])
         m_df.index += self.seq_len - 1
 
@@ -1258,6 +1257,28 @@ class LSTM_Model(Base_Model):
         else:
             print('Choose data file to import as main_df')
 
+    def sequence_data(self, d: np.ndarray):
+        """
+        Applies window effect to change feature to include previous \
+        self.seq_len features
+
+        Args:
+            d: array of features and targets
+
+        Returns:
+            tuple containing the windowed data and answer
+        """
+        seq_data = []
+        seq_len = self.seq_len
+        prev_points = deque(maxlen=seq_len)
+
+        for i in d:
+            # todo change this to adapt if multiple targets
+            prev_points.append([n for n in i[:-1]])
+            if len(prev_points) == seq_len:
+                seq_data.append([np.array(prev_points), i[-1]])
+        return seq_data
+
     def pre_process(
             self: Base_Model,
             val_frac: float = 0.2,
@@ -1280,30 +1301,6 @@ class LSTM_Model(Base_Model):
             for the training and validation sets.
 
         """
-
-        from collections import deque
-
-        def sequence_data(d: np.ndarray):
-            """
-            Applies window effect to change feature to include previous \
-            self.seq_len features
-
-            Args:
-                d: array of features and targets
-
-            Returns:
-                tuple containing the windowed data and answer
-            """
-            seq_data = []
-            seq_len = self.seq_len
-            prev_points = deque(maxlen=seq_len)
-
-            for i in d:
-                # todo change this to adapt if multiple targets
-                prev_points.append([n for n in i[:-1]])
-                if len(prev_points) == seq_len:
-                    seq_data.append([np.array(prev_points), i[-1]])
-            return seq_data
 
         # 4* seqlen for removing overlap
         indx = np.arange(len(self.main_df))
@@ -1328,7 +1325,7 @@ class LSTM_Model(Base_Model):
         m_df = pd.DataFrame(Xy, columns=m_df.columns)
 
         # window the dataset
-        m_df = sequence_data(m_df.values)
+        m_df = self.sequence_data(m_df.values)
         m_df = pd.DataFrame(m_df, columns=['features', 'target'])
         m_df.index += self.seq_len - 1
 
@@ -1444,7 +1441,7 @@ class LSTM_Model(Base_Model):
                 units=no_nodes,
                 activation=activation,
                 kernel_initializer=init_mode,
-                name=f'dense{i + 1}',
+                name=f'dense{j + 1}',
                 use_bias=True,
             ))
             model.add(Dropout(
