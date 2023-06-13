@@ -1339,15 +1339,22 @@ class LSTM_Model(Base_Model):
         del_indx = list(range(0, (self.seq_len - 1)))
         indx = np.delete(indx, del_indx)
 
-        del_indx_overlap = (
-            list(range(df_ends[0], (df_ends[0] + (self.seq_len - 1)))) +
-            list(range(df_ends[1], (df_ends[1] + (self.seq_len - 1)))) +
-            list(range(df_ends[2], (df_ends[2] + (self.seq_len - 1))))
-        )
-        try:
-            indx = np.delete(indx, del_indx_overlap)
-        except IndexError:
-            print('Overlapping sections between exps not removed!')
+        for end in df_ends:
+            del_indx_overlap = list(range(end, (end + (self.seq_len - 1))))
+            try:
+                indx = np.delete(indx, del_indx_overlap)
+            except IndexError:
+                print('Overlapping sections between exps not removed!')
+        
+        # del_indx_overlap = (
+        #     list(range(df_ends[0], (df_ends[0] + (self.seq_len - 1)))) +
+        #     list(range(df_ends[1], (df_ends[1] + (self.seq_len - 1)))) +
+        #     list(range(df_ends[2], (df_ends[2] + (self.seq_len - 1))))
+        # )
+        # try:
+        #     indx = np.delete(indx, del_indx_overlap)
+        # except IndexError:
+        #     print('Overlapping sections between exps not removed!')
 
         # split data set indicies into train and test
         temp_train_i = [element for element in train_i
