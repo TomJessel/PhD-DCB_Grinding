@@ -1031,11 +1031,15 @@ class MLP_Win_Model(Base_Model):
 
         # try to remove overlapping
         # indicies of data to remove from model
-        del_indx = list(range(0, (self.seq_len - 1))) + \
-            list(range(df_ends[0], (df_ends[0] + (self.seq_len - 1)))) + \
-            list(range(df_ends[1], (df_ends[1] + (self.seq_len - 1)))) + \
-            list(range(df_ends[2], (df_ends[2] + (self.seq_len - 1))))
+        del_indx = list(range(0, (self.seq_len - 1)))
         indx = np.delete(indx, del_indx)
+
+        for end in df_ends[:-1]:
+            del_indx_overlap = list(range(end, (end + (self.seq_len - 1))))
+            try:
+                indx = np.delete(indx, del_indx_overlap)
+            except IndexError:
+                print('Overlapping sections between exps not removed!')
 
         # split data set indicies into train and test
         temp_train_i = [element for element in train_i
@@ -1331,31 +1335,21 @@ class LSTM_Model(Base_Model):
 
         # index position of the end of each dataframe
         # todo need to change to get automatically
-        df_ends = [211, 374, 550, 708]
+        # df_ends = [211, 374, 550, 708]
         df_ends = np.cumsum([207, 159, 172, 154])
 
-        # # try to remove overlapping
-        # # indicies of data to remove from model
+        # try to remove overlapping
+        # indicies of data to remove from model
         del_indx = list(range(0, (self.seq_len - 1)))
         indx = np.delete(indx, del_indx)
 
-        for end in df_ends:
+        for end in df_ends[:-1]:
             del_indx_overlap = list(range(end, (end + (self.seq_len - 1))))
             try:
                 indx = np.delete(indx, del_indx_overlap)
             except IndexError:
                 print('Overlapping sections between exps not removed!')
         
-        # del_indx_overlap = (
-        #     list(range(df_ends[0], (df_ends[0] + (self.seq_len - 1)))) +
-        #     list(range(df_ends[1], (df_ends[1] + (self.seq_len - 1)))) +
-        #     list(range(df_ends[2], (df_ends[2] + (self.seq_len - 1))))
-        # )
-        # try:
-        #     indx = np.delete(indx, del_indx_overlap)
-        # except IndexError:
-        #     print('Overlapping sections between exps not removed!')
-
         # split data set indicies into train and test
         temp_train_i = [element for element in train_i
                         if element not in del_indx]
