@@ -262,7 +262,11 @@ class NC4:
         mplcursors.cursor(hover=2)
         return fig
     
-    def plot_xy(self, fno: tuple = None, step: int = 1) -> None:
+    def plot_xy(self,
+                fno: tuple = None,
+                step: int = 1,
+                plt_ax: plt.Axes = None
+                ) -> None:
         """
         Plot full radius measurement around tool circumference, \
             for a slice or all measurements.
@@ -282,9 +286,14 @@ class NC4:
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
 
+        if plt_ax is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = plt_ax
+            fig = ax.get_figure()
+
         if fno is None:
             radius = self.radius
-            fig, ax = plt.subplots()
             savefig = True
             n = 0
             for r in radius:
@@ -295,7 +304,6 @@ class NC4:
             ax.set_title(f'Test No: {self._testinfo.testno} - NC4 Radius Plot')
             ax.autoscale(enable=True, axis='x', tight=True)
         else:
-            fig, ax = plt.subplots()
             slice_n = slice(fno[0], fno[1], step)
             radius = self.radius[slice_n]
             lbl = range(len(self._files))[slice_n]
@@ -322,9 +330,12 @@ class NC4:
                 with open(pic_name, 'wb') as f:
                     pickle.dump(fig, f)
         mplcursors.cursor(multiple=True)
-        return fig
+        if plt_ax is None:
+            return fig, ax
+        else:
+            return ax
 
-    def plot_surf(self) -> None:
+    def plot_surf(self, fno: tuple = None, plt_ax=None) -> None:
         """
         Plot surface of DCB radius over measurements in time.
 
@@ -336,38 +347,49 @@ class NC4:
                    f'- NC4 Radius Surf.pickle'
         if not os.path.isdir(path) or not os.path.exists(path):
             os.makedirs(path)
-        try:
-            with open(pic_name, 'rb') as f:
-                fig = pickle.load(f)
-        except IOError:
-            fig = plt.figure()
-            ax = fig.add_subplot()
+
+        if plt_ax is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = plt_ax
+            fig = ax.get_figure()
+
+        if fno is None:
             r = np.array(self.radius, dtype=float)
             x = np.array(self.theta, dtype=float)
             y = np.array(self._datano, dtype=float)
-            surf = ax.pcolormesh(x,
-                                 y,
-                                 r,
-                                 cmap='jet',
-                                 rasterized=True,
-                                 shading='nearest'
-                                 )
-            fig.colorbar(surf, label='Radius (mm)')
-            ax.set_title(
-                f'Test No: {self._testinfo.testno} - NC4 Radius Surface'
-            )
-            ax.set_ylabel('Measurement Number')
-            ax.set_xlabel('Angle (rad)')
-            try:
-                open(png_name)
-            except IOError:
-                fig.savefig(png_name, dpi=300)
-            try:
-                open(pic_name)
-            except IOError:
-                with open(pic_name, 'wb') as f:
-                    pickle.dump(fig, f)
-        return fig
+        else:
+            slice_n = slice(fno[0], fno[1])
+            r = np.array(self.radius[slice_n], dtype=float)
+            x = np.array(self.theta, dtype=float)
+            y = np.array(self._datano[slice_n], dtype=float)
+        surf = ax.pcolormesh(x,
+                             y,
+                             r,
+                             cmap='jet',
+                             rasterized=True,
+                             shading='nearest'
+                             )
+        fig.colorbar(surf, label='Radius (mm)')
+        ax.set_title(
+            f'Test No: {self._testinfo.testno} - NC4 Radius Surface'
+        )
+        ax.set_ylabel('Measurement Number')
+        ax.set_xlabel('Angle (rad)')
+        try:
+            open(png_name)
+        except IOError:
+            fig.savefig(png_name, dpi=300)
+        try:
+            open(pic_name)
+        except IOError:
+            with open(pic_name, 'wb') as f:
+                pickle.dump(fig, f)
+
+        if plt_ax is None:
+            return fig, ax
+        else:
+            return ax
 
     def _sampleandpos(
             self,
