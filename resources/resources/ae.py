@@ -630,8 +630,8 @@ class AE:
         ts = 1 / self._fs
         n = len(sig)
         t = np.arange(0, n) * ts
-        filename = f'Test {fno:03d} - Triggers of enveloped & filtered\
-            AE signal'
+        filename = f'Test {fno:03d} - Triggers of enveloped & filtered' \
+                   f'AE signal'
 
         en_sig = envelope_hilbert(sig)
         sig = butter_filter(data=en_sig, fs=self._fs, order=3, ftype='low')
