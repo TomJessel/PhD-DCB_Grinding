@@ -24,7 +24,8 @@ from tqdm.auto import tqdm
 import multiprocessing as mp
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from keras.layers import Input, Dense, BatchNormalization, Lambda
+from keras.layers import Input, Dense, BatchNormalization, Lambda, Dropout
+from keras.layers import LSTM, RepeatVector, TimeDistributed
 from keras.models import Model
 # from keras.regularizers import l1, l2
 import tensorboard.plugins.hparams.api as hp
@@ -319,8 +320,22 @@ class AutoEncoder():
         Returns:
             cutoffs (dict): Dictionary of cutoff values for each score.
         """
+
+        def mad_based_outlier(points, thresh=1.8):
+            if len(points.shape) == 1:
+                points = points[:, None]
+            median = np.median(points, axis=0)
+            diff = np.sum((points - median)**2, axis=-1)
+            diff = np.sqrt(diff)
+            med_abs_deviation = np.median(diff)
+
+            modified_z_score = 0.6745 * diff / med_abs_deviation
+
+            return modified_z_score > thresh
+ 
         try:
             sc = {k: v[self._train_slice] for k, v in self.scores.items()}
+            # sc = {k: v for k, v in self.scores.items()}
         except AttributeError:
             print('Scores not calculated yet! Score then re-run.')
             return None
@@ -329,10 +344,19 @@ class AutoEncoder():
         print('\nCutoffs:')
         for key, score in sc.items():
             # check if the scores should be trying to inc or dec
+            # out = score[mad_based_outlier(score)]
             if key == 'r2':
-                cutoffs[key] = np.mean(score) - np.std(score)
+                # try:
+                #     cutoffs[key] = np.max(out)
+                # except ValueError:
+                #     print('std cutoff')
+                cutoffs[key] = np.median(score) - np.std(score)
             else:
-                cutoffs[key] = np.mean(score) + np.std(score)
+                # try:
+                #     cutoffs[key] = np.min(out)
+                # except ValueError:
+                #     print('std cutoff')
+                cutoffs[key] = np.median(score) + np.std(score)
             print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
         return cutoffs
 
@@ -365,6 +389,7 @@ class AutoEncoder():
             for dim in n_size:
                 e = Dense(dim, activation=activation)(e)
                 e = BatchNormalization()(e)
+                e = Dropout(0.1)(e)
 
             encoder_out = Dense(n_bottleneck,
                                 activation='relu',
@@ -379,6 +404,7 @@ class AutoEncoder():
             for dim in n_size[::-1]:
                 d = Dense(dim, activation=activation)(d)
                 d = BatchNormalization()(d)
+                d = Dropout(0.1)(d)
 
             decoder_out = Dense(n_inputs, activation='relu')(d)
             decoder = Model(decoder_in, decoder_out, name='Decoder')
@@ -772,6 +798,7 @@ class AutoEncoder():
             else:
                 cmap = ['r' if y > self.thres[metric] else 'b'
                         for y in self.scores[metric]]
+            # cmap = ['C0' for y in self.scores[metric]]
 
             ax[i].scatter(x=range(len(self.scores[metric])),
                           y=self.scores[metric],
@@ -814,6 +841,7 @@ class _VariationalAutoEncoder(Model):
         for dim in n_size:
             e = Dense(dim, activation='relu')(e)
             e = BatchNormalization()(e)
+            e = Dropout(0.01)(e)
 
         z_mean = Dense(latent_dim, name='z_mean')(e)
         z_log_sigma = Dense(latent_dim, name='z_log_sigma')(e)
@@ -837,6 +865,7 @@ class _VariationalAutoEncoder(Model):
         for dim in n_size[::-1]:
             d = Dense(dim, activation='relu')(d)
             d = BatchNormalization()(d)
+            d = Dropout(0.01)(d)
 
         outputs = Dense(input_dim, activation='sigmoid')(d)
 
@@ -870,6 +899,7 @@ class VariationalAutoEncoder(AutoEncoder):
         params: dict = None,
         train_slice=(0, 100),
         random_state=None,
+        **kwargs,
     ):
         super().__init__(rms_obj,
                          tb,
@@ -877,6 +907,7 @@ class VariationalAutoEncoder(AutoEncoder):
                          params,
                          train_slice,
                          random_state,
+                         **kwargs,
                          )
 
     def initialise_model(
@@ -1025,6 +1056,346 @@ class VariationalAutoEncoder(AutoEncoder):
         )
         fig.canvas.mpl_connect('button_press_event', onclick)
         return fig, ax
+
+
+class LSTMAutoEncoder(AutoEncoder):
+    def __init__(
+        self,
+        rms_obj: RMS,
+        tb: bool = True,
+        tb_logdir: str = '',
+        params: dict = None,
+        train_slice: tuple = (0, 100),
+        random_state: int = None,
+        **kwargs,
+    ):
+        self.seq_len = params.pop('seq_len', 15)
+        super().__init__(rms_obj,
+                         tb,
+                         tb_logdir,
+                         params,
+                         train_slice,
+                         random_state,
+                         **kwargs,
+                         )
+        self.data = self.data.reshape((self.data.shape[0],
+                                       self.data.shape[1],
+                                       1
+                                       ))
+
+    @staticmethod
+    def _get_autoencoder(
+        seq_len: int,
+        n_inputs: int,
+        n_bottleneck: int,
+        n_size: list[int],
+        activation: str,
+        activity_regularizer,
+    ) -> Model:
+        """
+        Create a Keras autoencoder model with the given parameters.
+
+        Args:
+            n_inputs (int): Number of inputs to the model.
+            n_bottleneck (int): Number of nodes in the bottleneck layer.
+            n_size (list[int]): List of integers for the number of nodes in \
+                the encoder (and decoder but reversed)
+            activation (str): Activation function to use.
+            activity_regularizer: Activity regulariser to use in encoder.
+
+        Returns:
+            Model: Keras model of the autoencoder.
+        """
+        def get_encoder(seq_len, n_inputs, n_bottleneck, n_size, activation):
+            encoder_in = Input(shape=(n_inputs, 1))
+            e = encoder_in
+
+            for dim in n_size:
+                e = LSTM(dim, activation=activation, return_sequences=True)(e)
+                # e = BatchNormalization()(e)
+
+            encoder_out = LSTM(n_bottleneck,
+                               activation='relu',
+                               activity_regularizer=activity_regularizer,
+                               return_sequences=False)(e)
+            encoder = Model(encoder_in, encoder_out, name='Encoder')
+            return encoder
+
+        def get_decoder(seq_len, n_inputs, n_bottleneck, n_size, activation):
+            decoder_in = Input(shape=(n_bottleneck))
+            d = decoder_in
+
+            d = RepeatVector(n_inputs)(d)
+
+            for dim in n_size[::-1]:
+                d = LSTM(dim, activation=activation, return_sequences=True)(d)
+                # d = BatchNormalization()(d)
+
+            decoder_out = TimeDistributed(Dense(1))(d)
+            decoder = Model(decoder_in, decoder_out, name='Decoder')
+            return decoder
+
+        encoder = get_encoder(seq_len,
+                              n_inputs,
+                              n_bottleneck,
+                              n_size,
+                              activation
+                              )
+        decoder = get_decoder(seq_len,
+                              n_inputs,
+                              n_bottleneck,
+                              n_size,
+                              activation
+                              )
+
+        autoencoder_in = Input(shape=(n_inputs, seq_len), name='Input')
+        encoded = encoder(autoencoder_in)
+        decoded = decoder(encoded)
+        autoencoder = Model(autoencoder_in, decoded, name='AutoEncoder')
+        return autoencoder
+
+    def initialise_model(
+        self,
+        n_bottleneck: int = 10,
+        n_size: list = [64, 64],
+        activation: str = 'relu',
+        epochs: int = 500,
+        batch_size: int = 10,
+        loss: str = 'mse',
+        metrics: list[str] = ['MSE',
+                              'MAE',
+                              KerasRegressor.r_squared
+                              ],
+        optimizer='adam',
+        activity_regularizer=None,
+        verbose: int = 1,
+        callbacks: list[Any] = None,
+    ):
+        """
+        Initialise the model with the given parameters and callbacks.
+
+        Creates an AutoEncoder model within a sickeras basewrapper, based on
+        the inputted parameters. Also creates a unique run name for logging to
+        tensorboard if chosen.
+
+        Args:
+            n_bottleneck (int, optional): Number of nodes in the bottleneck\
+                  layer.
+            n_size (list, optional): List of nodes in the encoder\
+                  (decoder reversed).
+            activation (str, optional): Activation function to use.
+            epochs (int, optional): Number of epochs to train for.
+            batch_size (int, optional): Batch size to use.
+            loss (str, optional): Loss function to use for each node.
+            metrics (list[str], optional): List of metrics to calc for.
+            optimizer (str, optional): Optimizer to use.
+            verbose (int, optional): Verbosity of the model.
+            callbacks (list[Any], optional): List of callbacks to use.
+        """
+
+        self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
+        layers = n_size + [n_bottleneck] + n_size[::-1]
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        self.run_name = f'LSTMAE-{self.RMS.exp_name.replace(" ", "_")}-' \
+                        f'WIN-{self.seq_len}-E-{epochs}-L-{layers}-{t}'
+
+        if callbacks is None:
+            callbacks = []
+        callbacks.append(tfa.callbacks.TQDMProgressBar(
+            show_epoch_progress=False))
+
+        if self._tb:
+            callbacks.append(tf.keras.callbacks.TensorBoard(
+                log_dir=self._tb_logdir.joinpath(self.run_name),
+                histogram_freq=1,
+            ))
+            tb_writer = tf.summary.create_file_writer(
+                f'{self._tb_logdir.joinpath(self.run_name)}')
+
+            with tb_writer.as_default():
+                hp_params = self.params
+                hp_params.pop('callbacks', None)
+                
+                t_allow = (int, float, str, bool)
+                types = {k: isinstance(val, t_allow)
+                         for k, val in hp_params.items()}
+
+                for k in types.keys():
+                    if types[k] is False:
+                        old = hp_params.pop(k)
+                        if k == 'n_size':
+                            hp_params[k] = str(layers)
+                        elif k == 'activity_regularizer':
+                            if old is not None:
+                                [[key, value]] = old.get_config().items()
+                                hp_params[k] = f'{key}: {value:.3g}'
+                            else:
+                                hp_params[k] = str(old)
+                        else:
+                            hp_params[k] = str(old)
+                
+                hp.hparams(
+                    hp_params,
+                    trial_id=f'{self._tb_logdir.joinpath(self.run_name)}'
+                )
+
+        model = BaseWrapper(
+            model=self._get_autoencoder,
+            model__seq_len=self.seq_len,
+            model__n_inputs=self._n_inputs,
+            model__n_bottleneck=n_bottleneck,
+            model__n_size=n_size,
+            model__activation=activation,
+            model__activity_regularizer=activity_regularizer,
+            epochs=epochs,
+            batch_size=batch_size,
+            loss=loss,
+            metrics=metrics,
+            optimizer=optimizer,
+            verbose=verbose,
+            callbacks=callbacks,
+        )
+
+        return model
+
+    def fit(self, x, val_data: np.ndarray = None, **kwargs):
+        """
+        Fit the model to the inputted data.
+
+        Passthrough func to fit the model to the inputted data. Will also track
+        use validation data if provided.
+
+        Args:
+            x (np.ndarray): Input data to fit the model to.
+            val_data (np.ndarray, optional): Validation data to use.\
+                Defaults to None.
+            **kwargs: Additional arguments to pass to the model.fit method.
+        """
+        if val_data is not None:
+            self.model.fit(
+                X=x,
+                y=x.squeeze(),
+                validation_data=(val_data, val_data.squeeze()),
+                **kwargs
+            )
+        else:
+            self.model.fit(
+                X=x,
+                y=x.squeeze(),
+                **kwargs
+            )
+
+    def score(
+            self,
+            label: str = None,
+            x: np.ndarray = None,
+            tb: bool = True,
+            print_score: bool = True,
+    ) -> tuple[tuple[np.ndarray, np.ndarray], dict]:
+        """
+        Score the model on the inputted data.
+
+        Predicts the model on the inputted data and calculates the scores,
+        as well as doing it for all the initiliased dataset.
+
+        Args:
+            label (str, optional): Label of the data to score the model on \
+                (train, val, dataset).
+            x (np.ndarray): Input data to score the model on.
+            tb (bool, optional): Log to tensorboard. Defaults to True.
+            print_score (bool, optional): Print the scores. Defaults to True.
+            
+        Returns:
+            tuple[tuple[np.ndarray, np.ndarray], dict]: A tuple (input,
+            prediction) and a dictionary of scores.
+
+        """
+
+        label_hash = {
+            'train': self._ind_tr,
+            'val': self._ind_val,
+            'dataset': np.arange(self.data.shape[0]),
+        }
+
+        if x is None and label is None:
+            raise ValueError('Must provide either x or label for scoring.')
+        elif x is not None and label is not None:
+            raise ValueError('Cannot provide both x and label for scoring.')
+
+        if self.pred is None:
+            pred = self.model.predict(self.data, verbose=0)
+            self.pred = pred
+
+        if self.scores is None:
+            mae = mean_absolute_error(np.squeeze(self.data),
+                                      np.squeeze(self.pred),
+                                      multioutput='raw_values',
+                                      )
+            mse = mean_squared_error(np.squeeze(self.data),
+                                     np.squeeze(self.pred),
+                                     multioutput='raw_values',
+                                     )
+            r2 = r2_score(np.squeeze(self.data),
+                          np.squeeze(self.pred),
+                          multioutput='raw_values',
+                          )
+            self.scores = {'mae': mae, 'mse': mse, 'r2': r2}
+
+        if x is not None:
+            pred = self.model.predict(x, verbose=0)
+            mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
+            mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
+            r2 = r2_score(x.T, pred.T, multioutput='raw_values')
+            scores = {'mae': mae, 'mse': mse, 'r2': r2}
+
+        if label is not None and label in label_hash.keys():
+            x = np.squeeze(self.data[label_hash[label]])
+            pred = np.squeeze(self.pred[label_hash[label]])
+            scores = {k: v[label_hash[label]] for k, v in self.scores.items()}
+        elif label is not None and label not in label_hash.keys():
+            raise KeyError(f'Label {label} not found in label_hash.')
+
+        if self._tb and tb:
+            tb_writer = tf.summary.create_file_writer(
+                f'{self._tb_logdir.joinpath(self.run_name)}')
+
+            md_scores = dedent(f'''
+                    ### Scores - Validation Data
+
+                    | MAE | MSE |  R2  |
+                    | ---- | ---- | ---- |
+                    | {np.mean(scores['mae']):.5f} |\
+                        {np.mean(scores['mse']):.5f} |\
+                            {np.mean(scores['r2']):.5f} |
+
+                    ''')
+            with tb_writer.as_default():
+                tf.summary.text('Model Info', md_scores, step=2)
+                tf.summary.scalar(
+                    'Val MAE',
+                    np.mean(scores['mae']),
+                    step=1,
+                )
+                tf.summary.scalar(
+                    'Val MSE',
+                    np.mean(scores['mse']),
+                    step=1,
+                )
+                tf.summary.scalar(
+                    'Val R\u00B2',
+                    np.mean(scores['r2']),
+                    step=1,
+                )
+
+        if print_score:
+            if label is not None:
+                print(f'\n{label.capitalize()} Scores:')
+            else:
+                print('\nScores:')
+            print(f'\tMAE: {np.mean(scores["mae"]):.5f}')
+            print(f'\tMSE: {np.mean(scores["mse"]):.5f}')
+            print(f'\tR2: {np.mean(scores["r2"]):.5f}')
+        return (x, pred), scores
 
 
 if __name__ == '__main__':
