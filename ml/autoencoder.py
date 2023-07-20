@@ -18,10 +18,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 # from matplotlib import transforms
 import mplcursors
-import pandas as pd
 import numpy as np
-from tqdm.auto import tqdm
-import multiprocessing as mp
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from keras.layers import Input, Dense, BatchNormalization, Lambda, Dropout
@@ -50,140 +47,11 @@ elif platform == 'posix':
     DATA_DIR = onedrive.joinpath('Testing', 'RMS')
     TB_DIR = onedrive.joinpath('Tensorboard')
 
-
-def _mp_rms_process(fno: int):
-    """
-    Multiprocessing function to compute RMS of AE data.
-
-    Calc averaged rms of AE data for each cut and return as array.
-    Average size is 100000. RMS calcualted using rolling window of 500000.
-
-    Args:
-        fno (int): File number of AE data to calc RMS for.
     
-    Returns:
-        np.array: Array of RMS values for each cut.
-    """
-    avg_size = 100000
-    sig = exp.ae.readAE(fno)
-    sig = pd.DataFrame(sig)
-    sig = sig.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
-    sig = np.array(sig)[500000 - 1:]
-    avg_sig = np.nanmean(np.pad(sig.astype(float),
-                                ((0, avg_size - sig.size % avg_size), (0, 0)),
-                                mode='constant',
-                                constant_values=np.NaN
-                                )
-                         .reshape(-1, avg_size), axis=1)
-    return avg_sig
-
-
-def mp_get_rms(fnos: list[int]):
-    """
-    Master multiprocessing function to compute RMS of AE data.
-
-    Args:
-        fnos (list[int]): List of file numbers to calc RMS for.
-    
-    Returns:
-        list: RMS values for each cut.
-    """
-    with mp.Pool(processes=20, maxtasksperchild=1) as pool:
-        rms = list(tqdm(pool.imap(
-            _mp_rms_process,
-            fnos),
-            total=len(fnos),
-            desc='RMS averaging'
-        ))
-        pool.close()
-        pool.join()
-    # rms = []
-    # for fno in tqdm(fnos, desc='RMS averaging'):
-    #     rms.append(_mp_rms_process(fno))
-    return rms
-
-
-class RMS:
-    def __init__(
-            self,
-            exp_name,
-    ):
-        """
-        RMS Data Object for AutoEncoder.
-
-        Args:
-            exp_name (str): Name of experiment to load data from.
-        """
-        self.exp_name = exp_name.upper().replace(" ", "_")
-
-        print(f'\nLoaded {exp_name} RMS Data')
-
-        # Read in data from file or compute
-        self._get_data()
-
-    def _process_exp(self, save_path: Path = None):
-        """
-        Process AE data and save to .csv file.
-
-        Args:
-            save_path (Path, optional): Path to save .csv file to.
-
-        Returns:
-            pd.DataFrame: Dataframe of RMS data.
-        """
-
-        # load in exp for this obj
-        global exp
-        try:
-            exp = resources.load(self.exp_name)
-        except NotADirectoryError:
-            exp = resources.load()
-
-        # get no of AE files in exp dataset
-        fnos = range(len(exp.ae._files))
-
-        # process data, requires func outside class for mp
-        rms = mp_get_rms(fnos)
-
-        # find min length of signals and create array
-        m = min([r.shape[0] for r in rms])
-        rms = [r[:m] for r in rms]
-        rms = np.array(rms)
-
-        # create dataframe from array each column is a cut
-        df = pd.DataFrame(rms.T)
-
-        if save_path is not None:
-            df.to_csv(save_path,
-                      encoding='utf-8',
-                      index=False)
-            print(f'Data file saved to: {save_path}')
-        del exp
-        return df
-
-    def _get_data(self):
-        """
-        Find and read in data from .csv file or process data and save to .csv.
-        """
-        # get file name of .csv file if created
-        file_name = f'RMS_{self.exp_name}.csv'
-
-        # join path of home dir, data folder, and file name for reading
-        path = DATA_DIR.joinpath(file_name)
-
-        try:
-            # try to read in .csv file
-            self.data = pd.read_csv(path)
-        except FileNotFoundError:
-            print(f'RMS Data File Not Found for {self.exp_name}')
-            # if no data file process data and save
-            self.data = self._process_exp(path)
-
-
 class AutoEncoder():
     def __init__(
         self,
-        rms_obj: RMS,
+        rms_obj: Any,
         tb: bool = True,
         tb_logdir: str = '',
         params: dict = None,
@@ -893,7 +761,7 @@ class _VariationalAutoEncoder(Model):
 class VariationalAutoEncoder(AutoEncoder):
     def __init__(
         self,
-        rms_obj: RMS,
+        rms_obj: Any,
         tb: bool = True,
         tb_logdir: str = '',
         params: dict = None,
@@ -1061,7 +929,7 @@ class VariationalAutoEncoder(AutoEncoder):
 class LSTMAutoEncoder(AutoEncoder):
     def __init__(
         self,
-        rms_obj: RMS,
+        rms_obj: Any,
         tb: bool = True,
         tb_logdir: str = '',
         params: dict = None,
@@ -1069,7 +937,7 @@ class LSTMAutoEncoder(AutoEncoder):
         random_state: int = None,
         **kwargs,
     ):
-        self.seq_len = params.pop('seq_len', 15)
+        self.seq_len = params.pop('seq_len', 50)
         super().__init__(rms_obj,
                          tb,
                          tb_logdir,
@@ -1078,10 +946,91 @@ class LSTMAutoEncoder(AutoEncoder):
                          random_state,
                          **kwargs,
                          )
-        self.data = self.data.reshape((self.data.shape[0],
-                                       self.data.shape[1],
-                                       1
-                                       ))
+
+    def pre_process(self, val_frac: float = 0.2):
+        print('Pre-processing Data:')
+        
+        print('\tCombining RMS data...')
+        org_sig_len = np.shape(self.data.values)[0]
+        joined_rms = []
+        for i in range(np.shape(self.data)[1]):
+            joined_rms.extend(self.RMS.data.iloc[:, i].values.T)
+        joined_rms = np.array(joined_rms).reshape(-1, 1)
+        print(f'\tNumber of RMS samples: {np.shape(joined_rms)}')
+
+        assert ~np.isnan(joined_rms).any(), 'NaN values in RMS data'
+
+        print(f'\n\tTraining Data: {self._train_slice}')
+        ind_tr = np.arange(len(joined_rms))
+        ind_tr = ind_tr[(self._train_slice.start * org_sig_len):
+                        (self._train_slice.stop * org_sig_len)]
+        
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
+
+        if self.random_state is None:
+            ind_tr, ind_val = train_test_split(
+                ind_tr,
+                test_size=val_frac,
+            )
+        else:
+            ind_tr, ind_val = train_test_split(
+                ind_tr,
+                test_size=val_frac,
+                random_state=self.random_state,
+            )
+
+        print(f'\tInput train shape: {joined_rms[ind_tr].shape}')
+        print(f'\tInput val shape: {joined_rms[ind_val].shape}')
+
+        # fit the data to all the training and val data
+        # contanination cant be avoided as its time series data
+        self.scaler.fit(joined_rms[np.concatenate([ind_tr, ind_val])])
+        self.data = self.scaler.transform(joined_rms)
+        self._seq_data = self.sequence_inputs(self.data, self.seq_len)
+
+        self._n_inputs = org_sig_len
+        self._ind_tr = ind_tr
+        self._ind_val = ind_val
+        
+    @staticmethod
+    def sequence_inputs(data, seq_len):
+        d = []
+        for index in range(len(data) - seq_len + 1):
+            d.append(data[index: (index + seq_len)])
+        return np.stack(d)
+    
+    @property
+    def seq_data(self):
+        """
+        Return the sequenced data.
+        """
+        try:
+            return self._seq_data
+        except AttributeError:
+            print('Data not pre-processed yet!')
+            return None
+    
+    @property
+    def train_data(self):
+        """
+        Return the training data.
+        """
+        try:
+            return self.seq_data[self._ind_tr]
+        except AttributeError:
+            print('Data not pre-processed yet!')
+            return None
+    
+    @property
+    def val_data(self):
+        """
+        Return the validation data.
+        """
+        try:
+            return self.seq_data[self._ind_val]
+        except AttributeError:
+            print('Data not pre-processed yet!')
+            return None
 
     @staticmethod
     def _get_autoencoder(
@@ -1405,96 +1354,117 @@ if __name__ == '__main__':
 
     rms = {}
     for test in exps:
-        rms[test] = RMS(test)
+        rms[test] = resources.ae.RMS(test)
+        rms[test].data.drop(['0', '1', '2'], axis=1, inplace=True)
     try:
         rms['Test 5'].data.drop(['23', '24'], axis=1, inplace=True)
     except KeyError:
         pass
 
+    # remove outside triggers and DC offset
+    def remove_dc(sig):
+        return sig - np.nanmean(sig)
+
+    for test in exps:
+        rms[test]._data = rms[test].data.T.reset_index(drop=True).T
+        rms[test]._data = rms[test].data.iloc[50:350, :].reset_index(drop=True)
+        rms[test]._data = rms[test].data.apply(remove_dc, axis=0)
+
     print()
 
     for test in exps:
         '''
-        # autoe = AutoEncoder(rms[test],
-        #                     random_state=1,
-        #                     train_slice=(0, 100),
-        #                     tb=False,
-        #                     tb_logdir=rms[test].exp_name + '/neurons',
-        #                     params={'n_bottleneck': 10,
-        #                             'n_size': [64, 64],
-        #                             'epochs': 500,
-        #                             'loss': 'mse',
-        #                             'batch_size': 10,
-        #                             # 'activity_regularizer': None,
-        #                             }
-        #                     )
-
-        # autoe.fit(
-        #     x=autoe.train_data,
-        #     val_data=autoe.val_data,
-        #     verbose=0,
-        # )
+        autoe = AutoEncoder(rms[test],
+                            random_state=1,
+                            train_slice=(0, 100),
+                            tb=False,
+                            tb_logdir=rms[test].exp_name + '/neurons',
+                            params={'n_bottleneck': 10,
+                                    'n_size': [64, 64],
+                                    'epochs': 500,
+                                    'loss': 'mse',
+                                    'batch_size': 10,
+                                    # 'activity_regularizer': None,
+                                    }
+                            )
+        )
         '''
 
-        vae = VariationalAutoEncoder(rms[test],
-                                     tb=False,
-                                     tb_logdir=rms[test].exp_name,
-                                     train_slice=(0, 100),
-                                     random_state=1,
-                                     params={'latent_dim': 2,
-                                             'n_size': [64, 64],
-                                             'epochs': 500,
-                                             'batch_size': 10,
-                                             }
-                                     )
+        '''
+        autoe = VariationalAutoEncoder(rms[test],
+                                       tb=False,
+                                       tb_logdir=rms[test].exp_name,
+                                       train_slice=(0, 100),
+                                       random_state=1,
+                                       params={'latent_dim': 2,
+                                               'n_size': [64, 64],
+                                               'epochs': 500,
+                                               'batch_size': 10,
+                                               }
+                                       )
+        '''
 
-        vae.fit(x=vae.train_data,
-                val_data=vae.val_data,
-                verbose=0,
-                use_multiprocessing=True,
-                )
+        autoe = LSTMAutoEncoder(rms[test],
+                                train_slice=(0, 60),
+                                tb=False,
+                                tb_logdir=rms[test].exp_name,
+                                random_state=1,
+                                params={'n_bottleneck': 32,
+                                        'n_size': [256, 128, 64],
+                                        'epochs': 50,
+                                        'loss': 'mse',
+                                        'batch_size': 10,
+                                        })
+        
+        # %% FIT THE MODEL
+        # ---------------------------------------------------------------------
+        autoe.fit(x=autoe.train_data,
+                  val_data=autoe.val_data,
+                  verbose=0,
+                  use_multiprocessing=True,
+                  )
 
         # %% PLOT LOSS
         # ---------------------------------------------------------------------
-        vae.loss_plot()
+        autoe.loss_plot()
 
         # %% MODEL SUMMARY
         # ---------------------------------------------------------------------
-        vae.model.model_.summary()
-        # vae.model.model_.encoder.summary()
-        # vae.model.model_.decoder.summary()
+        autoe.model.model_.summary()
+        #autoe.model.model_.encoder.summary()
+        #autoe.model.model_.decoder.summary()
 
         # %% SCORE THE MODEL ON TRAINING, VALIDATION AND ALL DATA
         # ---------------------------------------------------------------------
-        pred_tr, scores_tr = vae.score('train')
-        pred_val, scores_val = vae.score('val')
-        pred_data, scores_data = vae.score('dataset')
+        pred_tr, scores_tr = autoe.score('train')
+        pred_val, scores_val = autoe.score('val')
+        pred_data, scores_data = autoe.score('dataset')
 
         # %% HISTOGRAM OF SCORES
         # ---------------------------------------------------------------------
-        fig, ax = vae.hist_scores(['mse'])
+        fig, ax = autoe.hist_scores(['mse'])
 
         # %% PLOT PREDICTIONS
         # ---------------------------------------------------------------------
-        fig, ax = vae.pred_plot(vae._ind_tr[0])
-        ax.set_title(f'{vae.RMS.exp_name} Training Data - {ax.get_title()}')
-        fig, ax = vae.pred_plot(vae._ind_val[0])
-        ax.set_title(f'{vae.RMS.exp_name} Val Data - {ax.get_title()}')
+        fig, ax = autoe.pred_plot(autoe._ind_tr[0])
+        ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
+        fig, ax = autoe.pred_plot(autoe._ind_val[0])
+        ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
 
         # %% CALC CUTOFFS
         # ---------------------------------------------------------------------
-        vae.thres
+        autoe.thres
 
         # %% PLOT SCORES ON SCATTER
         # ---------------------------------------------------------------------
-        fig, ax = vae.scatter_scores()
+        fig, ax = autoe.scatter_scores()
 
         # %% GENERATE NEW DATA
         # ---------------------------------------------------------------------
-        _, fig, ax = vae.generate(z=[-2, 2])
+        _, fig, ax = autoe.generate(z=[-2, 2])
 
         # %% PLOT LATENT SPACE
         # ---------------------------------------------------------------------
-        fig, ax = vae.plot_latent_space()
+        fig, ax = autoe.plot_latent_space()
 
         plt.show(block=True)
