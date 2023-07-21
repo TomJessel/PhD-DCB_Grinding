@@ -76,7 +76,7 @@ class AutoEncoder():
             random_state (int, optional): Random state for reproducibility.
         """
         self.RMS = rms_obj
-        self.data = rms_obj.data
+        self._data = rms_obj.data
         self._train_slice = np.s_[train_slice[0]:train_slice[1]]
         self.random_state = random_state
         self._tb = tb
@@ -149,6 +149,17 @@ class AutoEncoder():
         self._n_inputs = data[ind_tr].shape[1]
         self._ind_tr = ind_tr
         self._ind_val = ind_val
+
+    @property
+    def data(self):
+        """
+        Return the data.
+        """
+        try:
+            return self._data
+        except AttributeError:
+            print('Data not pre-processed yet!')
+            return None
 
     @property
     def train_data(self):
@@ -462,16 +473,16 @@ class AutoEncoder():
             self.pred = pred
 
         if self.scores is None:
-            mae = mean_absolute_error(self.data.T,
-                                      self.pred.T,
+            mae = mean_absolute_error(self.data,
+                                      self.pred,
                                       multioutput='raw_values',
                                       )
-            mse = mean_squared_error(self.data.T,
-                                     self.pred.T,
+            mse = mean_squared_error(self.data,
+                                     self.pred,
                                      multioutput='raw_values',
                                      )
-            r2 = r2_score(self.data.T,
-                          self.pred.T,
+            r2 = r2_score(self.data,
+                          self.pred,
                           multioutput='raw_values',
                           )
             self.scores = {'mae': mae, 'mse': mse, 'r2': r2}
@@ -544,11 +555,11 @@ class AutoEncoder():
             fig, ax: Matplotlib figure and axis.
         """
         if input is not None:
-            pred_input = input[0][no, :].reshape(-1, self._n_inputs)
-            x_pred = input[1][no, :].reshape(-1, self._n_inputs)
+            pred_input = input[0][no, :].reshape(-1, 1)
+            x_pred = input[1][no, :].reshape(-1, 1)
         else:
-            pred_input = self.data[no, :].reshape(-1, self._n_inputs)
-            x_pred = self.pred[no, :].reshape(-1, self._n_inputs)
+            pred_input = self.data[no, :].reshape(-1, 1)
+            x_pred = self.pred[no, :].reshape(-1, 1)
 
         pred_input = self.scaler.inverse_transform(pred_input)
         x_pred = self.scaler.inverse_transform(x_pred)
@@ -560,8 +571,8 @@ class AutoEncoder():
             fig, ax = plt.subplots()
         else:
             ax = plt_ax
-        ax.plot(pred_input.T, label='Real')
-        ax.plot(x_pred.T, label='Predicition')
+        ax.plot(pred_input, label='Real')
+        ax.plot(x_pred, label='Predicition')
         ax.legend()
         ax.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
         if plt_ax is None:
@@ -985,8 +996,8 @@ class LSTMAutoEncoder(AutoEncoder):
         # fit the data to all the training and val data
         # contanination cant be avoided as its time series data
         self.scaler.fit(joined_rms[np.concatenate([ind_tr, ind_val])])
-        self.data = self.scaler.transform(joined_rms)
-        self._seq_data = self.sequence_inputs(self.data, self.seq_len)
+        self.joined_data = self.scaler.transform(joined_rms)
+        self._data = self.sequence_inputs(self.joined_data, self.seq_len)
 
         self._n_inputs = org_sig_len
         self._ind_tr = ind_tr
@@ -1016,7 +1027,7 @@ class LSTMAutoEncoder(AutoEncoder):
         Return the training data.
         """
         try:
-            return self.seq_data[self._ind_tr]
+            return self.data[self._ind_tr]
         except AttributeError:
             print('Data not pre-processed yet!')
             return None
@@ -1027,10 +1038,12 @@ class LSTMAutoEncoder(AutoEncoder):
         Return the validation data.
         """
         try:
-            return self.seq_data[self._ind_val]
+            return self.data[self._ind_val]
         except AttributeError:
             print('Data not pre-processed yet!')
             return None
+
+# todo add n_features to all autoencoders
 
     @staticmethod
     def _get_autoencoder(
@@ -1056,29 +1069,31 @@ class LSTMAutoEncoder(AutoEncoder):
             Model: Keras model of the autoencoder.
         """
         def get_encoder(seq_len, n_inputs, n_bottleneck, n_size, activation):
-            encoder_in = Input(shape=(n_inputs, 1))
+            encoder_in = Input(shape=(seq_len, 1))
             e = encoder_in
 
             for dim in n_size:
                 e = LSTM(dim, activation=activation, return_sequences=True)(e)
-                # e = BatchNormalization()(e)
+                e = Dropout(0.1)(e)
+                e = BatchNormalization()(e)
 
             encoder_out = LSTM(n_bottleneck,
-                               activation='relu',
+                               # activation='relu',
                                activity_regularizer=activity_regularizer,
                                return_sequences=False)(e)
             encoder = Model(encoder_in, encoder_out, name='Encoder')
             return encoder
 
         def get_decoder(seq_len, n_inputs, n_bottleneck, n_size, activation):
-            decoder_in = Input(shape=(n_bottleneck))
+            decoder_in = Input(shape=(n_bottleneck,))
             d = decoder_in
 
-            d = RepeatVector(n_inputs)(d)
+            d = RepeatVector(seq_len)(d)
 
             for dim in n_size[::-1]:
                 d = LSTM(dim, activation=activation, return_sequences=True)(d)
-                # d = BatchNormalization()(d)
+                d = Dropout(0.1)(d)
+                d = BatchNormalization()(d)
 
             decoder_out = TimeDistributed(Dense(1))(d)
             decoder = Model(decoder_in, decoder_out, name='Decoder')
@@ -1097,7 +1112,7 @@ class LSTMAutoEncoder(AutoEncoder):
                               activation
                               )
 
-        autoencoder_in = Input(shape=(n_inputs, seq_len), name='Input')
+        autoencoder_in = Input(shape=(seq_len, 1), name='Input')
         encoded = encoder(autoencoder_in)
         decoded = decoder(encoded)
         autoencoder = Model(autoencoder_in, decoded, name='AutoEncoder')
@@ -1207,33 +1222,6 @@ class LSTMAutoEncoder(AutoEncoder):
 
         return model
 
-    def fit(self, x, val_data: np.ndarray = None, **kwargs):
-        """
-        Fit the model to the inputted data.
-
-        Passthrough func to fit the model to the inputted data. Will also track
-        use validation data if provided.
-
-        Args:
-            x (np.ndarray): Input data to fit the model to.
-            val_data (np.ndarray, optional): Validation data to use.\
-                Defaults to None.
-            **kwargs: Additional arguments to pass to the model.fit method.
-        """
-        if val_data is not None:
-            self.model.fit(
-                X=x,
-                y=x.squeeze(),
-                validation_data=(val_data, val_data.squeeze()),
-                **kwargs
-            )
-        else:
-            self.model.fit(
-                X=x,
-                y=x.squeeze(),
-                **kwargs
-            )
-
     def score(
             self,
             label: str = None,
@@ -1276,16 +1264,16 @@ class LSTMAutoEncoder(AutoEncoder):
             self.pred = pred
 
         if self.scores is None:
-            mae = mean_absolute_error(np.squeeze(self.data),
-                                      np.squeeze(self.pred),
+            mae = mean_absolute_error(self.data.squeeze().T,
+                                      self.pred.squeeze().T,
                                       multioutput='raw_values',
                                       )
-            mse = mean_squared_error(np.squeeze(self.data),
-                                     np.squeeze(self.pred),
+            mse = mean_squared_error(self.data.squeeze().T,
+                                     self.pred.squeeze().T,
                                      multioutput='raw_values',
                                      )
-            r2 = r2_score(np.squeeze(self.data),
-                          np.squeeze(self.pred),
+            r2 = r2_score(self.data.squeeze().T,
+                          self.pred.squeeze().T,
                           multioutput='raw_values',
                           )
             self.scores = {'mae': mae, 'mse': mse, 'r2': r2}
@@ -1410,8 +1398,8 @@ if __name__ == '__main__':
                                 tb_logdir=rms[test].exp_name,
                                 random_state=1,
                                 params={'n_bottleneck': 32,
-                                        'n_size': [256, 128, 64],
-                                        'epochs': 50,
+                                        'n_size': [64],
+                                        'epochs': 2,
                                         'loss': 'mse',
                                         'batch_size': 10,
                                         })
@@ -1461,10 +1449,15 @@ if __name__ == '__main__':
 
         # %% GENERATE NEW DATA
         # ---------------------------------------------------------------------
-        _, fig, ax = autoe.generate(z=[-2, 2])
+        try:
+            _, fig, ax = autoe.generate(z=[-2, 2])
+        except AttributeError:
+            pass
 
         # %% PLOT LATENT SPACE
         # ---------------------------------------------------------------------
-        fig, ax = autoe.plot_latent_space()
-
+        try:
+            fig, ax = autoe.plot_latent_space()
+        except AttributeError:
+            pass
         plt.show(block=True)
