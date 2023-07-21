@@ -144,7 +144,7 @@ class AutoEncoder():
 
         # fit scaler to training data and transform all data
         self.scaler.fit(data[ind_tr])
-        self.data = self.scaler.transform(data)
+        self._data = self.scaler.transform(data)
 
         self._n_inputs = data[ind_tr].shape[1]
         self._ind_tr = ind_tr
@@ -468,8 +468,9 @@ class AutoEncoder():
         elif x is not None and label is not None:
             raise ValueError('Cannot provide both x and label for scoring.')
 
+        print('\nPredicting data:')
         if self.pred is None:
-            pred = self.model.predict(self.data, verbose=0)
+            pred = self.model.predict(self.data, verbose=1)
             self.pred = pred
 
         if self.scores is None:
@@ -488,7 +489,7 @@ class AutoEncoder():
             self.scores = {'mae': mae, 'mse': mse, 'r2': r2}
 
         if x is not None:
-            pred = self.model.predict(x, verbose=0)
+            pred = self.model.predict(x, verbose=1)
             mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
             mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
             r2 = r2_score(x.T, pred.T, multioutput='raw_values')
@@ -1043,8 +1044,6 @@ class LSTMAutoEncoder(AutoEncoder):
             print('Data not pre-processed yet!')
             return None
 
-# todo add n_features to all autoencoders
-
     @staticmethod
     def _get_autoencoder(
         seq_len: int,
@@ -1259,8 +1258,10 @@ class LSTMAutoEncoder(AutoEncoder):
         elif x is not None and label is not None:
             raise ValueError('Cannot provide both x and label for scoring.')
 
+        print('\nPredicting data:')
+
         if self.pred is None:
-            pred = self.model.predict(self.data, verbose=0)
+            pred = self.model.predict(self.data, verbose=1)
             self.pred = pred
 
         if self.scores is None:
@@ -1279,7 +1280,7 @@ class LSTMAutoEncoder(AutoEncoder):
             self.scores = {'mae': mae, 'mse': mse, 'r2': r2}
 
         if x is not None:
-            pred = self.model.predict(x, verbose=0)
+            pred = self.model.predict(x, verbose=1)
             mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
             mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
             r2 = r2_score(x.T, pred.T, multioutput='raw_values')
@@ -1361,7 +1362,7 @@ if __name__ == '__main__':
     print()
 
     for test in exps:
-        '''
+        # '''
         autoe = AutoEncoder(rms[test],
                             random_state=1,
                             train_slice=(0, 100),
@@ -1375,9 +1376,7 @@ if __name__ == '__main__':
                                     # 'activity_regularizer': None,
                                     }
                             )
-        )
-        '''
-
+        # '''
         '''
         autoe = VariationalAutoEncoder(rms[test],
                                        tb=False,
@@ -1391,7 +1390,7 @@ if __name__ == '__main__':
                                                }
                                        )
         '''
-
+        '''
         autoe = LSTMAutoEncoder(rms[test],
                                 train_slice=(0, 60),
                                 tb=False,
@@ -1403,6 +1402,7 @@ if __name__ == '__main__':
                                         'loss': 'mse',
                                         'batch_size': 10,
                                         })
+        '''
         
         # %% FIT THE MODEL
         # ---------------------------------------------------------------------
