@@ -1072,13 +1072,11 @@ class LSTMAutoEncoder(AutoEncoder):
             e = encoder_in
 
             for dim in n_size:
-                e = LSTM(dim, activation=activation, return_sequences=True)(e)
+                e = LSTM(dim, return_sequences=True)(e)
                 e = Dropout(0.1)(e)
                 e = BatchNormalization()(e)
 
             encoder_out = LSTM(n_bottleneck,
-                               # activation='relu',
-                               activity_regularizer=activity_regularizer,
                                return_sequences=False)(e)
             encoder = Model(encoder_in, encoder_out, name='Encoder')
             return encoder
@@ -1090,7 +1088,7 @@ class LSTMAutoEncoder(AutoEncoder):
             d = RepeatVector(seq_len)(d)
 
             for dim in n_size[::-1]:
-                d = LSTM(dim, activation=activation, return_sequences=True)(d)
+                d = LSTM(dim, return_sequences=True)(d)
                 d = Dropout(0.1)(d)
                 d = BatchNormalization()(d)
 
@@ -1121,7 +1119,7 @@ class LSTMAutoEncoder(AutoEncoder):
         self,
         n_bottleneck: int = 10,
         n_size: list = [64, 64],
-        activation: str = 'relu',
+        activation: str = None,
         epochs: int = 500,
         batch_size: int = 10,
         loss: str = 'mse',
@@ -1129,7 +1127,7 @@ class LSTMAutoEncoder(AutoEncoder):
                               'MAE',
                               KerasRegressor.r_squared
                               ],
-        optimizer='adam',
+        optimizer=None,
         activity_regularizer=None,
         verbose: int = 1,
         callbacks: list[Any] = None,
@@ -1201,6 +1199,15 @@ class LSTMAutoEncoder(AutoEncoder):
                     hp_params,
                     trial_id=f'{self._tb_logdir.joinpath(self.run_name)}'
                 )
+
+        if optimizer is None:
+            optimizer = tf.keras.optimizers.Adam(lr=0.001,
+                                                 beta_1=0.9,
+                                                 beta_2=0.999,
+                                                 amsgrad=False,
+                                                 clipnorm=1.,
+                                                 clipvalue=0.5,
+                                                 )
 
         model = BaseWrapper(
             model=self._get_autoencoder,
