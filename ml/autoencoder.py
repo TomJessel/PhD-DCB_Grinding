@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 # from matplotlib import transforms
 import mplcursors
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from keras.layers import Input, Dense, BatchNormalization, Lambda, Dropout
@@ -223,19 +224,19 @@ class AutoEncoder():
         print('\nCutoffs:')
         for key, score in sc.items():
             # check if the scores should be trying to inc or dec
-            # out = score[mad_based_outlier(score)]
+            out = score[mad_based_outlier(score)]
             if key == 'r2':
-                # try:
-                #     cutoffs[key] = np.max(out)
-                # except ValueError:
-                #     print('std cutoff')
-                cutoffs[key] = np.median(score) - np.std(score)
+                try:
+                    cutoffs[key] = np.max(out)
+                except ValueError:
+                    print('std cutoff')
+                    cutoffs[key] = np.median(score) - np.std(score)
             else:
-                # try:
-                #     cutoffs[key] = np.min(out)
-                # except ValueError:
-                #     print('std cutoff')
-                cutoffs[key] = np.median(score) + np.std(score)
+                try:
+                    cutoffs[key] = np.min(out)
+                except ValueError:
+                    print('std cutoff')
+                    cutoffs[key] = np.median(score) + np.std(score)
             print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
         return cutoffs
 
@@ -624,8 +625,8 @@ class AutoEncoder():
 
         fig, ax = plt.subplots(len(metrics), 1, squeeze=False)
         for i, metric in enumerate(metrics):
-            ax[i, 0].hist(self.scores[metric][self._train_slice],
-                          bins=40, label=metric)
+            ax[i, 0].hist(self.scores[metric][self._ind_tr],
+                          bins=50, label=metric)
             ax[i, 0].legend()
             ax[i, 0].set_xlabel(f'{metric.upper()} score')
             ax[i, 0].set_ylabel('Frequency')
@@ -1044,6 +1045,33 @@ class LSTMAutoEncoder(AutoEncoder):
             print('Data not pre-processed yet!')
             return None
 
+    def _get_cutoffs(self):
+        """
+        Method to get the cutoff values from the training slice scores
+
+        Returns:
+            cutoffs (dict): Dictionary of cutoff values for each score.
+        """
+
+        try:
+            sc = {k: v[self._train_slice] for k, v in self.scores.items()}
+            # sc = {k: v for k, v in self.scores.items()}
+        except AttributeError:
+            print('Scores not calculated yet! Score then re-run.')
+            return None
+
+        cutoffs = {}
+        print('\nCutoffs:')
+        for key, score in sc.items():
+            # check if the scores should be trying to inc or dec
+            if key == 'r2':
+                cutoffs[key] = np.median(score) - np.std(score)
+            else:
+                cutoffs[key] = np.median(score) + np.std(score)
+                # cutoffs[key] = np.percentile(score, 97)
+            print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
+        return cutoffs
+
     @staticmethod
     def _get_autoencoder(
         seq_len: int,
@@ -1341,6 +1369,42 @@ class LSTMAutoEncoder(AutoEncoder):
             print(f'\tMSE: {np.mean(scores["mse"]):.5f}')
             print(f'\tR2: {np.mean(scores["r2"]):.5f}')
         return (x, pred), scores
+
+    def anom_plot(self, anomaly_metric: str = 'mse', plt_ax=None):
+        if plt_ax is None:
+            fig, ax = plt.subplots(figsize=(7.5, 5))
+        else:
+            ax = plt_ax
+
+        if self.scores is None:
+            self.scores('dataset', print_score=False)
+        
+        if hasattr(self, 'thres') is False:
+            self.thres
+        
+        anomalies = self.scores[anomaly_metric] > self.thres[anomaly_metric]
+        anomalous_data_indices = [False] * len(self.joined_data)
+        np.array(anomalous_data_indices)
+        for data_idx in range(self.seq_len - 1, len(self.joined_data)):
+            if np.all(anomalies[data_idx - self.seq_len + 1:data_idx]):
+                anomalous_data_indices[data_idx] = True
+        # for i, anom in enumerate(anomalies):
+            # if anom:
+                # for j in range(i, (i + self.seq_len - 0)):
+                # anomalous_data_indices[i] = True
+
+        df_full_rms = pd.DataFrame(self.joined_data)
+        df_anom = df_full_rms.copy()
+        df_anom.loc[np.invert(anomalous_data_indices)] = np.nan
+
+        df_full_rms.plot(legend=False, ax=ax)
+        df_anom.plot(legend=False, ax=ax, color="r")
+
+        ax.set_xlabel('Samples')
+        ax.set_ylabel('Rolling RMS (V)')
+        ax.legend(labels=['Data', 'Anomalous Data'])
+        plt.autoscale(enable=True, axis='x', tight=True)
+        self.anomalies = anomalies
 
 
 if __name__ == '__main__':
