@@ -53,6 +53,7 @@ class AutoEncoder():
     def __init__(
         self,
         rms_obj: Any,
+        data: pd.DataFrame,
         tb: bool = True,
         tb_logdir: str = '',
         params: dict = None,
@@ -67,7 +68,10 @@ class AutoEncoder():
               initialises the model based on it.
 
         Args:
-            rms_obj (RMS): RMS object containing the AE data to use.
+            rms_obj (Any): RMS object with holds test information. Must have\
+                exp_name attribute.
+            data (pd.DataFrame): Dataframe of rms data. Columns are the \
+                denote seperate cuts.
             tb (bool, optional): Whether to use tensorboard. Defaults to True.
             tb_logdir (str, optional): Name of tensorboard log directory.
             params (dict, optional): Dictionary of parameters to pass to\
@@ -77,7 +81,7 @@ class AutoEncoder():
             random_state (int, optional): Random state for reproducibility.
         """
         self.RMS = rms_obj
-        self._data = rms_obj.data
+        self._data = data
         self._train_slice = np.s_[train_slice[0]:train_slice[1]]
         self.random_state = random_state
         self._tb = tb
@@ -97,8 +101,6 @@ class AutoEncoder():
 
         self.model = self.initialise_model(**self.params)
         print(f'\n{self.run_name}')
-        # self.model.initialize(X=self.train_data)
-        # self.model.model_.summary()
         print()
 
     def pre_process(
@@ -775,6 +777,7 @@ class VariationalAutoEncoder(AutoEncoder):
     def __init__(
         self,
         rms_obj: Any,
+        data: pd.DataFrame,
         tb: bool = True,
         tb_logdir: str = '',
         params: dict = None,
@@ -783,6 +786,7 @@ class VariationalAutoEncoder(AutoEncoder):
         **kwargs,
     ):
         super().__init__(rms_obj,
+                         data,
                          tb,
                          tb_logdir,
                          params,
@@ -943,6 +947,7 @@ class LSTMAutoEncoder(AutoEncoder):
     def __init__(
         self,
         rms_obj: Any,
+        data: pd.DataFrame,
         tb: bool = True,
         tb_logdir: str = '',
         params: dict = None,
@@ -952,6 +957,7 @@ class LSTMAutoEncoder(AutoEncoder):
     ):
         self.seq_len = params.pop('seq_len', 50)
         super().__init__(rms_obj,
+                         data,
                          tb,
                          tb_logdir,
                          params,
@@ -967,7 +973,7 @@ class LSTMAutoEncoder(AutoEncoder):
         org_sig_len = np.shape(self.data.values)[0]
         joined_rms = []
         for i in range(np.shape(self.data)[1]):
-            joined_rms.extend(self.RMS.data.iloc[:, i].values.T)
+            joined_rms.extend(self.data.iloc[:, i].values.T)
         joined_rms = np.array(joined_rms).reshape(-1, 1)
         print(f'\tNumber of RMS samples: {np.shape(joined_rms)}')
 
@@ -1435,6 +1441,7 @@ if __name__ == '__main__':
     for test in exps:
         # '''
         autoe = AutoEncoder(rms[test],
+                            rms[test].data,
                             random_state=1,
                             train_slice=(0, 100),
                             tb=False,
@@ -1450,6 +1457,7 @@ if __name__ == '__main__':
         # '''
         '''
         autoe = VariationalAutoEncoder(rms[test],
+                                       rms[test].data,
                                        tb=False,
                                        tb_logdir=rms[test].exp_name,
                                        train_slice=(0, 100),
@@ -1463,6 +1471,7 @@ if __name__ == '__main__':
         '''
         '''
         autoe = LSTMAutoEncoder(rms[test],
+                                rms[test].data,
                                 train_slice=(0, 60),
                                 tb=False,
                                 tb_logdir=rms[test].exp_name,
