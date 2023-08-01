@@ -122,7 +122,7 @@ if __name__ == '__main__':
         df_val = rms[val_exp].data
         jr_val = []
         for i in range(np.shape(df_val)[1]):
-            jr_val.extend(jr_val.iloc[:, i].values.T)
+            jr_val.extend(df_val.iloc[:, i].values.T)
         jr_val = np.array(jr_val).reshape(-1, 1)
         print(f'\tNo of RMS samples in Val df: {np.shape(jr_val)}')
         assert ~np.isnan(jr_val).any(), 'NaN values in RMS data'
