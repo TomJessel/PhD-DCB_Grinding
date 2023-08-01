@@ -1322,9 +1322,18 @@ class LSTMAutoEncoder(AutoEncoder):
 
         if x is not None:
             pred = self.model.predict(x, verbose=1)
-            mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
-            mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
-            r2 = r2_score(x.T, pred.T, multioutput='raw_values')
+            mae = mean_absolute_error(x.squeeze().T,
+                                      pred.squeeze().T,
+                                      multioutput='raw_values'
+                                      )
+            mse = mean_squared_error(x.squeeze().T,
+                                     pred.squeeze().T,
+                                     multioutput='raw_values'
+                                     )
+            r2 = r2_score(x.squeeze().T,
+                          pred.squeeze().T,
+                          multioutput='raw_values'
+                          )
             scores = {'mae': mae, 'mse': mse, 'r2': r2}
 
         if label is not None and label in label_hash.keys():
