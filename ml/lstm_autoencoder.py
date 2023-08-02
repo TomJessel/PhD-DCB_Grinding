@@ -53,20 +53,24 @@ if __name__ == '__main__':
         rms[test]._data = rms[test].data.apply(remove_dc, axis=0)
 
     for i, val_exp in enumerate(exps):
+        print('\n')
+        print('=' * 50)
         print(f'Experiment {val_exp} is the validation set.')
+        print('=' * 50)
 
-        print('\tCombining training data...')
+        print('Combining training data...')
         dfs = []
         for exp in exps:
             if exp != val_exp:
                 dfs.append(rms[exp].data.iloc[:, :50].values)
         join_df = np.concatenate(dfs, axis=1)
         join_df = pd.DataFrame(join_df)
-        print(f'\t{np.shape(join_df)}')
+        print(f'No data files: \t{np.shape(join_df)[1]}')
+        print('-' * 50)
 
         join_rms = join_rms_obj(join_df, f'!{val_exp}')
 
-        print('\tCreate Autoencoder...')
+        print('Create Autoencoder...')
         autoe = LSTMAutoEncoder(join_rms,
                                 join_rms.data,
                                 tb=True,
@@ -106,56 +110,65 @@ if __name__ == '__main__':
             )
         )
 
-        print('\tTraining...')
+        print('-' * 50)
+        print('Training...')
         autoe.fit(x=autoe.train_data,
                   val_data=autoe.val_data,
                   verbose=0,
                   )
 
-        print('\tLoading best weights...')
+        print('Reloading best weights...')
         autoe.model.model_.load_weights(
             TB_DIR.joinpath(model_folder.joinpath(f'{name}.h5'))
         )
+        # autoe.model.initialize(X=autoe.train_data, y=autoe.train_data)
+        # autoe.model.model_.load_weights(
+        # )
         autoe.pred = None
         autoe.scores = None
 
+        print('-' * 50)
+        print('Pre-processing validation data...')
         df_val = rms[val_exp].data
         jr_val = []
         for i in range(np.shape(df_val)[1]):
             jr_val.extend(df_val.iloc[:, i].values.T)
         jr_val = np.array(jr_val).reshape(-1, 1)
-        print(f'\tNo of RMS samples in Val df: {np.shape(jr_val)}')
+        print(f'No of RMS samples in Val df: {np.shape(jr_val)}')
         assert ~np.isnan(jr_val).any(), 'NaN values in RMS data'
 
         jr_val = autoe.scaler.transform(jr_val)
-        seq_val = autoe.seqence_inputs(jr_val, autoe.seq_len)
-        print(f'\tSequenced data shape: {np.shape(seq_val)}')
+        seq_val = autoe.sequence_inputs(jr_val, autoe.seq_len)
+        print(f'Sequenced data shape: {np.shape(seq_val)}')
 
-        print('\tScoring...')
-        print(f'\t!{val_exp}')
-        (_, pred_val), scores = autoe['join_rms'].score(x=(seq_val))
+        print('-' * 50)
+        print('Scoring...')
+        print(f'Model trained with everything !{val_exp}')
+        (_, pred_val), scores = autoe.score(x=(seq_val))
 
         # Prediction plot
-        print('\tPrediction Plot...')
-        fig, ax = plt.subplots(1, 2, figsize=(10, 5), constrained_layout=True)
+        print('-' * 50)
+        print('Prediction Plot...')
+        fig, ax = plt.subplots(1, 1, figsize=(10, 5), constrained_layout=True)
         fig.suptitle(f'{autoe.RMS.exp_name} - Resconstruction')
 
-        ax = autoe.pred_plot(10000, input(seq_val, pred_val), plt_ax=ax)
+        ax = autoe.pred_plot(10000, input=(seq_val, pred_val), plt_ax=ax)
 
         fig_name = TB_DIR.joinpath(model_folder.joinpath(f'{name}_pred.png'))
         fig.savefig(fig_name)
-        print(f'\tSaved predicition fig to {fig_name}')
+        print(f'Saved predicition fig to {fig_name}')
 
         # Scatter error plot
-        print('\tScatter Error Plot...')
+        print('-' * 50)
+        print('Scatter Error Plot...')
         metric = ['mse', 'mae']
         features = ['Runout', 'Form error']
 
-        fig, ax = plt.subplots(len(metric), len(exps),
+        fig, ax = plt.subplots(len(metric), 1,
                                figsize=(10, 6),
                                constrained_layout=True,
                                sharex='col',
-                               dpi=500,
+                               dpi=200,
                                )
 
         ax2 = []
@@ -176,32 +189,32 @@ if __name__ == '__main__':
         axes = fig.axes
         axes2 = axes[-(len(axes) // 2):]
         axes = axes[0:(len(axes) // 2)]
-        axes[i].set_title(val_exp)
+        axes[0].set_title(val_exp)
 
         exp = resources.load(val_exp)
         for j, met in enumerate(metric):
             score = scores[met]
-            axes[(i + j)].scatter(x=range(len(score)),
-                                  y=score,
-                                  s=2,
-                                  label=met,
-                                  )
+            axes[j].scatter(x=range(len(score)),
+                            y=score,
+                            s=2,
+                            label=met,
+                            )
 
             for feature in features:
                 feat = exp.features[feature].drop([0, 1, 2])
-                if test == 'Test 5':
+                if val_exp == 'Test 5':
                     feat = feat.drop([23, 24])
-                axes2[(j) + i].plot(range(0, len(scores[met]), 300),
-                                    feat,
-                                    label=feature
-                                    )
+                axes2[j].plot(range(0, len(scores[met]), 300),
+                              feat,
+                              label=feature
+                              )
 
-            axes[(j) + i].set_xlabel('')
-            axes[(j) + i].set_ylabel('')
+            axes[j].set_xlabel('')
+            axes[j].set_ylabel('')
             if i == 0:
-                axes[(j) + i].set_ylabel(f'{met.upper()}')
+                axes[j].set_ylabel(f'{met.upper()}')
             if i == len(exps) - 1:
-                axes2[(j) + i].set_ylabel('Errors')
+                axes2[j].set_ylabel('Errors')
 
         _ = fig.supxlabel('Cut Number')
 
@@ -223,4 +236,5 @@ if __name__ == '__main__':
             model_folder.joinpath(f'{name}_scatter.png')
         )
         fig.savefig(fig_name)
-        print(f'\tSaved scatter fig to {fig_name}')
+        print(f'Saved scatter fig to {fig_name}')
+        print('-' * 50)
