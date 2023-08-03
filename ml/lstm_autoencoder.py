@@ -161,6 +161,7 @@ if __name__ == '__main__':
         # Scatter error plot
         print('-' * 50)
         print('Scatter Error Plot...')
+
         metric = ['mse', 'mae']
         features = ['Runout', 'Form error']
 
@@ -209,19 +210,10 @@ if __name__ == '__main__':
                               label=feature
                               )
 
-            axes[j].set_xlabel('')
-            axes[j].set_ylabel('')
-            # TODO fix the labelling of y axis
-            if i == 0:
-                axes[j].set_ylabel(f'{met.upper()}')
-            if i == len(exps) - 1:
-                axes2[j].set_ylabel('Errors')
+            axes[j].set_ylabel(f'{met.upper()}')
+            axes2[j].set_ylabel('Errors')
 
         _ = fig.supxlabel('Cut Number')
-
-        for i, a in enumerate(axes2):
-            if (i + 1) % 1 != 0:
-                plt.setp(a.get_yticklabels(), visible=False)
 
         l1, lab1 = axes[0].get_legend_handles_labels()
         l2, lab2 = axes2[0].get_legend_handles_labels()
