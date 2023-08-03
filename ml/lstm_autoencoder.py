@@ -211,6 +211,7 @@ if __name__ == '__main__':
 
             axes[j].set_xlabel('')
             axes[j].set_ylabel('')
+            # TODO fix the labelling of y axis
             if i == 0:
                 axes[j].set_ylabel(f'{met.upper()}')
             if i == len(exps) - 1:
