@@ -703,7 +703,6 @@ class RMS:
             return self._data
         else:
             self._data = self._get_data()
-            # self._data = self._process_rms()
             return self._data
         
     def _get_data(self) -> pd.DataFrame:

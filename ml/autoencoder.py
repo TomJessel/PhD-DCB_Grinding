@@ -18,13 +18,12 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 # from matplotlib import transforms
 import mplcursors
-import pandas as pd
 import numpy as np
-from tqdm.auto import tqdm
-import multiprocessing as mp
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from keras.layers import Input, Dense, BatchNormalization, Lambda
+from keras.layers import Input, Dense, BatchNormalization, Lambda, Dropout
+from keras.layers import LSTM, RepeatVector, TimeDistributed
 from keras.models import Model
 # from keras.regularizers import l1, l2
 import tensorboard.plugins.hparams.api as hp
@@ -49,140 +48,12 @@ elif platform == 'posix':
     DATA_DIR = onedrive.joinpath('Testing', 'RMS')
     TB_DIR = onedrive.joinpath('Tensorboard')
 
-
-def _mp_rms_process(fno: int):
-    """
-    Multiprocessing function to compute RMS of AE data.
-
-    Calc averaged rms of AE data for each cut and return as array.
-    Average size is 100000. RMS calcualted using rolling window of 500000.
-
-    Args:
-        fno (int): File number of AE data to calc RMS for.
     
-    Returns:
-        np.array: Array of RMS values for each cut.
-    """
-    avg_size = 100000
-    sig = exp.ae.readAE(fno)
-    sig = pd.DataFrame(sig)
-    sig = sig.pow(2).rolling(500000).mean().apply(np.sqrt, raw=True)
-    sig = np.array(sig)[500000 - 1:]
-    avg_sig = np.nanmean(np.pad(sig.astype(float),
-                                ((0, avg_size - sig.size % avg_size), (0, 0)),
-                                mode='constant',
-                                constant_values=np.NaN
-                                )
-                         .reshape(-1, avg_size), axis=1)
-    return avg_sig
-
-
-def mp_get_rms(fnos: list[int]):
-    """
-    Master multiprocessing function to compute RMS of AE data.
-
-    Args:
-        fnos (list[int]): List of file numbers to calc RMS for.
-    
-    Returns:
-        list: RMS values for each cut.
-    """
-    with mp.Pool(processes=20, maxtasksperchild=1) as pool:
-        rms = list(tqdm(pool.imap(
-            _mp_rms_process,
-            fnos),
-            total=len(fnos),
-            desc='RMS averaging'
-        ))
-        pool.close()
-        pool.join()
-    # rms = []
-    # for fno in tqdm(fnos, desc='RMS averaging'):
-    #     rms.append(_mp_rms_process(fno))
-    return rms
-
-
-class RMS:
-    def __init__(
-            self,
-            exp_name,
-    ):
-        """
-        RMS Data Object for AutoEncoder.
-
-        Args:
-            exp_name (str): Name of experiment to load data from.
-        """
-        self.exp_name = exp_name.upper().replace(" ", "_")
-
-        print(f'\nLoaded {exp_name} RMS Data')
-
-        # Read in data from file or compute
-        self._get_data()
-
-    def _process_exp(self, save_path: Path = None):
-        """
-        Process AE data and save to .csv file.
-
-        Args:
-            save_path (Path, optional): Path to save .csv file to.
-
-        Returns:
-            pd.DataFrame: Dataframe of RMS data.
-        """
-
-        # load in exp for this obj
-        global exp
-        try:
-            exp = resources.load(self.exp_name)
-        except NotADirectoryError:
-            exp = resources.load()
-
-        # get no of AE files in exp dataset
-        fnos = range(len(exp.ae._files))
-
-        # process data, requires func outside class for mp
-        rms = mp_get_rms(fnos)
-
-        # find min length of signals and create array
-        m = min([r.shape[0] for r in rms])
-        rms = [r[:m] for r in rms]
-        rms = np.array(rms)
-
-        # create dataframe from array each column is a cut
-        df = pd.DataFrame(rms.T)
-
-        if save_path is not None:
-            df.to_csv(save_path,
-                      encoding='utf-8',
-                      index=False)
-            print(f'Data file saved to: {save_path}')
-        del exp
-        return df
-
-    def _get_data(self):
-        """
-        Find and read in data from .csv file or process data and save to .csv.
-        """
-        # get file name of .csv file if created
-        file_name = f'RMS_{self.exp_name}.csv'
-
-        # join path of home dir, data folder, and file name for reading
-        path = DATA_DIR.joinpath(file_name)
-
-        try:
-            # try to read in .csv file
-            self.data = pd.read_csv(path)
-        except FileNotFoundError:
-            print(f'RMS Data File Not Found for {self.exp_name}')
-            # if no data file process data and save
-            self.data = self._process_exp(path)
-
-
 class AutoEncoder():
     def __init__(
         self,
-        rms_obj: RMS,
+        rms_obj: Any,
+        data: pd.DataFrame,
         tb: bool = True,
         tb_logdir: str = '',
         params: dict = None,
@@ -197,7 +68,10 @@ class AutoEncoder():
               initialises the model based on it.
 
         Args:
-            rms_obj (RMS): RMS object containing the AE data to use.
+            rms_obj (Any): RMS object with holds test information. Must have\
+                exp_name attribute.
+            data (pd.DataFrame): Dataframe of rms data. Columns are the \
+                denote seperate cuts.
             tb (bool, optional): Whether to use tensorboard. Defaults to True.
             tb_logdir (str, optional): Name of tensorboard log directory.
             params (dict, optional): Dictionary of parameters to pass to\
@@ -207,7 +81,7 @@ class AutoEncoder():
             random_state (int, optional): Random state for reproducibility.
         """
         self.RMS = rms_obj
-        self.data = rms_obj.data
+        self._data = data
         self._train_slice = np.s_[train_slice[0]:train_slice[1]]
         self.random_state = random_state
         self._tb = tb
@@ -227,8 +101,6 @@ class AutoEncoder():
 
         self.model = self.initialise_model(**self.params)
         print(f'\n{self.run_name}')
-        # self.model.initialize(X=self.train_data)
-        # self.model.model_.summary()
         print()
 
     def pre_process(
@@ -275,11 +147,22 @@ class AutoEncoder():
 
         # fit scaler to training data and transform all data
         self.scaler.fit(data[ind_tr])
-        self.data = self.scaler.transform(data)
+        self._data = self.scaler.transform(data)
 
         self._n_inputs = data[ind_tr].shape[1]
         self._ind_tr = ind_tr
         self._ind_val = ind_val
+
+    @property
+    def data(self):
+        """
+        Return the data.
+        """
+        try:
+            return self._data
+        except AttributeError:
+            print('Data not pre-processed yet!')
+            return None
 
     @property
     def train_data(self):
@@ -319,8 +202,22 @@ class AutoEncoder():
         Returns:
             cutoffs (dict): Dictionary of cutoff values for each score.
         """
+
+        def mad_based_outlier(points, thresh=1.8):
+            if len(points.shape) == 1:
+                points = points[:, None]
+            median = np.median(points, axis=0)
+            diff = np.sum((points - median)**2, axis=-1)
+            diff = np.sqrt(diff)
+            med_abs_deviation = np.median(diff)
+
+            modified_z_score = 0.6745 * diff / med_abs_deviation
+
+            return modified_z_score > thresh
+ 
         try:
             sc = {k: v[self._train_slice] for k, v in self.scores.items()}
+            # sc = {k: v for k, v in self.scores.items()}
         except AttributeError:
             print('Scores not calculated yet! Score then re-run.')
             return None
@@ -329,10 +226,19 @@ class AutoEncoder():
         print('\nCutoffs:')
         for key, score in sc.items():
             # check if the scores should be trying to inc or dec
+            out = score[mad_based_outlier(score)]
             if key == 'r2':
-                cutoffs[key] = np.mean(score) - np.std(score)
+                try:
+                    cutoffs[key] = np.max(out)
+                except ValueError:
+                    print('std cutoff')
+                    cutoffs[key] = np.median(score) - np.std(score)
             else:
-                cutoffs[key] = np.mean(score) + np.std(score)
+                try:
+                    cutoffs[key] = np.min(out)
+                except ValueError:
+                    print('std cutoff')
+                    cutoffs[key] = np.median(score) + np.std(score)
             print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
         return cutoffs
 
@@ -365,6 +271,7 @@ class AutoEncoder():
             for dim in n_size:
                 e = Dense(dim, activation=activation)(e)
                 e = BatchNormalization()(e)
+                e = Dropout(0.1)(e)
 
             encoder_out = Dense(n_bottleneck,
                                 activation='relu',
@@ -379,6 +286,7 @@ class AutoEncoder():
             for dim in n_size[::-1]:
                 d = Dense(dim, activation=activation)(d)
                 d = BatchNormalization()(d)
+                d = Dropout(0.1)(d)
 
             decoder_out = Dense(n_inputs, activation='relu')(d)
             decoder = Model(decoder_in, decoder_out, name='Decoder')
@@ -563,27 +471,28 @@ class AutoEncoder():
         elif x is not None and label is not None:
             raise ValueError('Cannot provide both x and label for scoring.')
 
+        print('\nPredicting data:')
         if self.pred is None:
-            pred = self.model.predict(self.data, verbose=0)
+            pred = self.model.predict(self.data, verbose=1)
             self.pred = pred
 
         if self.scores is None:
-            mae = mean_absolute_error(self.data.T,
-                                      self.pred.T,
+            mae = mean_absolute_error(self.data,
+                                      self.pred,
                                       multioutput='raw_values',
                                       )
-            mse = mean_squared_error(self.data.T,
-                                     self.pred.T,
+            mse = mean_squared_error(self.data,
+                                     self.pred,
                                      multioutput='raw_values',
                                      )
-            r2 = r2_score(self.data.T,
-                          self.pred.T,
+            r2 = r2_score(self.data,
+                          self.pred,
                           multioutput='raw_values',
                           )
             self.scores = {'mae': mae, 'mse': mse, 'r2': r2}
 
         if x is not None:
-            pred = self.model.predict(x, verbose=0)
+            pred = self.model.predict(x, verbose=1)
             mae = mean_absolute_error(x.T, pred.T, multioutput='raw_values')
             mse = mean_squared_error(x.T, pred.T, multioutput='raw_values')
             r2 = r2_score(x.T, pred.T, multioutput='raw_values')
@@ -650,11 +559,11 @@ class AutoEncoder():
             fig, ax: Matplotlib figure and axis.
         """
         if input is not None:
-            pred_input = input[0][no, :].reshape(-1, self._n_inputs)
-            x_pred = input[1][no, :].reshape(-1, self._n_inputs)
+            pred_input = input[0][no, :].reshape(-1, 1)
+            x_pred = input[1][no, :].reshape(-1, 1)
         else:
-            pred_input = self.data[no, :].reshape(-1, self._n_inputs)
-            x_pred = self.pred[no, :].reshape(-1, self._n_inputs)
+            pred_input = self.data[no, :].reshape(-1, 1)
+            x_pred = self.pred[no, :].reshape(-1, 1)
 
         pred_input = self.scaler.inverse_transform(pred_input)
         x_pred = self.scaler.inverse_transform(x_pred)
@@ -666,8 +575,8 @@ class AutoEncoder():
             fig, ax = plt.subplots()
         else:
             ax = plt_ax
-        ax.plot(pred_input.T, label='Real')
-        ax.plot(x_pred.T, label='Predicition')
+        ax.plot(pred_input, label='Real')
+        ax.plot(x_pred, label='Predicition')
         ax.legend()
         ax.set_title(f'MAE: {mae:.4f} MSE: {mse:.4f}')
         if plt_ax is None:
@@ -718,8 +627,8 @@ class AutoEncoder():
 
         fig, ax = plt.subplots(len(metrics), 1, squeeze=False)
         for i, metric in enumerate(metrics):
-            ax[i, 0].hist(self.scores[metric][self._train_slice],
-                          bins=40, label=metric)
+            ax[i, 0].hist(self.scores[metric][self._ind_tr],
+                          bins=50, label=metric)
             ax[i, 0].legend()
             ax[i, 0].set_xlabel(f'{metric.upper()} score')
             ax[i, 0].set_ylabel('Frequency')
@@ -772,6 +681,7 @@ class AutoEncoder():
             else:
                 cmap = ['r' if y > self.thres[metric] else 'b'
                         for y in self.scores[metric]]
+            # cmap = ['C0' for y in self.scores[metric]]
 
             ax[i].scatter(x=range(len(self.scores[metric])),
                           y=self.scores[metric],
@@ -814,6 +724,7 @@ class _VariationalAutoEncoder(Model):
         for dim in n_size:
             e = Dense(dim, activation='relu')(e)
             e = BatchNormalization()(e)
+            e = Dropout(0.01)(e)
 
         z_mean = Dense(latent_dim, name='z_mean')(e)
         z_log_sigma = Dense(latent_dim, name='z_log_sigma')(e)
@@ -837,6 +748,7 @@ class _VariationalAutoEncoder(Model):
         for dim in n_size[::-1]:
             d = Dense(dim, activation='relu')(d)
             d = BatchNormalization()(d)
+            d = Dropout(0.01)(d)
 
         outputs = Dense(input_dim, activation='sigmoid')(d)
 
@@ -864,19 +776,23 @@ class _VariationalAutoEncoder(Model):
 class VariationalAutoEncoder(AutoEncoder):
     def __init__(
         self,
-        rms_obj: RMS,
+        rms_obj: Any,
+        data: pd.DataFrame,
         tb: bool = True,
         tb_logdir: str = '',
         params: dict = None,
         train_slice=(0, 100),
         random_state=None,
+        **kwargs,
     ):
         super().__init__(rms_obj,
+                         data,
                          tb,
                          tb_logdir,
                          params,
                          train_slice,
                          random_state,
+                         **kwargs,
                          )
 
     def initialise_model(
@@ -1027,6 +943,485 @@ class VariationalAutoEncoder(AutoEncoder):
         return fig, ax
 
 
+class LSTMAutoEncoder(AutoEncoder):
+    def __init__(
+        self,
+        rms_obj: Any,
+        data: pd.DataFrame,
+        tb: bool = True,
+        tb_logdir: str = '',
+        params: dict = None,
+        train_slice: tuple = (0, 100),
+        random_state: int = None,
+        **kwargs,
+    ):
+        self.seq_len = params.pop('seq_len', 50)
+        super().__init__(rms_obj,
+                         data,
+                         tb,
+                         tb_logdir,
+                         params,
+                         train_slice,
+                         random_state,
+                         **kwargs,
+                         )
+
+    def pre_process(self, val_frac: float = 0.2):
+        print('Pre-processing Data:')
+        
+        print('\tCombining RMS data...')
+        org_sig_len = np.shape(self.data.values)[0]
+        joined_rms = []
+        for i in range(np.shape(self.data)[1]):
+            joined_rms.extend(self.data.iloc[:, i].values.T)
+        joined_rms = np.array(joined_rms).reshape(-1, 1)
+        print(f'\tNumber of RMS samples: {np.shape(joined_rms)}')
+
+        assert ~np.isnan(joined_rms).any(), 'NaN values in RMS data'
+
+        print(f'\n\tTraining Data: {self._train_slice}')
+        ind_tr = np.arange(len(joined_rms))
+        ind_tr = ind_tr[(self._train_slice.start * org_sig_len):
+                        (self._train_slice.stop * org_sig_len)]
+        
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
+
+        if self.random_state is None:
+            ind_tr, ind_val = train_test_split(
+                ind_tr,
+                test_size=val_frac,
+            )
+        else:
+            ind_tr, ind_val = train_test_split(
+                ind_tr,
+                test_size=val_frac,
+                random_state=self.random_state,
+            )
+
+        print(f'\tInput train shape: {joined_rms[ind_tr].shape}')
+        print(f'\tInput val shape: {joined_rms[ind_val].shape}')
+
+        # fit the data to all the training and val data
+        # contanination cant be avoided as its time series data
+        self.scaler.fit(joined_rms[np.concatenate([ind_tr, ind_val])])
+        self.joined_data = self.scaler.transform(joined_rms)
+        self._data = self.sequence_inputs(self.joined_data, self.seq_len)
+
+        self._n_inputs = org_sig_len
+        self._ind_tr = ind_tr
+        self._ind_val = ind_val
+        
+    @staticmethod
+    def sequence_inputs(data, seq_len):
+        d = []
+        for index in range(len(data) - seq_len + 1):
+            d.append(data[index: (index + seq_len)])
+        return np.stack(d)
+    
+    @property
+    def seq_data(self):
+        """
+        Return the sequenced data.
+        """
+        try:
+            return self._seq_data
+        except AttributeError:
+            print('Data not pre-processed yet!')
+            return None
+    
+    @property
+    def train_data(self):
+        """
+        Return the training data.
+        """
+        try:
+            return self.data[self._ind_tr]
+        except AttributeError:
+            print('Data not pre-processed yet!')
+            return None
+    
+    @property
+    def val_data(self):
+        """
+        Return the validation data.
+        """
+        try:
+            return self.data[self._ind_val]
+        except AttributeError:
+            print('Data not pre-processed yet!')
+            return None
+
+    def _get_cutoffs(self):
+        """
+        Method to get the cutoff values from the training slice scores
+
+        Returns:
+            cutoffs (dict): Dictionary of cutoff values for each score.
+        """
+
+        try:
+            sc = {k: v[self._train_slice] for k, v in self.scores.items()}
+            # sc = {k: v for k, v in self.scores.items()}
+        except AttributeError:
+            print('Scores not calculated yet! Score then re-run.')
+            return None
+
+        cutoffs = {}
+        print('\nCutoffs:')
+        for key, score in sc.items():
+            # check if the scores should be trying to inc or dec
+            if key == 'r2':
+                cutoffs[key] = np.median(score) - np.std(score)
+            else:
+                cutoffs[key] = np.median(score) + np.std(score)
+                # cutoffs[key] = np.percentile(score, 97)
+            print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
+        return cutoffs
+
+    @staticmethod
+    def _get_autoencoder(
+        seq_len: int,
+        n_inputs: int,
+        n_bottleneck: int,
+        n_size: list[int],
+        activation: str,
+        activity_regularizer,
+    ) -> Model:
+        """
+        Create a Keras autoencoder model with the given parameters.
+
+        Args:
+            n_inputs (int): Number of inputs to the model.
+            n_bottleneck (int): Number of nodes in the bottleneck layer.
+            n_size (list[int]): List of integers for the number of nodes in \
+                the encoder (and decoder but reversed)
+            activation (str): Activation function to use.
+            activity_regularizer: Activity regulariser to use in encoder.
+
+        Returns:
+            Model: Keras model of the autoencoder.
+        """
+        def get_encoder(seq_len, n_inputs, n_bottleneck, n_size, activation):
+            encoder_in = Input(shape=(seq_len, 1))
+            e = encoder_in
+
+            for dim in n_size:
+                e = LSTM(dim, return_sequences=True)(e)
+                e = Dropout(0.1)(e)
+                e = BatchNormalization()(e)
+
+            encoder_out = LSTM(n_bottleneck,
+                               return_sequences=False)(e)
+            encoder = Model(encoder_in, encoder_out, name='Encoder')
+            return encoder
+
+        def get_decoder(seq_len, n_inputs, n_bottleneck, n_size, activation):
+            decoder_in = Input(shape=(n_bottleneck,))
+            d = decoder_in
+
+            d = RepeatVector(seq_len)(d)
+
+            for dim in n_size[::-1]:
+                d = LSTM(dim, return_sequences=True)(d)
+                d = Dropout(0.1)(d)
+                d = BatchNormalization()(d)
+
+            decoder_out = TimeDistributed(Dense(1))(d)
+            decoder = Model(decoder_in, decoder_out, name='Decoder')
+            return decoder
+
+        encoder = get_encoder(seq_len,
+                              n_inputs,
+                              n_bottleneck,
+                              n_size,
+                              activation
+                              )
+        decoder = get_decoder(seq_len,
+                              n_inputs,
+                              n_bottleneck,
+                              n_size,
+                              activation
+                              )
+
+        autoencoder_in = Input(shape=(seq_len, 1), name='Input')
+        encoded = encoder(autoencoder_in)
+        decoded = decoder(encoded)
+        autoencoder = Model(autoencoder_in, decoded, name='AutoEncoder')
+        return autoencoder
+
+    def initialise_model(
+        self,
+        n_bottleneck: int = 10,
+        n_size: list = [64, 64],
+        activation: str = None,
+        epochs: int = 500,
+        batch_size: int = 10,
+        loss: str = 'mse',
+        metrics: list[str] = ['MSE',
+                              'MAE',
+                              KerasRegressor.r_squared
+                              ],
+        optimizer=None,
+        activity_regularizer=None,
+        verbose: int = 1,
+        callbacks: list[Any] = None,
+    ):
+        """
+        Initialise the model with the given parameters and callbacks.
+
+        Creates an AutoEncoder model within a sickeras basewrapper, based on
+        the inputted parameters. Also creates a unique run name for logging to
+        tensorboard if chosen.
+
+        Args:
+            n_bottleneck (int, optional): Number of nodes in the bottleneck\
+                  layer.
+            n_size (list, optional): List of nodes in the encoder\
+                  (decoder reversed).
+            activation (str, optional): Activation function to use.
+            epochs (int, optional): Number of epochs to train for.
+            batch_size (int, optional): Batch size to use.
+            loss (str, optional): Loss function to use for each node.
+            metrics (list[str], optional): List of metrics to calc for.
+            optimizer (str, optional): Optimizer to use.
+            verbose (int, optional): Verbosity of the model.
+            callbacks (list[Any], optional): List of callbacks to use.
+        """
+
+        self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
+        layers = n_size + [n_bottleneck] + n_size[::-1]
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        self.run_name = f'LSTMAE-{self.RMS.exp_name.replace(" ", "_")}-' \
+                        f'WIN-{self.seq_len}-E-{epochs}-L-{layers}-{t}'
+
+        if callbacks is None:
+            callbacks = []
+        callbacks.append(tfa.callbacks.TQDMProgressBar(
+            show_epoch_progress=False))
+
+        if self._tb:
+            callbacks.append(tf.keras.callbacks.TensorBoard(
+                log_dir=self._tb_logdir.joinpath(self.run_name),
+                histogram_freq=1,
+            ))
+            tb_writer = tf.summary.create_file_writer(
+                f'{self._tb_logdir.joinpath(self.run_name)}')
+
+            with tb_writer.as_default():
+                hp_params = self.params
+                hp_params.pop('callbacks', None)
+                
+                t_allow = (int, float, str, bool)
+                types = {k: isinstance(val, t_allow)
+                         for k, val in hp_params.items()}
+
+                for k in types.keys():
+                    if types[k] is False:
+                        old = hp_params.pop(k)
+                        if k == 'n_size':
+                            hp_params[k] = str(layers)
+                        elif k == 'activity_regularizer':
+                            if old is not None:
+                                [[key, value]] = old.get_config().items()
+                                hp_params[k] = f'{key}: {value:.3g}'
+                            else:
+                                hp_params[k] = str(old)
+                        else:
+                            hp_params[k] = str(old)
+                
+                hp.hparams(
+                    hp_params,
+                    trial_id=f'{self._tb_logdir.joinpath(self.run_name)}'
+                )
+
+        if optimizer is None:
+            optimizer = tf.keras.optimizers.Adam(lr=0.001,
+                                                 beta_1=0.9,
+                                                 beta_2=0.999,
+                                                 amsgrad=False,
+                                                 clipnorm=1.,
+                                                 clipvalue=0.5,
+                                                 )
+
+        model = BaseWrapper(
+            model=self._get_autoencoder,
+            model__seq_len=self.seq_len,
+            model__n_inputs=self._n_inputs,
+            model__n_bottleneck=n_bottleneck,
+            model__n_size=n_size,
+            model__activation=activation,
+            model__activity_regularizer=activity_regularizer,
+            epochs=epochs,
+            batch_size=batch_size,
+            loss=loss,
+            metrics=metrics,
+            optimizer=optimizer,
+            verbose=verbose,
+            callbacks=callbacks,
+        )
+
+        return model
+
+    def score(
+            self,
+            label: str = None,
+            x: np.ndarray = None,
+            tb: bool = True,
+            print_score: bool = True,
+    ) -> tuple[tuple[np.ndarray, np.ndarray], dict]:
+        """
+        Score the model on the inputted data.
+
+        Predicts the model on the inputted data and calculates the scores,
+        as well as doing it for all the initiliased dataset.
+
+        Args:
+            label (str, optional): Label of the data to score the model on \
+                (train, val, dataset).
+            x (np.ndarray): Input data to score the model on.
+            tb (bool, optional): Log to tensorboard. Defaults to True.
+            print_score (bool, optional): Print the scores. Defaults to True.
+            
+        Returns:
+            tuple[tuple[np.ndarray, np.ndarray], dict]: A tuple (input,
+            prediction) and a dictionary of scores.
+
+        """
+
+        label_hash = {
+            'train': self._ind_tr,
+            'val': self._ind_val,
+            'dataset': np.arange(self.data.shape[0]),
+        }
+
+        if x is None and label is None:
+            raise ValueError('Must provide either x or label for scoring.')
+        elif x is not None and label is not None:
+            raise ValueError('Cannot provide both x and label for scoring.')
+
+        print('\nPredicting data:')
+
+        if self.pred is None:
+            pred = self.model.predict(self.data, verbose=1)
+            self.pred = pred
+
+        if self.scores is None:
+            mae = mean_absolute_error(self.data.squeeze().T,
+                                      self.pred.squeeze().T,
+                                      multioutput='raw_values',
+                                      )
+            mse = mean_squared_error(self.data.squeeze().T,
+                                     self.pred.squeeze().T,
+                                     multioutput='raw_values',
+                                     )
+            r2 = r2_score(self.data.squeeze().T,
+                          self.pred.squeeze().T,
+                          multioutput='raw_values',
+                          )
+            self.scores = {'mae': mae, 'mse': mse, 'r2': r2}
+
+        if x is not None:
+            pred = self.model.predict(x, verbose=1)
+            mae = mean_absolute_error(x.squeeze().T,
+                                      pred.squeeze().T,
+                                      multioutput='raw_values'
+                                      )
+            mse = mean_squared_error(x.squeeze().T,
+                                     pred.squeeze().T,
+                                     multioutput='raw_values'
+                                     )
+            r2 = r2_score(x.squeeze().T,
+                          pred.squeeze().T,
+                          multioutput='raw_values'
+                          )
+            scores = {'mae': mae, 'mse': mse, 'r2': r2}
+
+        if label is not None and label in label_hash.keys():
+            x = np.squeeze(self.data[label_hash[label]])
+            pred = np.squeeze(self.pred[label_hash[label]])
+            scores = {k: v[label_hash[label]] for k, v in self.scores.items()}
+        elif label is not None and label not in label_hash.keys():
+            raise KeyError(f'Label {label} not found in label_hash.')
+
+        if self._tb and tb:
+            tb_writer = tf.summary.create_file_writer(
+                f'{self._tb_logdir.joinpath(self.run_name)}')
+
+            md_scores = dedent(f'''
+                    ### Scores - Validation Data
+
+                    | MAE | MSE |  R2  |
+                    | ---- | ---- | ---- |
+                    | {np.mean(scores['mae']):.5f} |\
+                        {np.mean(scores['mse']):.5f} |\
+                            {np.mean(scores['r2']):.5f} |
+
+                    ''')
+            with tb_writer.as_default():
+                tf.summary.text('Model Info', md_scores, step=2)
+                tf.summary.scalar(
+                    'Val MAE',
+                    np.mean(scores['mae']),
+                    step=1,
+                )
+                tf.summary.scalar(
+                    'Val MSE',
+                    np.mean(scores['mse']),
+                    step=1,
+                )
+                tf.summary.scalar(
+                    'Val R\u00B2',
+                    np.mean(scores['r2']),
+                    step=1,
+                )
+
+        if print_score:
+            if label is not None:
+                print(f'\n{label.capitalize()} Scores:')
+            else:
+                print('\nScores:')
+            print(f'\tMAE: {np.mean(scores["mae"]):.5f}')
+            print(f'\tMSE: {np.mean(scores["mse"]):.5f}')
+            print(f'\tR2: {np.mean(scores["r2"]):.5f}')
+        return (x, pred), scores
+
+    def anom_plot(self, anomaly_metric: str = 'mse', plt_ax=None):
+        if plt_ax is None:
+            fig, ax = plt.subplots(figsize=(7.5, 5))
+        else:
+            ax = plt_ax
+
+        if self.scores is None:
+            self.scores('dataset', print_score=False)
+        
+        if hasattr(self, 'thres') is False:
+            self.thres
+        
+        anomalies = self.scores[anomaly_metric] > self.thres[anomaly_metric]
+        anomalous_data_indices = [False] * len(self.joined_data)
+        np.array(anomalous_data_indices)
+        for data_idx in range(self.seq_len - 1, len(self.joined_data)):
+            if np.all(anomalies[data_idx - self.seq_len + 1:data_idx]):
+                anomalous_data_indices[data_idx] = True
+        # for i, anom in enumerate(anomalies):
+            # if anom:
+                # for j in range(i, (i + self.seq_len - 0)):
+                # anomalous_data_indices[i] = True
+
+        df_full_rms = pd.DataFrame(self.joined_data)
+        df_anom = df_full_rms.copy()
+        df_anom.loc[np.invert(anomalous_data_indices)] = np.nan
+
+        df_full_rms.plot(legend=False, ax=ax)
+        df_anom.plot(legend=False, ax=ax, color="r")
+
+        ax.set_xlabel('Samples')
+        ax.set_ylabel('Rolling RMS (V)')
+        ax.legend(labels=['Data', 'Anomalous Data'])
+        plt.autoscale(enable=True, axis='x', tight=True)
+        self.anomalies = anomalies
+
+
 if __name__ == '__main__':
 
     # exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
@@ -1034,96 +1429,124 @@ if __name__ == '__main__':
 
     rms = {}
     for test in exps:
-        rms[test] = RMS(test)
+        rms[test] = resources.ae.RMS(test)
+        rms[test].data.drop(['0', '1', '2'], axis=1, inplace=True)
     try:
         rms['Test 5'].data.drop(['23', '24'], axis=1, inplace=True)
     except KeyError:
         pass
 
+    # remove outside triggers and DC offset
+    def remove_dc(sig):
+        return sig - np.nanmean(sig)
+
+    for test in exps:
+        rms[test]._data = rms[test].data.T.reset_index(drop=True).T
+        rms[test]._data = rms[test].data.iloc[50:350, :].reset_index(drop=True)
+        rms[test]._data = rms[test].data.apply(remove_dc, axis=0)
+
     print()
 
     for test in exps:
+        # '''
+        autoe = AutoEncoder(rms[test],
+                            rms[test].data,
+                            random_state=1,
+                            train_slice=(0, 100),
+                            tb=False,
+                            tb_logdir=rms[test].exp_name + '/neurons',
+                            params={'n_bottleneck': 10,
+                                    'n_size': [64, 64],
+                                    'epochs': 500,
+                                    'loss': 'mse',
+                                    'batch_size': 10,
+                                    # 'activity_regularizer': None,
+                                    }
+                            )
+        # '''
         '''
-        # autoe = AutoEncoder(rms[test],
-        #                     random_state=1,
-        #                     train_slice=(0, 100),
-        #                     tb=False,
-        #                     tb_logdir=rms[test].exp_name + '/neurons',
-        #                     params={'n_bottleneck': 10,
-        #                             'n_size': [64, 64],
-        #                             'epochs': 500,
-        #                             'loss': 'mse',
-        #                             'batch_size': 10,
-        #                             # 'activity_regularizer': None,
-        #                             }
-        #                     )
-
-        # autoe.fit(
-        #     x=autoe.train_data,
-        #     val_data=autoe.val_data,
-        #     verbose=0,
-        # )
+        autoe = VariationalAutoEncoder(rms[test],
+                                       rms[test].data,
+                                       tb=False,
+                                       tb_logdir=rms[test].exp_name,
+                                       train_slice=(0, 100),
+                                       random_state=1,
+                                       params={'latent_dim': 2,
+                                               'n_size': [64, 64],
+                                               'epochs': 500,
+                                               'batch_size': 10,
+                                               }
+                                       )
         '''
-
-        vae = VariationalAutoEncoder(rms[test],
-                                     tb=False,
-                                     tb_logdir=rms[test].exp_name,
-                                     train_slice=(0, 100),
-                                     random_state=1,
-                                     params={'latent_dim': 2,
-                                             'n_size': [64, 64],
-                                             'epochs': 500,
-                                             'batch_size': 10,
-                                             }
-                                     )
-
-        vae.fit(x=vae.train_data,
-                val_data=vae.val_data,
-                verbose=0,
-                use_multiprocessing=True,
-                )
+        '''
+        autoe = LSTMAutoEncoder(rms[test],
+                                rms[test].data,
+                                train_slice=(0, 60),
+                                tb=False,
+                                tb_logdir=rms[test].exp_name,
+                                random_state=1,
+                                params={'n_bottleneck': 32,
+                                        'n_size': [64],
+                                        'epochs': 2,
+                                        'loss': 'mse',
+                                        'batch_size': 10,
+                                        })
+        '''
+        
+        # %% FIT THE MODEL
+        # ---------------------------------------------------------------------
+        autoe.fit(x=autoe.train_data,
+                  val_data=autoe.val_data,
+                  verbose=0,
+                  use_multiprocessing=True,
+                  )
 
         # %% PLOT LOSS
         # ---------------------------------------------------------------------
-        vae.loss_plot()
+        autoe.loss_plot()
 
         # %% MODEL SUMMARY
         # ---------------------------------------------------------------------
-        vae.model.model_.summary()
-        # vae.model.model_.encoder.summary()
-        # vae.model.model_.decoder.summary()
+        autoe.model.model_.summary()
+        #autoe.model.model_.encoder.summary()
+        #autoe.model.model_.decoder.summary()
 
         # %% SCORE THE MODEL ON TRAINING, VALIDATION AND ALL DATA
         # ---------------------------------------------------------------------
-        pred_tr, scores_tr = vae.score('train')
-        pred_val, scores_val = vae.score('val')
-        pred_data, scores_data = vae.score('dataset')
+        pred_tr, scores_tr = autoe.score('train')
+        pred_val, scores_val = autoe.score('val')
+        pred_data, scores_data = autoe.score('dataset')
 
         # %% HISTOGRAM OF SCORES
         # ---------------------------------------------------------------------
-        fig, ax = vae.hist_scores(['mse'])
+        fig, ax = autoe.hist_scores(['mse'])
 
         # %% PLOT PREDICTIONS
         # ---------------------------------------------------------------------
-        fig, ax = vae.pred_plot(vae._ind_tr[0])
-        ax.set_title(f'{vae.RMS.exp_name} Training Data - {ax.get_title()}')
-        fig, ax = vae.pred_plot(vae._ind_val[0])
-        ax.set_title(f'{vae.RMS.exp_name} Val Data - {ax.get_title()}')
+        fig, ax = autoe.pred_plot(autoe._ind_tr[0])
+        ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
+        fig, ax = autoe.pred_plot(autoe._ind_val[0])
+        ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
 
         # %% CALC CUTOFFS
         # ---------------------------------------------------------------------
-        vae.thres
+        autoe.thres
 
         # %% PLOT SCORES ON SCATTER
         # ---------------------------------------------------------------------
-        fig, ax = vae.scatter_scores()
+        fig, ax = autoe.scatter_scores()
 
         # %% GENERATE NEW DATA
         # ---------------------------------------------------------------------
-        _, fig, ax = vae.generate(z=[-2, 2])
+        try:
+            _, fig, ax = autoe.generate(z=[-2, 2])
+        except AttributeError:
+            pass
 
         # %% PLOT LATENT SPACE
         # ---------------------------------------------------------------------
-        fig, ax = vae.plot_latent_space()
-
+        try:
+            fig, ax = autoe.plot_latent_space()
+        except AttributeError:
+            pass
         plt.show(block=True)
