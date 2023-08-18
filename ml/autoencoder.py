@@ -13,10 +13,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from textwrap import dedent
 from typing import Any, Union
 import tensorflow as tf
-# import matplotlib as mpl
-# mpl.use('TkAgg')
 import matplotlib.pyplot as plt
-# from matplotlib import transforms
 import mplcursors
 import numpy as np
 import pandas as pd
@@ -25,14 +22,13 @@ from sklearn.preprocessing import MinMaxScaler
 from keras.layers import Input, Dense, BatchNormalization, Lambda, Dropout
 from keras.layers import LSTM, RepeatVector, TimeDistributed
 from keras.models import Model
-# from keras.regularizers import l1, l2
 import tensorboard.plugins.hparams.api as hp
-import tensorflow_addons as tfa
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from pathlib import PurePosixPath as Path
 import time
 from scikeras.wrappers import KerasRegressor, BaseWrapper
 from keras import backend as K
+import dill as pickle
 
 import resources
 
@@ -48,7 +44,44 @@ elif platform == 'posix':
     DATA_DIR = onedrive.joinpath('Testing', 'RMS')
     TB_DIR = onedrive.joinpath('Tensorboard')
 
+
+def load_model(filepath):
+
+    file_loc = Path(filepath)
+
+    # check path exists
+    if os.path.exists(file_loc) is False:
+        try:
+            file_loc = TB_DIR.joinpath('AUTOE', file_loc)
+            if os.path.exists(file_loc) is False:
+                raise FileNotFoundError()
+        except FileNotFoundError:
+            raise FileNotFoundError(f'{file_loc} does not exist.')
+
+    # check if path is file or directory
+    if os.path.isdir(file_loc):
+        pkl_files = []
+        for f in os.listdir(file_loc):
+            if f.endswith('.pickle'):
+                pkl_files.append(f)
+        if len(pkl_files) == 1:
+            file_loc = file_loc.joinpath(pkl_files[0])
+        elif len(pkl_files) > 1:
+            raise ValueError(f'Multiple pickle files in {file_loc}.')
+        else:
+            raise FileNotFoundError(f'{file_loc} does not exist.')
+    elif os.path.isfile(file_loc):
+        file_loc = file_loc
+    else:
+        raise FileNotFoundError(f'{file_loc} does not exist.')
+
+    with open(file_loc, 'rb') as f:
+        model = pickle.load(f)
+        print('Model loaded:')
+        print(f'\tLoad Loc: {file_loc}')
+    return model
     
+
 class AutoEncoder():
     def __init__(
         self,
@@ -146,8 +179,10 @@ class AutoEncoder():
         print(f'\tInput val shape: {data[ind_val].shape}')
 
         # fit scaler to training data and transform all data
-        self.scaler.fit(data[ind_tr])
-        self._data = self.scaler.transform(data)
+        self.scaler.fit(data[ind_tr].reshape(-1, 1))
+        self._data = self.scaler.transform(data.reshape(-1, 1)).reshape(
+            data.shape[0], data.shape[1]
+        )
 
         self._n_inputs = data[ind_tr].shape[1]
         self._ind_tr = ind_tr
@@ -351,8 +386,6 @@ class AutoEncoder():
 
         if callbacks is None:
             callbacks = []
-        callbacks.append(tfa.callbacks.TQDMProgressBar(
-            show_epoch_progress=False))
 
         if self._tb:
             callbacks.append(tf.keras.callbacks.TensorBoard(
@@ -407,7 +440,7 @@ class AutoEncoder():
 
         return model
 
-    def fit(self, x, val_data: np.ndarray = None, **kwargs):
+    def fit(self, x, val_data: np.ndarray = None, verbose=1, **kwargs):
         """
         Fit the model to the inputted data.
 
@@ -420,17 +453,20 @@ class AutoEncoder():
                 Defaults to None.
             **kwargs: Additional arguments to pass to the model.fit method.
         """
+        print(f'Training model: {self.run_name}:')
         if val_data is not None:
             self.model.fit(
                 X=x,
                 y=x,
                 validation_data=(val_data, val_data),
+                verbose=verbose,
                 **kwargs
             )
         else:
             self.model.fit(
                 X=x,
                 y=x,
+                verbose=verbose,
                 **kwargs
             )
 
@@ -707,7 +743,23 @@ class AutoEncoder():
 
         return fig, ax
 
+    def save_model(self, folder_path=None) -> Union[Path, str]:
+        if folder_path is None:
+            folder_path = self._tb_logdir.joinpath(self.run_name)
 
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        assert os.path.exists(folder_path), f'{folder_path} does not exist.'
+            
+        file_loc = folder_path.joinpath(f'{self.run_name}.pickle')
+
+        with open(file_loc, 'wb') as f:
+            pickle.dump(self, f)
+            print('Model saved')
+            print(f'\tSave Loc: {file_loc}')
+        return file_loc
+
+            
 class _VariationalAutoEncoder(Model):
     def __init__(self, input_dim, latent_dim, n_size):
         super().__init__()
@@ -815,8 +867,6 @@ class VariationalAutoEncoder(AutoEncoder):
 
         if callbacks is None:
             callbacks = []
-        callbacks.append(tfa.callbacks.TQDMProgressBar(
-            show_epoch_progress=False))
         
         if self._tb:
             callbacks.append(tf.keras.callbacks.TensorBoard(
@@ -1196,9 +1246,7 @@ class LSTMAutoEncoder(AutoEncoder):
 
         if callbacks is None:
             callbacks = []
-        callbacks.append(tfa.callbacks.TQDMProgressBar(
-            show_epoch_progress=False))
-
+            
         if self._tb:
             callbacks.append(tf.keras.callbacks.TensorBoard(
                 log_dir=self._tb_logdir.joinpath(self.run_name),
@@ -1454,10 +1502,10 @@ if __name__ == '__main__':
                             random_state=1,
                             train_slice=(0, 100),
                             tb=False,
-                            tb_logdir=rms[test].exp_name + '/neurons',
+                            tb_logdir='pickle_test',
                             params={'n_bottleneck': 10,
                                     'n_size': [64, 64],
-                                    'epochs': 500,
+                                    'epochs': 50,
                                     'loss': 'mse',
                                     'batch_size': 10,
                                     # 'activity_regularizer': None,
@@ -1550,3 +1598,11 @@ if __name__ == '__main__':
         except AttributeError:
             pass
         plt.show(block=True)
+        
+        # %% SAVE MODEL
+        # ---------------------------------------------------------------------
+        mod_path = autoe.save_model()
+
+        # %% LOAD MODEL
+        # ---------------------------------------------------------------------
+        autoe_2 = load_model(mod_path)
