@@ -75,7 +75,7 @@ if __name__ == '__main__':
                                 join_rms.data,
                                 tb=True,
                                 tb_logdir='LSTMAE_combined_datasets',
-                                train_slice=(0, 149),
+                                train_slice=(0, 50),
                                 val_frac=0.33,
                                 params={'epochs': 300,
                                         'batch_size': 64,
@@ -96,7 +96,7 @@ if __name__ == '__main__':
         
         name = autoe.run_name
         model_folder = TB_DIR.joinpath(autoe._tb_logdir.joinpath(name))
-        if not os.path.exists:
+        if not os.path.exists(model_folder):
             os.makedirs(model_folder)
         assert os.path.exists(model_folder)
 
@@ -114,16 +114,14 @@ if __name__ == '__main__':
         print('Training...')
         autoe.fit(x=autoe.train_data,
                   val_data=autoe.val_data,
-                  verbose=0,
+                  verbose=1,
                   )
 
         print('Reloading best weights...')
         autoe.model.model_.load_weights(
             TB_DIR.joinpath(model_folder.joinpath(f'{name}.h5'))
         )
-        # autoe.model.initialize(X=autoe.train_data, y=autoe.train_data)
-        # autoe.model.model_.load_weights(
-        # )
+
         autoe.pred = None
         autoe.scores = None
 
@@ -231,3 +229,5 @@ if __name__ == '__main__':
         fig.savefig(fig_name)
         print(f'Saved scatter fig to {fig_name}')
         print('-' * 50)
+        
+        autoe.save_model()
