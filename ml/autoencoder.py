@@ -1496,7 +1496,7 @@ if __name__ == '__main__':
     print()
 
     for test in exps:
-        # '''
+        '''
         autoe = AutoEncoder(rms[test],
                             rms[test].data,
                             random_state=1,
@@ -1511,7 +1511,7 @@ if __name__ == '__main__':
                                     # 'activity_regularizer': None,
                                     }
                             )
-        # '''
+        '''
         '''
         autoe = VariationalAutoEncoder(rms[test],
                                        rms[test].data,
@@ -1526,7 +1526,7 @@ if __name__ == '__main__':
                                                }
                                        )
         '''
-        '''
+        # '''
         autoe = LSTMAutoEncoder(rms[test],
                                 rms[test].data,
                                 train_slice=(0, 60),
@@ -1534,75 +1534,100 @@ if __name__ == '__main__':
                                 tb_logdir=rms[test].exp_name,
                                 random_state=1,
                                 params={'n_bottleneck': 32,
-                                        'n_size': [64],
-                                        'epochs': 2,
+                                        'n_size': [64, 64],
+                                        'epochs': 25,
                                         'loss': 'mse',
-                                        'batch_size': 10,
+                                        'batch_size': 32,
+                                        'callbacks': [
+                                            tf.keras.callbacks.EarlyStopping(
+                                                monitor='val_loss',
+                                                patience=10,
+                                                mode='min',
+                                            ),
+                                        ]
                                         })
-        '''
+        # '''
         
+        # %% ADD MODEL CHECKPOITN CALLBACK
+        # -------------------------------------------------------------------
+        name = autoe.run_name
+        model_folder = TB_DIR.joinpath(autoe._tb_logdir.joinpath(name))
+        if not os.path.exists(model_folder):
+            os.makedirs(model_folder)
+        assert os.path.exists(model_folder)
+
+        autoe.model.callbacks.append(
+            tf.keras.callbacks.ModelCheckpoint(
+                filepath=model_folder.joinpath(f'{name}.h5'),
+                monitor='val_loss',
+                mode='min',
+                save_best_only=True,
+                save_weights_only=True,
+            )
+        )
+
         # %% FIT THE MODEL
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         autoe.fit(x=autoe.train_data,
                   val_data=autoe.val_data,
-                  verbose=0,
+                  verbose=1,
                   use_multiprocessing=True,
                   )
 
         # %% PLOT LOSS
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         autoe.loss_plot()
 
         # %% MODEL SUMMARY
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         autoe.model.model_.summary()
         #autoe.model.model_.encoder.summary()
         #autoe.model.model_.decoder.summary()
 
         # %% SCORE THE MODEL ON TRAINING, VALIDATION AND ALL DATA
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         pred_tr, scores_tr = autoe.score('train')
         pred_val, scores_val = autoe.score('val')
         pred_data, scores_data = autoe.score('dataset')
 
-        # %% HISTOGRAM OF SCORES
-        # ---------------------------------------------------------------------
-        fig, ax = autoe.hist_scores(['mse'])
+        # # %% HISTOGRAM OF SCORES
+        # # -------------------------------------------------------------------
+        # fig, ax = autoe.hist_scores(['mse'])
 
-        # %% PLOT PREDICTIONS
-        # ---------------------------------------------------------------------
-        fig, ax = autoe.pred_plot(autoe._ind_tr[0])
-        ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
-        fig, ax = autoe.pred_plot(autoe._ind_val[0])
-        ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
+        # # %% PLOT PREDICTIONS
+        # # -------------------------------------------------------------------
+        # fig, ax = autoe.pred_plot(autoe._ind_tr[0])
+        # ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
+        # fig, ax = autoe.pred_plot(autoe._ind_val[0])
+        # ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
 
-        # %% CALC CUTOFFS
-        # ---------------------------------------------------------------------
-        autoe.thres
+        # # %% CALC CUTOFFS
+        # # -------------------------------------------------------------------
+        # autoe.thres
 
-        # %% PLOT SCORES ON SCATTER
-        # ---------------------------------------------------------------------
-        fig, ax = autoe.scatter_scores()
+        # # %% PLOT SCORES ON SCATTER
+        # # -------------------------------------------------------------------
+        # fig, ax = autoe.scatter_scores()
 
-        # %% GENERATE NEW DATA
-        # ---------------------------------------------------------------------
-        try:
-            _, fig, ax = autoe.generate(z=[-2, 2])
-        except AttributeError:
-            pass
+        # # %% GENERATE NEW DATA
+        # # -------------------------------------------------------------------
+        # try:
+        #     _, fig, ax = autoe.generate(z=[-2, 2])
+        # except AttributeError:
+        #     pass
 
-        # %% PLOT LATENT SPACE
-        # ---------------------------------------------------------------------
-        try:
-            fig, ax = autoe.plot_latent_space()
-        except AttributeError:
-            pass
-        plt.show(block=True)
+        # # %% PLOT LATENT SPACE
+        # # -------------------------------------------------------------------
+        # try:
+        #     fig, ax = autoe.plot_latent_space()
+        # except AttributeError:
+        #     pass
+        # plt.show(block=True)
         
         # %% SAVE MODEL
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         mod_path = autoe.save_model()
 
         # %% LOAD MODEL
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         autoe_2 = load_model(mod_path)
