@@ -229,5 +229,3 @@ if __name__ == '__main__':
         fig.savefig(fig_name)
         print(f'Saved scatter fig to {fig_name}')
         print('-' * 50)
-        
-        autoe.save_model()
