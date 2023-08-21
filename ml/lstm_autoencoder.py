@@ -110,6 +110,8 @@ if __name__ == '__main__':
             )
         )
 
+        autoe.save_model()
+
         print('-' * 50)
         print('Training...')
         autoe.fit(x=autoe.train_data,
@@ -121,6 +123,8 @@ if __name__ == '__main__':
         autoe.model.model_.load_weights(
             TB_DIR.joinpath(model_folder.joinpath(f'{name}.h5'))
         )
+
+        autoe.save_model()
 
         autoe.pred = None
         autoe.scores = None

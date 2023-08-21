@@ -80,6 +80,39 @@ def load_model(filepath):
         print('Model loaded:')
         print(f'\tLoad Loc: {file_loc}')
     return model
+
+
+class Custom_TB_Callback(tf.keras.callbacks.Callback):
+    # custom tb callback to allow for pickle saving
+    def __init__(self, logdir, run_name):
+        super().__init__()
+        self.logdir = logdir
+        self.run_name = run_name
+
+    def on_epoch_end(self, epoch, logs=None):
+        train_writer = tf.summary.create_file_writer(
+            f'{self.logdir.joinpath(self.run_name)}/train'
+        )
+        val_writer = tf.summary.create_file_writer(
+            f'{self.logdir.joinpath(self.run_name)}/validation'
+        )
+
+        for key, value in logs.items():
+            if 'val_' in key:
+                key = key.replace('val_', '')
+                with train_writer.as_default():
+                    tf.summary.scalar(
+                        f'epoch_{key}',
+                        value,
+                        step=epoch,
+                    )
+            elif 'val_' not in key:
+                with val_writer.as_default():
+                    tf.summary.scalar(
+                        f'epoch_{key}',
+                        value,
+                        step=epoch,
+                    )
     
 
 class AutoEncoder():
@@ -388,10 +421,12 @@ class AutoEncoder():
             callbacks = []
 
         if self._tb:
-            callbacks.append(tf.keras.callbacks.TensorBoard(
-                log_dir=self._tb_logdir.joinpath(self.run_name),
-                histogram_freq=1,
-            ))
+            tb_callback = Custom_TB_Callback(
+                logdir=self._tb_logdir,
+                run_name=self.run_name,
+            )
+            callbacks.append(tb_callback)
+
             tb_writer = tf.summary.create_file_writer(
                 f'{self._tb_logdir.joinpath(self.run_name)}')
 
@@ -869,10 +904,12 @@ class VariationalAutoEncoder(AutoEncoder):
             callbacks = []
         
         if self._tb:
-            callbacks.append(tf.keras.callbacks.TensorBoard(
-                log_dir=self._tb_logdir.joinpath(self.run_name),
-                histogram_freq=1,
-            ))
+            tb_callback = Custom_TB_Callback(
+                logdir=self._tb_logdir,
+                run_name=self.run_name,
+            )
+            callbacks.append(tb_callback)
+
             tb_writer = tf.summary.create_file_writer(
                 f'{self._tb_logdir.joinpath(self.run_name)}')
             
@@ -1248,10 +1285,12 @@ class LSTMAutoEncoder(AutoEncoder):
             callbacks = []
             
         if self._tb:
-            callbacks.append(tf.keras.callbacks.TensorBoard(
-                log_dir=self._tb_logdir.joinpath(self.run_name),
-                histogram_freq=1,
-            ))
+            tb_callback = Custom_TB_Callback(
+                logdir=self._tb_logdir,
+                run_name=self.run_name,
+            )
+            callbacks.append(tb_callback)
+
             tb_writer = tf.summary.create_file_writer(
                 f'{self._tb_logdir.joinpath(self.run_name)}')
 
@@ -1590,39 +1629,39 @@ if __name__ == '__main__':
         pred_val, scores_val = autoe.score('val')
         pred_data, scores_data = autoe.score('dataset')
 
-        # # %% HISTOGRAM OF SCORES
-        # # -------------------------------------------------------------------
-        # fig, ax = autoe.hist_scores(['mse'])
+        # %% HISTOGRAM OF SCORES
+        # -------------------------------------------------------------------
+        fig, ax = autoe.hist_scores(['mse'])
 
-        # # %% PLOT PREDICTIONS
-        # # -------------------------------------------------------------------
-        # fig, ax = autoe.pred_plot(autoe._ind_tr[0])
-        # ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
-        # fig, ax = autoe.pred_plot(autoe._ind_val[0])
-        # ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
+        # %% PLOT PREDICTIONS
+        # -------------------------------------------------------------------
+        fig, ax = autoe.pred_plot(autoe._ind_tr[0])
+        ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
+        fig, ax = autoe.pred_plot(autoe._ind_val[0])
+        ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
 
-        # # %% CALC CUTOFFS
-        # # -------------------------------------------------------------------
-        # autoe.thres
+        # %% CALC CUTOFFS
+        # -------------------------------------------------------------------
+        autoe.thres
 
-        # # %% PLOT SCORES ON SCATTER
-        # # -------------------------------------------------------------------
-        # fig, ax = autoe.scatter_scores()
+        # %% PLOT SCORES ON SCATTER
+        # -------------------------------------------------------------------
+        fig, ax = autoe.scatter_scores()
 
-        # # %% GENERATE NEW DATA
-        # # -------------------------------------------------------------------
-        # try:
-        #     _, fig, ax = autoe.generate(z=[-2, 2])
-        # except AttributeError:
-        #     pass
+        # %% GENERATE NEW DATA
+        # -------------------------------------------------------------------
+        try:
+            _, fig, ax = autoe.generate(z=[-2, 2])
+        except AttributeError:
+            pass
 
-        # # %% PLOT LATENT SPACE
-        # # -------------------------------------------------------------------
-        # try:
-        #     fig, ax = autoe.plot_latent_space()
-        # except AttributeError:
-        #     pass
-        # plt.show(block=True)
+        # %% PLOT LATENT SPACE
+        # -------------------------------------------------------------------
+        try:
+            fig, ax = autoe.plot_latent_space()
+        except AttributeError:
+            pass
+        plt.show(block=True)
         
         # %% SAVE MODEL
         # -------------------------------------------------------------------
