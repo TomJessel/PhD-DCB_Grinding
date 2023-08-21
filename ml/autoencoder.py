@@ -28,6 +28,7 @@ from pathlib import PurePosixPath as Path
 import time
 from scikeras.wrappers import KerasRegressor, BaseWrapper
 from keras import backend as K
+import dill as pickle
 
 import resources
 
@@ -43,6 +44,43 @@ elif platform == 'posix':
     DATA_DIR = onedrive.joinpath('Testing', 'RMS')
     TB_DIR = onedrive.joinpath('Tensorboard')
 
+
+def load_model(filepath):
+
+    file_loc = Path(filepath)
+
+    # check path exists
+    if os.path.exists(file_loc) is False:
+        try:
+            file_loc = TB_DIR.joinpath('AUTOE', file_loc)
+            if os.path.exists(file_loc) is False:
+                raise FileNotFoundError()
+        except FileNotFoundError:
+            raise FileNotFoundError(f'{file_loc} does not exist.')
+
+    # check if path is file or directory
+    if os.path.isdir(file_loc):
+        pkl_files = []
+        for f in os.listdir(file_loc):
+            if f.endswith('.pickle'):
+                pkl_files.append(f)
+        if len(pkl_files) == 1:
+            file_loc = file_loc.joinpath(pkl_files[0])
+        elif len(pkl_files) > 1:
+            raise ValueError(f'Multiple pickle files in {file_loc}.')
+        else:
+            raise FileNotFoundError(f'{file_loc} does not exist.')
+    elif os.path.isfile(file_loc):
+        file_loc = file_loc
+    else:
+        raise FileNotFoundError(f'{file_loc} does not exist.')
+
+    with open(file_loc, 'rb') as f:
+        model = pickle.load(f)
+        print('Model loaded:')
+        print(f'\tLoad Loc: {file_loc}')
+    return model
+    
 
 class AutoEncoder():
     def __init__(
@@ -705,7 +743,23 @@ class AutoEncoder():
 
         return fig, ax
 
+    def save_model(self, folder_path=None) -> Union[Path, str]:
+        if folder_path is None:
+            folder_path = self._tb_logdir.joinpath(self.run_name)
 
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        assert os.path.exists(folder_path), f'{folder_path} does not exist.'
+            
+        file_loc = folder_path.joinpath(f'{self.run_name}.pickle')
+
+        with open(file_loc, 'wb') as f:
+            pickle.dump(self, f)
+            print('Model saved')
+            print(f'\tSave Loc: {file_loc}')
+        return file_loc
+
+            
 class _VariationalAutoEncoder(Model):
     def __init__(self, input_dim, latent_dim, n_size):
         super().__init__()
@@ -1536,37 +1590,44 @@ if __name__ == '__main__':
         pred_val, scores_val = autoe.score('val')
         pred_data, scores_data = autoe.score('dataset')
 
-        # %% HISTOGRAM OF SCORES
-        # -------------------------------------------------------------------
-        fig, ax = autoe.hist_scores(['mse'])
+        # # %% HISTOGRAM OF SCORES
+        # # -------------------------------------------------------------------
+        # fig, ax = autoe.hist_scores(['mse'])
 
-        # %% PLOT PREDICTIONS
-        # -------------------------------------------------------------------
-        fig, ax = autoe.pred_plot(autoe._ind_tr[0])
-        ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
-        fig, ax = autoe.pred_plot(autoe._ind_val[0])
-        ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
+        # # %% PLOT PREDICTIONS
+        # # -------------------------------------------------------------------
+        # fig, ax = autoe.pred_plot(autoe._ind_tr[0])
+        # ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
+        # fig, ax = autoe.pred_plot(autoe._ind_val[0])
+        # ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
 
-        # %% CALC CUTOFFS
-        # -------------------------------------------------------------------
-        autoe.thres
+        # # %% CALC CUTOFFS
+        # # -------------------------------------------------------------------
+        # autoe.thres
 
-        # %% PLOT SCORES ON SCATTER
-        # -------------------------------------------------------------------
-        fig, ax = autoe.scatter_scores()
+        # # %% PLOT SCORES ON SCATTER
+        # # -------------------------------------------------------------------
+        # fig, ax = autoe.scatter_scores()
 
-        # %% GENERATE NEW DATA
-        # -------------------------------------------------------------------
-        try:
-            _, fig, ax = autoe.generate(z=[-2, 2])
-        except AttributeError:
-            pass
+        # # %% GENERATE NEW DATA
+        # # -------------------------------------------------------------------
+        # try:
+        #     _, fig, ax = autoe.generate(z=[-2, 2])
+        # except AttributeError:
+        #     pass
 
-        # %% PLOT LATENT SPACE
-        # -------------------------------------------------------------------
-        try:
-            fig, ax = autoe.plot_latent_space()
-        except AttributeError:
-            pass
-        plt.show(block=True)
+        # # %% PLOT LATENT SPACE
+        # # -------------------------------------------------------------------
+        # try:
+        #     fig, ax = autoe.plot_latent_space()
+        # except AttributeError:
+        #     pass
+        # plt.show(block=True)
         
+        # %% SAVE MODEL
+        # -------------------------------------------------------------------
+        mod_path = autoe.save_model()
+
+        # %% LOAD MODEL
+        # -------------------------------------------------------------------
+        autoe_2 = load_model(mod_path)
