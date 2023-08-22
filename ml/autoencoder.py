@@ -263,6 +263,38 @@ class AutoEncoder():
             self._thres = self._get_cutoffs()
         return self._thres
 
+    @property
+    def run_name(self):
+        """
+        Return the run name for the model. Set if not already.
+        """
+        if hasattr(self, '_run_name'):
+            return self._run_name
+        else:
+            self._run_name = self.set_run_name()
+
+    def set_run_name(self, append: str = None):
+        """
+        Initialise the run name for the model.
+
+        Args:
+            append (str, optional): String to append to the run name.\
+                Defaults to None.
+        
+        Returns:
+            str: Run name.
+        """
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        n_size = self.params['n_size']
+        n_bottle = self.params['n_bottleneck']
+        layers = n_size + [n_bottle] + n_size[::-1]
+        rn = f'AUTOE-{self.RMS.exp_name.replace(" ", "_")}-' \
+             f'E-{self.params["epochs"]}-L-{layers}-{t}'
+        if append is not None:
+            rn = f'{rn}-{append}'
+        self._run_name = rn
+        return self._run_name
+
     def _get_cutoffs(self):
         """
         Method to get the cutoff values from the training slice scores
@@ -412,10 +444,6 @@ class AutoEncoder():
         """
 
         self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
-        layers = n_size + [n_bottleneck] + n_size[::-1]
-        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        self.run_name = f'AUTOE-{self.RMS.exp_name.replace(" ", "_")}-' \
-                        f'E-{epochs}-L-{layers}-{t}'
 
         if callbacks is None:
             callbacks = []
@@ -882,6 +910,28 @@ class VariationalAutoEncoder(AutoEncoder):
                          **kwargs,
                          )
 
+    def set_run_name(self, append: str = None):
+        """
+        Initialise the run name for the model.
+
+        Args:
+            append (str, optional): String to append to the run name.\
+                Defaults to None.
+        
+        Returns:
+            str: Run name.
+        """
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        n_size = self.params['n_size']
+        n_bottle = self.params['n_bottleneck']
+        layers = n_size + [n_bottle] + n_size[::-1]
+        rn = f'VAE-{self.RMS.exp_name.replace(" ", "_")}-' \
+             f'E-{self.params["epochs"]}-L-{layers}-{t}'
+        if append is not None:
+            rn = f'{rn}-{append}'
+        self._run_name = rn
+        return self._run_name
+
     def initialise_model(
             self,
             latent_dim: int = 2,
@@ -895,10 +945,6 @@ class VariationalAutoEncoder(AutoEncoder):
     ):
         
         self._tb_logdir = TB_DIR.joinpath('VAE', self._tb_logdir)
-
-        layers = n_size + ['Z'] + n_size[::-1]
-        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        self.run_name = f'VAE-{self.RMS.exp_name}-E-{epochs}-L-{layers}-T-{t}'
 
         if callbacks is None:
             callbacks = []
@@ -1052,6 +1098,29 @@ class LSTMAutoEncoder(AutoEncoder):
                          random_state,
                          **kwargs,
                          )
+
+    def set_run_name(self, append: str = None):
+        """
+        Initialise the run name for the model.
+
+        Args:
+            append (str, optional): String to append to the run name.\
+                Defaults to None.
+        
+        Returns:
+            str: Run name.
+        """
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        n_size = self.params['n_size']
+        n_bottle = self.params['n_bottleneck']
+        layers = n_size + [n_bottle] + n_size[::-1]
+        win_len = self.seq_len
+        rn = f'LSTMAE-{self.RMS.exp_name.replace(" ", "_")}-' \
+             f'WIN-{win_len}-E-{self.params["epochs"]}-L-{layers}-{t}'
+        if append is not None:
+            rn = f'{rn}-{append}'
+        self._run_name = rn
+        return self._run_name
 
     def pre_process(self, val_frac: float = 0.2):
         print('Pre-processing Data:')
@@ -1276,10 +1345,6 @@ class LSTMAutoEncoder(AutoEncoder):
         """
 
         self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
-        layers = n_size + [n_bottleneck] + n_size[::-1]
-        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        self.run_name = f'LSTMAE-{self.RMS.exp_name.replace(" ", "_")}-' \
-                        f'WIN-{self.seq_len}-E-{epochs}-L-{layers}-{t}'
 
         if callbacks is None:
             callbacks = []

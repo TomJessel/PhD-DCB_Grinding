@@ -75,7 +75,7 @@ if __name__ == '__main__':
                                 join_rms.data,
                                 tb=True,
                                 tb_logdir='LSTMAE_combined_datasets',
-                                train_slice=(0, 50),
+                                train_slice=(0, 100),
                                 val_frac=0.33,
                                 params={'epochs': 300,
                                         'batch_size': 64,
