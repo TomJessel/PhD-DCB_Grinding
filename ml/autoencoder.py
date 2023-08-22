@@ -444,6 +444,7 @@ class AutoEncoder():
         """
 
         self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
+        layers = n_size + [n_bottleneck] + n_size[::-1]
 
         if callbacks is None:
             callbacks = []
@@ -945,6 +946,7 @@ class VariationalAutoEncoder(AutoEncoder):
     ):
         
         self._tb_logdir = TB_DIR.joinpath('VAE', self._tb_logdir)
+        layers = n_size + ['Z'] + n_size[::-1]
 
         if callbacks is None:
             callbacks = []
@@ -1345,6 +1347,7 @@ class LSTMAutoEncoder(AutoEncoder):
         """
 
         self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
+        layers = n_size + [n_bottleneck] + n_size[::-1]
 
         if callbacks is None:
             callbacks = []
