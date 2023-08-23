@@ -268,10 +268,9 @@ class AutoEncoder():
         """
         Return the run name for the model. Set if not already.
         """
-        if hasattr(self, '_run_name'):
-            return self._run_name
-        else:
+        if not hasattr(self, '_run_name'):
             self._run_name = self.set_run_name()
+        return self._run_name
 
     def set_run_name(self, append: str = None):
         """
