@@ -8,28 +8,35 @@
 27/02/2023 11:23   tomhj      1.0         N/A
 """
 # %%
+# standard library imports
+import sys
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from textwrap import dedent
 from typing import Any, Union
-import tensorflow as tf
-import matplotlib.pyplot as plt
-import mplcursors
+from pathlib import PurePosixPath as Path
+import time
+
+# third party imports - common
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt
+import mplcursors
+import dill as pickle
+
+# third party imports - ml
+import tensorflow as tf
 from keras.layers import Input, Dense, BatchNormalization, Lambda, Dropout
 from keras.layers import LSTM, RepeatVector, TimeDistributed
 from keras.models import Model
-import tensorboard.plugins.hparams.api as hp
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from pathlib import PurePosixPath as Path
-import time
-from scikeras.wrappers import KerasRegressor, BaseWrapper
 from keras import backend as K
-import dill as pickle
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import tensorboard.plugins.hparams.api as hp
+from scikeras.wrappers import KerasRegressor, BaseWrapper
 
+# local imports
 import resources
 
 platform = os.name
@@ -46,6 +53,8 @@ elif platform == 'posix':
 
 
 def load_model(filepath):
+    from ml import autoencoder
+    sys.modules['autoencoder'] = autoencoder
 
     file_loc = Path(filepath)
 
