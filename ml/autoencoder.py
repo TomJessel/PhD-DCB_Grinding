@@ -468,7 +468,7 @@ class AutoEncoder():
                 f'{self._tb_logdir.joinpath(self.run_name)}')
 
             with tb_writer.as_default():
-                hp_params = self.params
+                hp_params = self.params.copy()
                 hp_params.pop('callbacks', None)
                 
                 t_allow = (int, float, str, bool)
@@ -970,7 +970,7 @@ class VariationalAutoEncoder(AutoEncoder):
                 f'{self._tb_logdir.joinpath(self.run_name)}')
             
             with tb_writer.as_default():
-                hp_params = self.params
+                hp_params = self.params.copy()
                 hp_params.pop('callbacks', None)
 
                 t_allow = (int, float, str, bool)
@@ -1371,7 +1371,7 @@ class LSTMAutoEncoder(AutoEncoder):
                 f'{self._tb_logdir.joinpath(self.run_name)}')
 
             with tb_writer.as_default():
-                hp_params = self.params
+                hp_params = self.params.copy()
                 hp_params.pop('callbacks', None)
                 
                 t_allow = (int, float, str, bool)
