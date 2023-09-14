@@ -334,19 +334,19 @@ class AutoEncoder():
         print('\nCutoffs:')
         for key, score in sc.items():
             # check if the scores should be trying to inc or dec
-            out = score[mad_based_outlier(score)]
+            # out = score[mad_based_outlier(score)]
             if key == 'r2':
-                try:
-                    cutoffs[key] = np.max(out)
-                except ValueError:
-                    print('std cutoff')
-                    cutoffs[key] = np.median(score) - np.std(score)
+                # try:
+                #   cutoffs[key] = np.max(out)
+                # except ValueError:
+                #   print('std cutoff')
+                cutoffs[key] = np.median(score) - np.std(score)
             else:
-                try:
-                    cutoffs[key] = np.min(out)
-                except ValueError:
-                    print('std cutoff')
-                    cutoffs[key] = np.median(score) + np.std(score)
+                # try:
+                #   cutoffs[key] = np.min(out)
+                # except ValueError:
+                #   print('std cutoff')
+                cutoffs[key] = np.median(score) + np.std(score)
             print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
         return cutoffs
 
@@ -585,16 +585,16 @@ class AutoEncoder():
             self.pred = pred
 
         if self.scores is None:
-            mae = mean_absolute_error(self.data,
-                                      self.pred,
+            mae = mean_absolute_error(self.data.T,
+                                      self.pred.T,
                                       multioutput='raw_values',
                                       )
-            mse = mean_squared_error(self.data,
-                                     self.pred,
+            mse = mean_squared_error(self.data.T,
+                                     self.pred.T,
                                      multioutput='raw_values',
                                      )
-            r2 = r2_score(self.data,
-                          self.pred,
+            r2 = r2_score(self.data.T,
+                          self.pred.T,
                           multioutput='raw_values',
                           )
             self.scores = {'mae': mae, 'mse': mse, 'r2': r2}
@@ -932,8 +932,7 @@ class VariationalAutoEncoder(AutoEncoder):
         """
         t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         n_size = self.params['n_size']
-        n_bottle = self.params['n_bottleneck']
-        layers = n_size + [n_bottle] + n_size[::-1]
+        layers = n_size + ['Z'] + n_size[::-1]
         rn = f'VAE-{self.RMS.exp_name.replace(" ", "_")}-' \
              f'E-{self.params["epochs"]}-L-{layers}-{t}'
         if append is not None:
@@ -1611,7 +1610,7 @@ if __name__ == '__main__':
     print()
 
     for test in exps:
-        '''
+        # '''
         autoe = AutoEncoder(rms[test],
                             rms[test].data,
                             random_state=1,
@@ -1620,13 +1619,13 @@ if __name__ == '__main__':
                             tb_logdir='pickle_test',
                             params={'n_bottleneck': 10,
                                     'n_size': [64, 64],
-                                    'epochs': 50,
+                                    'epochs': 200,
                                     'loss': 'mse',
                                     'batch_size': 10,
                                     # 'activity_regularizer': None,
                                     }
                             )
-        '''
+        # '''
         '''
         autoe = VariationalAutoEncoder(rms[test],
                                        rms[test].data,
@@ -1641,7 +1640,7 @@ if __name__ == '__main__':
                                                }
                                        )
         '''
-        # '''
+        '''
         autoe = LSTMAutoEncoder(rms[test],
                                 rms[test].data,
                                 train_slice=(0, 60),
@@ -1661,7 +1660,7 @@ if __name__ == '__main__':
                                             ),
                                         ]
                                         })
-        # '''
+        '''
         
         # %% ADD MODEL CHECKPOITN CALLBACK
         # -------------------------------------------------------------------
