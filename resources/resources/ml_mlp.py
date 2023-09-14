@@ -179,18 +179,17 @@ class Base_Model:
         opt = self.model.model_.optimizer.get_config()
         optimiser = opt['name']
         learning_rate = opt['learning_rate']
-        decay = opt['decay']
 
         hp = dedent(f"""
             ### Parameters:
             ___
 
             | Epochs | Batch Size | No Layers | No Neurons | Init Mode |\
-             Activation | Dropout | Loss | Optimiser | Learning rate | Decay |
+             Activation | Dropout | Loss | Optimiser | Learning rate |
             |--------|------------|-----------|------------|-----------|\
-            ------------|---------|------|-----------|---------------|-------|
+            ------------|---------|------|-----------|---------------|
             |{self.model.epochs}|{self.model.batch_size}|{no_layers}|{nodes[:-1]}|{self.model.model__init_mode}|\
-            {activation}|{dropout:.3f}|{self.model.loss}|{optimiser}|{learning_rate:.3E}|{decay:.3E}|
+            {activation}|{dropout:.3f}|{self.model.loss}|{optimiser}|{learning_rate:.3E}|
 
             """)
 
@@ -639,7 +638,6 @@ class MLP_Model(Base_Model):
                                            ),
             optimizer: str = Adam,
             learning_rate: float = 0.001,
-            decay: float = 1e-6,
             verbose: int = 1,
             callbacks: List[Any] = None,
             **params,
@@ -664,7 +662,6 @@ class MLP_Model(Base_Model):
             metrics: Metrics to track during training of the model
             optimizer: Optimizer function used to allow model to learn
             learning_rate: Learning rate of the optimizer
-            decay: Decay rate of the optimizer
             verbose: Output type for the console
             callbacks: Callbacks to add into the Keras model.
 
@@ -718,7 +715,6 @@ class MLP_Model(Base_Model):
             metrics=metrics,
             optimizer=optimizer,
             optimizer__learning_rate=learning_rate,
-            optimizer__decay=decay,
             verbose=verbose,
             callbacks=callbacks,
         )
@@ -1097,7 +1093,6 @@ class MLP_Win_Model(Base_Model):
                                            ),
             optimizer: str = Adam,
             learning_rate: float = 0.001,
-            decay: float = 1e-6,
             verbose: int = 1,
             callbacks: List[Any] = None,
             **params,
@@ -1122,7 +1117,6 @@ class MLP_Win_Model(Base_Model):
             metrics: Metrics to track during training of the model
             optimizer: Optimizer function used to allow model to learn
             learning_rate: Learning rate of the optimizer
-            decay: Decay rate of the optimizer
             verbose: Output type for the console
             callbacks: Callbacks to add into the Keras model.
 
@@ -1175,7 +1169,6 @@ class MLP_Win_Model(Base_Model):
             metrics=metrics,
             optimizer=optimizer,
             optimizer__learning_rate=learning_rate,
-            optimizer__decay=decay,
             verbose=verbose,
             callbacks=callbacks,
         )
@@ -1195,7 +1188,6 @@ class MLP_Win_Model(Base_Model):
         opt = self.model.model_.optimizer.get_config()
         optimiser = opt['name']
         learning_rate = opt['learning_rate']
-        decay = opt['decay']
 
         hp = dedent(f"""
             ### Parameters:
@@ -1203,13 +1195,13 @@ class MLP_Win_Model(Base_Model):
 
             |Seq Len| Epochs | Batch Size | No Layers | No Neurons | \
             Init Mode | Activation | Dropout | Loss | \
-            Optimiser | Learning rate | Decay |
+            Optimiser | Learning rate |
             |--------|--------|------------|-----------|------------|\
             -----------|------------|---------|------|-----------|\
-            ---------------|-------|
+            ---------------|
             |{self.seq_len}|{self.model.epochs}|{self.model.batch_size}|{no_layers}|{nodes[:-1]}|\
             {self.model.model__init_mode}|{activation}|{dropout:.3f}|{self.model.loss}|{optimiser}|\
-            {learning_rate:.3E}|{decay:.3E}|
+            {learning_rate:.3E}|
 
             """)
 
@@ -1467,7 +1459,6 @@ class LSTM_Model(Base_Model):
                                            ),
             optimizer: str = Adam,
             learning_rate: float = 0.001,
-            decay: float = 1e-6,
             verbose: int = 1,
             callbacks: List[Any] = None,
             **params,
@@ -1493,7 +1484,6 @@ class LSTM_Model(Base_Model):
             metrics: Metrics to track during training of the model
             optimizer: Optimizer function used to allow model to learn
             learning_rate: Learning rate of the optimizer
-            decay: Decay rate of the optimizer
             verbose: Output type for the console
             callbacks: Callbacks to add into the Keras model.
 
@@ -1548,7 +1538,6 @@ class LSTM_Model(Base_Model):
             metrics=metrics,
             optimizer=optimizer,
             optimizer__learning_rate=learning_rate,
-            optimizer__decay=decay,
             verbose=verbose,
             callbacks=callbacks,
         )
@@ -1575,7 +1564,6 @@ class LSTM_Model(Base_Model):
         opt = self.model.model_.optimizer.get_config()
         optimiser = opt['name']
         learning_rate = opt['learning_rate']
-        decay = opt['decay']
 
         hp = dedent(f"""
             ### Parameters:
@@ -1583,14 +1571,14 @@ class LSTM_Model(Base_Model):
 
             |Seq Len| Epochs | Batch Size | No Layers | No Dense | \
             No Neurons | Init Mode | Activation | Dropout | Loss | \
-            Optimiser | Learning rate | Decay |
+            Optimiser | Learning rate |
             |--------|--------|------------|-----------|------------|\
             -----------|------------|---------|------|-----------|\
-            ---------------|-------|-------|
+            ---------------|-------|
             |{self.seq_len}|{self.model.epochs}|{self.model.batch_size}|\
             {no_layers}|{no_dense}|{nodes[:-1]}|\
             {self.model.model__init_mode}|{activation}|{dropout:.3f}|\
-            {self.model.loss}|{optimiser}|{learning_rate:.3E}|{decay:.3E}|
+            {self.model.loss}|{optimiser}|{learning_rate:.3E}|
 
             """)
 
