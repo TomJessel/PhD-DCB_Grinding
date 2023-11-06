@@ -19,3 +19,4 @@ import resources.ml_mlp # noqa
 from .experiment import load # noqa
 from .ml_mlp import MLP_Model, MLP_Win_Model, LSTM_Model, Linear_Model # noqa
 from .surf_meas import SurfMeasurements # noqa
+from .config import * # noqa
