@@ -8,32 +8,35 @@
 27/02/2023 11:23   tomhj      1.0         N/A
 """
 # %%
+# standard library imports
+import sys
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from textwrap import dedent
 from typing import Any, Union
-import tensorflow as tf
-# import matplotlib as mpl
-# mpl.use('TkAgg')
-import matplotlib.pyplot as plt
-# from matplotlib import transforms
-import mplcursors
+from pathlib import PurePosixPath as Path
+import time
+
+# third party imports - common
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
+import matplotlib.pyplot as plt
+import mplcursors
+import dill as pickle
+
+# third party imports - ml
+import tensorflow as tf
 from keras.layers import Input, Dense, BatchNormalization, Lambda, Dropout
 from keras.layers import LSTM, RepeatVector, TimeDistributed
 from keras.models import Model
-# from keras.regularizers import l1, l2
-import tensorboard.plugins.hparams.api as hp
-import tensorflow_addons as tfa
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from pathlib import PurePosixPath as Path
-import time
-from scikeras.wrappers import KerasRegressor, BaseWrapper
 from keras import backend as K
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import tensorboard.plugins.hparams.api as hp
+from scikeras.wrappers import KerasRegressor, BaseWrapper
 
+# local imports
 import resources
 
 platform = os.name
@@ -48,7 +51,79 @@ elif platform == 'posix':
     DATA_DIR = onedrive.joinpath('Testing', 'RMS')
     TB_DIR = onedrive.joinpath('Tensorboard')
 
+
+def load_model(filepath):
+    from ml import autoencoder
+    sys.modules['autoencoder'] = autoencoder
+
+    file_loc = Path(filepath)
+
+    # check path exists
+    if os.path.exists(file_loc) is False:
+        try:
+            file_loc = TB_DIR.joinpath('AUTOE', file_loc)
+            if os.path.exists(file_loc) is False:
+                raise FileNotFoundError()
+        except FileNotFoundError:
+            raise FileNotFoundError(f'{file_loc} does not exist.')
+
+    # check if path is file or directory
+    if os.path.isdir(file_loc):
+        pkl_files = []
+        for f in os.listdir(file_loc):
+            if f.endswith('.pickle'):
+                pkl_files.append(f)
+        if len(pkl_files) == 1:
+            file_loc = file_loc.joinpath(pkl_files[0])
+        elif len(pkl_files) > 1:
+            raise ValueError(f'Multiple pickle files in {file_loc}.')
+        else:
+            raise FileNotFoundError(f'{file_loc} does not exist.')
+    elif os.path.isfile(file_loc):
+        file_loc = file_loc
+    else:
+        raise FileNotFoundError(f'{file_loc} does not exist.')
+
+    with open(file_loc, 'rb') as f:
+        model = pickle.load(f)
+        print('Model loaded:')
+        print(f'\tLoad Loc: {file_loc}')
+    return model
+
+
+class Custom_TB_Callback(tf.keras.callbacks.Callback):
+    # custom tb callback to allow for pickle saving
+    def __init__(self, logdir, run_name):
+        super().__init__()
+        self.logdir = logdir
+        self.run_name = run_name
+
+    def on_epoch_end(self, epoch, logs=None):
+        train_writer = tf.summary.create_file_writer(
+            f'{self.logdir.joinpath(self.run_name)}/train'
+        )
+        val_writer = tf.summary.create_file_writer(
+            f'{self.logdir.joinpath(self.run_name)}/validation'
+        )
+
+        for key, value in logs.items():
+            if 'val_' in key:
+                key = key.replace('val_', '')
+                with train_writer.as_default():
+                    tf.summary.scalar(
+                        f'epoch_{key}',
+                        value,
+                        step=epoch,
+                    )
+            elif 'val_' not in key:
+                with val_writer.as_default():
+                    tf.summary.scalar(
+                        f'epoch_{key}',
+                        value,
+                        step=epoch,
+                    )
     
+
 class AutoEncoder():
     def __init__(
         self,
@@ -146,8 +221,10 @@ class AutoEncoder():
         print(f'\tInput val shape: {data[ind_val].shape}')
 
         # fit scaler to training data and transform all data
-        self.scaler.fit(data[ind_tr])
-        self._data = self.scaler.transform(data)
+        self.scaler.fit(data[ind_tr].reshape(-1, 1))
+        self._data = self.scaler.transform(data.reshape(-1, 1)).reshape(
+            data.shape[0], data.shape[1]
+        )
 
         self._n_inputs = data[ind_tr].shape[1]
         self._ind_tr = ind_tr
@@ -195,6 +272,37 @@ class AutoEncoder():
             self._thres = self._get_cutoffs()
         return self._thres
 
+    @property
+    def run_name(self):
+        """
+        Return the run name for the model. Set if not already.
+        """
+        if not hasattr(self, '_run_name'):
+            self._run_name = self.set_run_name()
+        return self._run_name
+
+    def set_run_name(self, append: str = None):
+        """
+        Initialise the run name for the model.
+
+        Args:
+            append (str, optional): String to append to the run name.\
+                Defaults to None.
+        
+        Returns:
+            str: Run name.
+        """
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        n_size = self.params['n_size']
+        n_bottle = self.params['n_bottleneck']
+        layers = n_size + [n_bottle] + n_size[::-1]
+        rn = f'AUTOE-{self.RMS.exp_name.replace(" ", "_")}-' \
+             f'E-{self.params["epochs"]}-L-{layers}-{t}'
+        if append is not None:
+            rn = f'{rn}-{append}'
+        self._run_name = rn
+        return self._run_name
+
     def _get_cutoffs(self):
         """
         Method to get the cutoff values from the training slice scores
@@ -226,19 +334,19 @@ class AutoEncoder():
         print('\nCutoffs:')
         for key, score in sc.items():
             # check if the scores should be trying to inc or dec
-            out = score[mad_based_outlier(score)]
+            # out = score[mad_based_outlier(score)]
             if key == 'r2':
-                try:
-                    cutoffs[key] = np.max(out)
-                except ValueError:
-                    print('std cutoff')
-                    cutoffs[key] = np.median(score) - np.std(score)
+                # try:
+                #   cutoffs[key] = np.max(out)
+                # except ValueError:
+                #   print('std cutoff')
+                cutoffs[key] = np.median(score) - np.std(score)
             else:
-                try:
-                    cutoffs[key] = np.min(out)
-                except ValueError:
-                    print('std cutoff')
-                    cutoffs[key] = np.median(score) + np.std(score)
+                # try:
+                #   cutoffs[key] = np.min(out)
+                # except ValueError:
+                #   print('std cutoff')
+                cutoffs[key] = np.median(score) + np.std(score)
             print(f'\t{key.upper()} cutoff: {cutoffs[key]:.5f}')
         return cutoffs
 
@@ -345,25 +453,22 @@ class AutoEncoder():
 
         self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
         layers = n_size + [n_bottleneck] + n_size[::-1]
-        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        self.run_name = f'AUTOE-{self.RMS.exp_name.replace(" ", "_")}-' \
-                        f'E-{epochs}-L-{layers}-{t}'
 
         if callbacks is None:
             callbacks = []
-        callbacks.append(tfa.callbacks.TQDMProgressBar(
-            show_epoch_progress=False))
 
         if self._tb:
-            callbacks.append(tf.keras.callbacks.TensorBoard(
-                log_dir=self._tb_logdir.joinpath(self.run_name),
-                histogram_freq=1,
-            ))
+            tb_callback = Custom_TB_Callback(
+                logdir=self._tb_logdir,
+                run_name=self.run_name,
+            )
+            callbacks.append(tb_callback)
+
             tb_writer = tf.summary.create_file_writer(
                 f'{self._tb_logdir.joinpath(self.run_name)}')
 
             with tb_writer.as_default():
-                hp_params = self.params
+                hp_params = self.params.copy()
                 hp_params.pop('callbacks', None)
                 
                 t_allow = (int, float, str, bool)
@@ -407,7 +512,7 @@ class AutoEncoder():
 
         return model
 
-    def fit(self, x, val_data: np.ndarray = None, **kwargs):
+    def fit(self, x, val_data: np.ndarray = None, verbose=1, **kwargs):
         """
         Fit the model to the inputted data.
 
@@ -420,17 +525,20 @@ class AutoEncoder():
                 Defaults to None.
             **kwargs: Additional arguments to pass to the model.fit method.
         """
+        print(f'Training model: {self.run_name}:')
         if val_data is not None:
             self.model.fit(
                 X=x,
                 y=x,
                 validation_data=(val_data, val_data),
+                verbose=verbose,
                 **kwargs
             )
         else:
             self.model.fit(
                 X=x,
                 y=x,
+                verbose=verbose,
                 **kwargs
             )
 
@@ -477,16 +585,16 @@ class AutoEncoder():
             self.pred = pred
 
         if self.scores is None:
-            mae = mean_absolute_error(self.data,
-                                      self.pred,
+            mae = mean_absolute_error(self.data.T,
+                                      self.pred.T,
                                       multioutput='raw_values',
                                       )
-            mse = mean_squared_error(self.data,
-                                     self.pred,
+            mse = mean_squared_error(self.data.T,
+                                     self.pred.T,
                                      multioutput='raw_values',
                                      )
-            r2 = r2_score(self.data,
-                          self.pred,
+            r2 = r2_score(self.data.T,
+                          self.pred.T,
                           multioutput='raw_values',
                           )
             self.scores = {'mae': mae, 'mse': mse, 'r2': r2}
@@ -707,7 +815,23 @@ class AutoEncoder():
 
         return fig, ax
 
+    def save_model(self, folder_path=None) -> Union[Path, str]:
+        if folder_path is None:
+            folder_path = self._tb_logdir.joinpath(self.run_name)
 
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        assert os.path.exists(folder_path), f'{folder_path} does not exist.'
+            
+        file_loc = folder_path.joinpath(f'{self.run_name}.pickle')
+
+        with open(file_loc, 'wb') as f:
+            pickle.dump(self, f)
+            print('Model saved')
+            print(f'\tSave Loc: {file_loc}')
+        return file_loc
+
+            
 class _VariationalAutoEncoder(Model):
     def __init__(self, input_dim, latent_dim, n_size):
         super().__init__()
@@ -795,6 +919,27 @@ class VariationalAutoEncoder(AutoEncoder):
                          **kwargs,
                          )
 
+    def set_run_name(self, append: str = None):
+        """
+        Initialise the run name for the model.
+
+        Args:
+            append (str, optional): String to append to the run name.\
+                Defaults to None.
+        
+        Returns:
+            str: Run name.
+        """
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        n_size = self.params['n_size']
+        layers = n_size + ['Z'] + n_size[::-1]
+        rn = f'VAE-{self.RMS.exp_name.replace(" ", "_")}-' \
+             f'E-{self.params["epochs"]}-L-{layers}-{t}'
+        if append is not None:
+            rn = f'{rn}-{append}'
+        self._run_name = rn
+        return self._run_name
+
     def initialise_model(
             self,
             latent_dim: int = 2,
@@ -808,26 +953,23 @@ class VariationalAutoEncoder(AutoEncoder):
     ):
         
         self._tb_logdir = TB_DIR.joinpath('VAE', self._tb_logdir)
-
         layers = n_size + ['Z'] + n_size[::-1]
-        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        self.run_name = f'VAE-{self.RMS.exp_name}-E-{epochs}-L-{layers}-T-{t}'
 
         if callbacks is None:
             callbacks = []
-        callbacks.append(tfa.callbacks.TQDMProgressBar(
-            show_epoch_progress=False))
         
         if self._tb:
-            callbacks.append(tf.keras.callbacks.TensorBoard(
-                log_dir=self._tb_logdir.joinpath(self.run_name),
-                histogram_freq=1,
-            ))
+            tb_callback = Custom_TB_Callback(
+                logdir=self._tb_logdir,
+                run_name=self.run_name,
+            )
+            callbacks.append(tb_callback)
+
             tb_writer = tf.summary.create_file_writer(
                 f'{self._tb_logdir.joinpath(self.run_name)}')
             
             with tb_writer.as_default():
-                hp_params = self.params
+                hp_params = self.params.copy()
                 hp_params.pop('callbacks', None)
 
                 t_allow = (int, float, str, bool)
@@ -965,6 +1107,29 @@ class LSTMAutoEncoder(AutoEncoder):
                          random_state,
                          **kwargs,
                          )
+
+    def set_run_name(self, append: str = None):
+        """
+        Initialise the run name for the model.
+
+        Args:
+            append (str, optional): String to append to the run name.\
+                Defaults to None.
+        
+        Returns:
+            str: Run name.
+        """
+        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+        n_size = self.params['n_size']
+        n_bottle = self.params['n_bottleneck']
+        layers = n_size + [n_bottle] + n_size[::-1]
+        win_len = self.seq_len
+        rn = f'LSTMAE-{self.RMS.exp_name.replace(" ", "_")}-' \
+             f'WIN-{win_len}-E-{self.params["epochs"]}-L-{layers}-{t}'
+        if append is not None:
+            rn = f'{rn}-{append}'
+        self._run_name = rn
+        return self._run_name
 
     def pre_process(self, val_frac: float = 0.2):
         print('Pre-processing Data:')
@@ -1190,25 +1355,22 @@ class LSTMAutoEncoder(AutoEncoder):
 
         self._tb_logdir = TB_DIR.joinpath('AUTOE', self._tb_logdir)
         layers = n_size + [n_bottleneck] + n_size[::-1]
-        t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-        self.run_name = f'LSTMAE-{self.RMS.exp_name.replace(" ", "_")}-' \
-                        f'WIN-{self.seq_len}-E-{epochs}-L-{layers}-{t}'
 
         if callbacks is None:
             callbacks = []
-        callbacks.append(tfa.callbacks.TQDMProgressBar(
-            show_epoch_progress=False))
-
+            
         if self._tb:
-            callbacks.append(tf.keras.callbacks.TensorBoard(
-                log_dir=self._tb_logdir.joinpath(self.run_name),
-                histogram_freq=1,
-            ))
+            tb_callback = Custom_TB_Callback(
+                logdir=self._tb_logdir,
+                run_name=self.run_name,
+            )
+            callbacks.append(tb_callback)
+
             tb_writer = tf.summary.create_file_writer(
                 f'{self._tb_logdir.joinpath(self.run_name)}')
 
             with tb_writer.as_default():
-                hp_params = self.params
+                hp_params = self.params.copy()
                 hp_params.pop('callbacks', None)
                 
                 t_allow = (int, float, str, bool)
@@ -1454,10 +1616,10 @@ if __name__ == '__main__':
                             random_state=1,
                             train_slice=(0, 100),
                             tb=False,
-                            tb_logdir=rms[test].exp_name + '/neurons',
+                            tb_logdir='pickle_test',
                             params={'n_bottleneck': 10,
                                     'n_size': [64, 64],
-                                    'epochs': 500,
+                                    'epochs': 200,
                                     'loss': 'mse',
                                     'batch_size': 10,
                                     # 'activity_regularizer': None,
@@ -1486,67 +1648,100 @@ if __name__ == '__main__':
                                 tb_logdir=rms[test].exp_name,
                                 random_state=1,
                                 params={'n_bottleneck': 32,
-                                        'n_size': [64],
-                                        'epochs': 2,
+                                        'n_size': [64, 64],
+                                        'epochs': 25,
                                         'loss': 'mse',
-                                        'batch_size': 10,
+                                        'batch_size': 32,
+                                        'callbacks': [
+                                            tf.keras.callbacks.EarlyStopping(
+                                                monitor='val_loss',
+                                                patience=10,
+                                                mode='min',
+                                            ),
+                                        ]
                                         })
         '''
         
+        # %% ADD MODEL CHECKPOITN CALLBACK
+        # -------------------------------------------------------------------
+        name = autoe.run_name
+        model_folder = TB_DIR.joinpath(autoe._tb_logdir.joinpath(name))
+        if not os.path.exists(model_folder):
+            os.makedirs(model_folder)
+        assert os.path.exists(model_folder)
+
+        autoe.model.callbacks.append(
+            tf.keras.callbacks.ModelCheckpoint(
+                filepath=model_folder.joinpath(f'{name}.h5'),
+                monitor='val_loss',
+                mode='min',
+                save_best_only=True,
+                save_weights_only=True,
+            )
+        )
+
         # %% FIT THE MODEL
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         autoe.fit(x=autoe.train_data,
                   val_data=autoe.val_data,
-                  verbose=0,
+                  verbose=1,
                   use_multiprocessing=True,
                   )
 
         # %% PLOT LOSS
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         autoe.loss_plot()
 
         # %% MODEL SUMMARY
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         autoe.model.model_.summary()
         #autoe.model.model_.encoder.summary()
         #autoe.model.model_.decoder.summary()
 
         # %% SCORE THE MODEL ON TRAINING, VALIDATION AND ALL DATA
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         pred_tr, scores_tr = autoe.score('train')
         pred_val, scores_val = autoe.score('val')
         pred_data, scores_data = autoe.score('dataset')
 
         # %% HISTOGRAM OF SCORES
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         fig, ax = autoe.hist_scores(['mse'])
 
         # %% PLOT PREDICTIONS
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         fig, ax = autoe.pred_plot(autoe._ind_tr[0])
         ax.set_title(f'{autoe.RMS.exp_name} Training Data - {ax.get_title()}')
         fig, ax = autoe.pred_plot(autoe._ind_val[0])
         ax.set_title(f'{autoe.RMS.exp_name} Val Data - {ax.get_title()}')
 
         # %% CALC CUTOFFS
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         autoe.thres
 
         # %% PLOT SCORES ON SCATTER
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         fig, ax = autoe.scatter_scores()
 
         # %% GENERATE NEW DATA
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         try:
             _, fig, ax = autoe.generate(z=[-2, 2])
         except AttributeError:
             pass
 
         # %% PLOT LATENT SPACE
-        # ---------------------------------------------------------------------
+        # -------------------------------------------------------------------
         try:
             fig, ax = autoe.plot_latent_space()
         except AttributeError:
             pass
         plt.show(block=True)
+        
+        # %% SAVE MODEL
+        # -------------------------------------------------------------------
+        mod_path = autoe.save_model()
+
+        # %% LOAD MODEL
+        # -------------------------------------------------------------------
+        autoe_2 = load_model(mod_path)
