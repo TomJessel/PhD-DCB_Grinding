@@ -13,11 +13,6 @@
 import os
 from pathlib import Path
 
-# Paths
-# -----------------------------------------------------------------------------
-# TODO: Make this a function so it only gets called once
-# TODO: Test the paths on both WSL and windows
-
 
 def config_paths():
     """
