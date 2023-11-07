@@ -398,6 +398,8 @@ class Base_Model:
         std_MSE = np.std([score['MSE'] for score in scores])
         std_r2 = np.std([score['r2'] for score in scores])
 
+        self.cvScores = scores
+
         print('-' * 65)
         # print(f'{self._run_name.split(self.tb_log_dir)[1][1:]}')
         print('CV Scores:')
@@ -802,9 +804,15 @@ class Linear_Model(Base_Model):
         if model is None:
             model = self.model
         if X is None:
-            X = self.val_data[0].values
+            try:
+                X = self.val_data[0].values
+            except AttributeError:
+                X = self.val_data[0]
         if y is None:
-            y = self.val_data[1].values
+            try:
+                y = self.val_data[1].values
+            except AttributeError:
+                y = self.train_data[1]
 
         scoring = {'MAE': 'neg_mean_absolute_error',
                    'MSE': 'neg_mean_squared_error',

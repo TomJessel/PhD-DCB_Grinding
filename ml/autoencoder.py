@@ -54,8 +54,8 @@ def load_model(filepath):
             file_loc = TB_DIR.joinpath('AUTOE', file_loc)
             if os.path.exists(file_loc) is False:
                 raise FileNotFoundError()
-        except FileNotFoundError:
-            raise FileNotFoundError(f'{file_loc} does not exist.')
+        except FileNotFoundError as e:
+            raise ValueError(f'{file_loc} does not exist.') from e
 
     # check if path is file or directory
     if os.path.isdir(file_loc):
@@ -69,9 +69,7 @@ def load_model(filepath):
             raise ValueError(f'Multiple pickle files in {file_loc}.')
         else:
             raise FileNotFoundError(f'{file_loc} does not exist.')
-    elif os.path.isfile(file_loc):
-        file_loc = file_loc
-    else:
+    elif not os.path.isfile(file_loc):
         raise FileNotFoundError(f'{file_loc} does not exist.')
 
     with open(file_loc, 'rb') as f:
@@ -112,7 +110,7 @@ class Custom_TB_Callback(tf.keras.callbacks.Callback):
                         value,
                         step=epoch,
                     )
-    
+
 
 class AutoEncoder():
     def __init__(
@@ -152,6 +150,7 @@ class AutoEncoder():
         self._tb = tb
         self._tb_logdir = TB_DIR.joinpath('AUTOE', tb_logdir)
         self._thres = None
+        self._run_name = None
 
         # attributes to be set later for predictions and scores on whole data
         self.pred = None
@@ -241,7 +240,7 @@ class AutoEncoder():
         except AttributeError:
             print('Data not pre-processed yet!')
             return None
-    
+
     @property
     def val_data(self):
         """
@@ -312,7 +311,7 @@ class AutoEncoder():
             modified_z_score = 0.6745 * diff / med_abs_deviation
 
             return modified_z_score > thresh
- 
+
         try:
             sc = {k: v[self._train_slice] for k, v in self.scores.items()}
             # sc = {k: v for k, v in self.scores.items()}
@@ -460,7 +459,7 @@ class AutoEncoder():
             with tb_writer.as_default():
                 hp_params = self.params.copy()
                 hp_params.pop('callbacks', None)
-                
+
                 t_allow = (int, float, str, bool)
                 types = {k: isinstance(val, t_allow)
                          for k, val in hp_params.items()}
@@ -478,7 +477,7 @@ class AutoEncoder():
                                 hp_params[k] = str(old)
                         else:
                             hp_params[k] = str(old)
-                
+
                 hp.hparams(
                     hp_params,
                     trial_id=f'{self._tb_logdir.joinpath(self.run_name)}'
@@ -757,7 +756,7 @@ class AutoEncoder():
             metrics = self.scores.keys()
 
         if hasattr(self, "thres") is False:
-            self.thres
+            _ = self.thres
 
         if plt_ax is None:
             fig, ax = plt.subplots(len(metrics), 1,
@@ -797,7 +796,7 @@ class AutoEncoder():
             #            )
             ax[i].set_ylabel(f'{metric.upper()} score')
         ax[-1].set_xlabel('Cut number')
-        
+
         try:
             fig.canvas.mpl_connect('button_press_event', onclick)
         except UnboundLocalError:
@@ -812,7 +811,7 @@ class AutoEncoder():
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         assert os.path.exists(folder_path), f'{folder_path} does not exist.'
-            
+
         file_loc = folder_path.joinpath(f'{self.run_name}.pickle')
 
         with open(file_loc, 'wb') as f:
@@ -821,7 +820,7 @@ class AutoEncoder():
             print(f'\tSave Loc: {file_loc}')
         return file_loc
 
-            
+
 class _VariationalAutoEncoder(Model):
     def __init__(self, input_dim, latent_dim, n_size):
         super().__init__()
@@ -848,7 +847,7 @@ class _VariationalAutoEncoder(Model):
             epsilon = K.random_normal(shape=(K.shape(z_mean)[0], latent_dim),
                                       mean=0., stddev=0.1)
             return z_mean + K.exp(z_log_sigma) * epsilon
-        
+
         z = Lambda(sampling)([z_mean, z_log_sigma])
 
         # encoder mapping inputs to rthe latent space
@@ -1123,7 +1122,7 @@ class LSTMAutoEncoder(AutoEncoder):
 
     def pre_process(self, val_frac: float = 0.2):
         print('Pre-processing Data:')
-        
+
         print('\tCombining RMS data...')
         org_sig_len = np.shape(self.data.values)[0]
         joined_rms = []
@@ -1135,10 +1134,11 @@ class LSTMAutoEncoder(AutoEncoder):
         assert ~np.isnan(joined_rms).any(), 'NaN values in RMS data'
 
         print(f'\n\tTraining Data: {self._train_slice}')
-        ind_tr = np.arange(len(joined_rms))
-        ind_tr = ind_tr[(self._train_slice.start * org_sig_len):
-                        (self._train_slice.stop * org_sig_len)]
-        
+        # ind_tr = np.arange(len(joined_rms))
+        # ind_tr = ind_tr[(self._train_slice.start * org_sig_len):
+        #                 (self._train_slice.stop * org_sig_len)]
+        ind_tr = [self._train_slice] * org_sig_len
+
         self.scaler = MinMaxScaler(feature_range=(0, 1))
 
         if self.random_state is None:
@@ -1165,7 +1165,7 @@ class LSTMAutoEncoder(AutoEncoder):
         self._n_inputs = org_sig_len
         self._ind_tr = ind_tr
         self._ind_val = ind_val
-        
+
     @staticmethod
     def sequence_inputs(data, seq_len):
         d = []
@@ -1183,7 +1183,7 @@ class LSTMAutoEncoder(AutoEncoder):
         except AttributeError:
             print('Data not pre-processed yet!')
             return None
-    
+
     @property
     def train_data(self):
         """
@@ -1194,7 +1194,7 @@ class LSTMAutoEncoder(AutoEncoder):
         except AttributeError:
             print('Data not pre-processed yet!')
             return None
-    
+
     @property
     def val_data(self):
         """
@@ -1348,7 +1348,7 @@ class LSTMAutoEncoder(AutoEncoder):
 
         if callbacks is None:
             callbacks = []
-            
+
         if self._tb:
             tb_callback = Custom_TB_Callback(
                 logdir=self._tb_logdir,
@@ -1362,7 +1362,7 @@ class LSTMAutoEncoder(AutoEncoder):
             with tb_writer.as_default():
                 hp_params = self.params.copy()
                 hp_params.pop('callbacks', None)
-                
+
                 t_allow = (int, float, str, bool)
                 types = {k: isinstance(val, t_allow)
                          for k, val in hp_params.items()}
@@ -1380,7 +1380,7 @@ class LSTMAutoEncoder(AutoEncoder):
                                 hp_params[k] = str(old)
                         else:
                             hp_params[k] = str(old)
-                
+
                 hp.hparams(
                     hp_params,
                     trial_id=f'{self._tb_logdir.joinpath(self.run_name)}'
@@ -1545,10 +1545,10 @@ class LSTMAutoEncoder(AutoEncoder):
 
         if self.scores is None:
             self.scores('dataset', print_score=False)
-        
+
         if hasattr(self, 'thres') is False:
             self.thres
-        
+
         anomalies = self.scores[anomaly_metric] > self.thres[anomaly_metric]
         anomalous_data_indices = [False] * len(self.joined_data)
         np.array(anomalous_data_indices)
@@ -1651,7 +1651,7 @@ if __name__ == '__main__':
                                         ]
                                         })
         '''
-        
+
         # %% ADD MODEL CHECKPOITN CALLBACK
         # -------------------------------------------------------------------
         name = autoe.run_name
@@ -1725,10 +1725,9 @@ if __name__ == '__main__':
         try:
             fig, ax = autoe.plot_latent_space()
         except AttributeError:
-            pass
-        # plt.show(block=True)
-        plt.show()
-        
+            pass      
+        plt.show(block=True)
+
         # %% SAVE MODEL
         # -------------------------------------------------------------------
         mod_path = autoe.save_model()
