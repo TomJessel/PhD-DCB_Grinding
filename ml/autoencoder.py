@@ -39,17 +39,7 @@ from scikeras.wrappers import KerasRegressor, BaseWrapper
 # local imports
 import resources
 
-platform = os.name
-if platform == 'nt':
-    onedrive = Path(r'C:\Users\tomje\OneDrive - Cardiff University')
-    onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
-    DATA_DIR = onedrive.joinpath('Testing', 'RMS')
-    TB_DIR = onedrive.joinpath('Tensorboard')
-elif platform == 'posix':
-    onedrive = Path(r'/mnt/c/Users/tomje/OneDrive - Cardiff University')
-    onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
-    DATA_DIR = onedrive.joinpath('Testing', 'RMS')
-    TB_DIR = onedrive.joinpath('Tensorboard')
+HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = resources.config_paths()
 
 
 def load_model(filepath):
@@ -1615,8 +1605,8 @@ if __name__ == '__main__':
                             rms[test].data,
                             random_state=1,
                             train_slice=(0, 100),
-                            tb=False,
-                            tb_logdir='pickle_test',
+                            tb=True,
+                            tb_logdir='path_test',
                             params={'n_bottleneck': 10,
                                     'n_size': [64, 64],
                                     'epochs': 200,
@@ -1735,7 +1725,7 @@ if __name__ == '__main__':
         try:
             fig, ax = autoe.plot_latent_space()
         except AttributeError:
-            pass
+            pass      
         plt.show(block=True)
 
         # %% SAVE MODEL

@@ -2,21 +2,12 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from tensorboard import program
-from pathlib import PurePosixPath as Path
 import sys
 
+from resources.config import config_paths
 
-PLATFORM = os.name
-if PLATFORM == 'nt':
-    onedrive = Path(
-        r'C:\Users\tomje\OneDrive - Cardiff University\Documents\PHD\AE'
-    )
-    TB_DIR = onedrive.joinpath('Tensorboard')
-elif PLATFORM == 'posix':
-    onedrive = Path(
-        r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents/PHD/AE'
-    )
-    TB_DIR = onedrive.joinpath('Tensorboard')
+
+HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = config_paths()
 
 
 def launch_tb(log_dir):

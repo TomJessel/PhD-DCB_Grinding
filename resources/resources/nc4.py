@@ -13,7 +13,6 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from typing import Any, Union
-from pathlib import PurePosixPath as Path
 from nptdms import TdmsFile
 from numpy import ndarray
 from tqdm import tqdm
@@ -28,17 +27,9 @@ import mplcursors
 import pickle
 import pandas as pd
 
-PLATFORM = os.name
-if PLATFORM == 'posix':
-    ONEDRIVE_PATH = Path(
-        r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents/PHD/'
-    )
-    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('AE/PYTHON/Acoustic-Emission')
-elif PLATFORM == 'nt':
-    ONEDRIVE_PATH = Path(
-        r'C:\Users\tomje\OneDrive - Cardiff University\Documents\PHD\AE'
-    )
-    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('PYTHON/Acoustic-Emission')
+from . import config
+
+HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = config.config_paths()
 
 
 def compute_shift(zipped: tuple[Any, Any]) -> int:
@@ -101,7 +92,7 @@ class NC4:
         Returns:
             NC4 data from the file.
         """
-        filepath = ONEDRIVE_PATH.joinpath(self._files[fno])
+        filepath = CODE_DIR.joinpath(self._files[fno])
         test = TdmsFile.read(filepath)
         prop = test.properties
         data = []
@@ -217,7 +208,7 @@ class NC4:
         Plot NC4 features for each measurement.
         """
         # mpl.use("TkAgg")
-        dataloc = ONEDRIVE_PATH.joinpath(self._testinfo.dataloc)
+        dataloc = CODE_DIR.joinpath(self._testinfo.dataloc)
         path = dataloc.joinpath('Figures')
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Attributes.png'
         pic_name = f'{path}/Test {self._testinfo.testno} ' \
@@ -276,7 +267,7 @@ class NC4:
             step: Step between files of slice.
 
         """
-        dataloc = ONEDRIVE_PATH.joinpath(self._testinfo.dataloc)
+        dataloc = CODE_DIR.joinpath(self._testinfo.dataloc)
         path = dataloc.joinpath('Figures')
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 XY Plot.png'
         pic_name = f'{path}/Test {self._testinfo.testno} - NC4 XY Plot.pickle'
@@ -340,7 +331,7 @@ class NC4:
         Plot surface of DCB radius over measurements in time.
 
         """
-        dataloc = ONEDRIVE_PATH.joinpath(self._testinfo.dataloc)
+        dataloc = CODE_DIR.joinpath(self._testinfo.dataloc)
         path = dataloc.joinpath('Figures')
         png_name = f'{path}/Test {self._testinfo.testno} - NC4 Radius Surf.png'
         pic_name = f'{path}/Test {self._testinfo.testno} '\

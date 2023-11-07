@@ -18,22 +18,9 @@ class join_rms_obj:
         self.exp_name = exp_name
 
 
-def get_tb_logdir():
-    platform = os.name
-    if platform == 'nt':
-        onedrive = Path(r'C:\Users\tomje\OneDrive - Cardiff University')
-        onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
-        TB_DIR = onedrive.joinpath('Tensorboard')
-    elif platform == 'posix':
-        onedrive = Path(r'/mnt/c/Users/tomje/OneDrive - Cardiff University')
-        onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
-        TB_DIR = onedrive.joinpath('Tensorboard')
-    return TB_DIR
-
-
 if __name__ == '__main__':
 
-    TB_DIR = get_tb_logdir()
+    _, _, CODE_DIR, TB_DIR, RMS_DATA_DIR = resources.config_paths()
     print(f'TB logdir: {TB_DIR}')
 
     exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
