@@ -33,7 +33,7 @@ def config_paths():
     # Home directory from OS and user
     PLATFORM = os.name
     if PLATFORM == 'posix':
-        HOME_DIR = Path.home()
+        HOME_DIR = Path(r'/mnt/c/Users/tomje')
 
     elif PLATFORM == 'nt':
         HOME_DIR = Path.home()
