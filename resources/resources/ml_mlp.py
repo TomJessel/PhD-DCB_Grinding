@@ -14,7 +14,6 @@ import multiprocessing
 import time
 from textwrap import dedent
 from typing import Any, Dict, Iterable, List, Union, Tuple
-from pathlib import PurePosixPath as Path
 import numpy as np
 import pandas as pd
 from collections import deque
@@ -37,6 +36,8 @@ logging.set_verbosity(logging.ERROR)
 from keras.layers import Dense, Dropout, LSTM  # noqa: E402
 from keras.models import Sequential  # noqa: E402
 from keras.optimizers import Adam  # noqa: E402
+
+from . import config
 
 
 def parse_tensorboard(path: str, scalars: list[str]):
@@ -95,8 +96,9 @@ class Base_Model:
         self._run_name = None
 
         # Tensorboard filename
-        dirname = self.get_file_dir()
-        self.tb_log_dir = os.path.join(dirname, 'Tensorboard')
+
+        _, _, _, TB_DIR, _ = config.config_paths()
+        self.tb_log_dir = TB_DIR
 
         if self.target is None:
             raise AttributeError('There is no TARGET attribute set.')
@@ -106,26 +108,6 @@ class Base_Model:
         if params is None:
             params = {}
         self.params = params
-
-    @staticmethod
-    def get_file_dir():
-        """
-        Get path to the AE file in OneDrive folder
-
-        Returns:
-            file path to AE folder
-
-        """
-        platform = os.name
-        if platform == 'nt':
-            onedrive = Path(r'C:\Users\tomje\OneDrive - Cardiff University')
-            filename = onedrive.joinpath('Documents/PHD/AE')
-        elif platform == 'posix':
-            onedrive = Path(
-                r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents'
-            )
-            filename = onedrive.joinpath('PHD/AE')
-        return filename
 
     def pre_process(self):
         raise AttributeError('No assigned function to pre-process \

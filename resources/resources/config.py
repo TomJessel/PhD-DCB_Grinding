@@ -23,6 +23,8 @@ def config_paths():
     """
     Find directory paths for the project.
 
+    HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = .config_paths()
+
     Returns:
         HOME_DIR (pathlib.Path): Home directory for the user.
         BASE_DIR (pathlib.Path): Base directory for all data and code.

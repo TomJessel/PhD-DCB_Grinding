@@ -31,18 +31,10 @@ import tkinter as tk
 import glob
 import re
 
+from . import config
 
-PLATFORM = os.name
-if PLATFORM == 'posix':
-    ONEDRIVE_PATH = Path(
-        r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents/PHD/'
-    )
-    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('AE/PYTHON/Acoustic-Emission')
-elif PLATFORM == 'nt':
-    ONEDRIVE_PATH = Path(
-        r'C:\Users\tomje\OneDrive - Cardiff University\Documents\PHD\AE'
-    )
-    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('PYTHON/Acoustic-Emission')
+
+HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = config.config_paths()
 
 
 def butter_filter(
@@ -246,7 +238,7 @@ class AE:
             data: AE data from the TDMS file.
 
         """
-        filepath = ONEDRIVE_PATH.joinpath(self._files[fno])
+        filepath = CODE_DIR.joinpath(self._files[fno])
         test = TdmsFile.read(filepath)
         prop = test.properties
         data = []
@@ -588,7 +580,7 @@ class AE:
             ax.set_ylabel('RMS (V)')
             writer = PillowWriter(fps=1)
             n = 40_000_000  # number of points to plot
-            dataloc = ONEDRIVE_PATH.joinpath(self._testinfo.dataloc)
+            dataloc = CODE_DIR.joinpath(self._testinfo.dataloc)
             path = dataloc.joinpath('Figures/')
             name = f'{path}Test {self._testinfo.testno} - Rolling RMS.gif'
             with writer.saving(fig, name, 200):
@@ -663,12 +655,12 @@ class RMS:
         self.exp_name = 'Test_99'
 
         if type(exp_obj) is str:
-            ref_test_loc = ONEDRIVE_PATH.joinpath(
+            ref_test_loc = CODE_DIR.joinpath(
                 'resources/reference/Test obj locations.txt'
             )
             f_locs = pd.read_csv(ref_test_loc, sep=',', index_col=0)
             f_locs = f_locs.to_dict()['Obj location']
-            f_locs = {k: ONEDRIVE_PATH.parents[1].joinpath(v)
+            f_locs = {k: CODE_DIR.parents[1].joinpath(v)
                       for k, v in f_locs.items()}
             try:
                 self._folder = f_locs[exp_obj.lower().replace(' ', '')].parent
@@ -679,7 +671,7 @@ class RMS:
         if exp_obj is None:
             folder = tk.filedialog.askdirectory(
                 title="Select the experiment's folder",
-                initialdir=ONEDRIVE_PATH.parents[1].joinpath('Testing'),
+                initialdir=CODE_DIR.parents[1].joinpath('Testing'),
                 mustexist=True,
             )
             self._folder = Path(folder)

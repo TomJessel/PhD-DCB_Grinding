@@ -32,18 +32,10 @@ import pandas as pd
 
 from . import ae
 from . import nc4
+from . import config
 
-PLATFORM = os.name
-if PLATFORM == 'posix':
-    ONEDRIVE_PATH = Path(
-        r'/mnt/c/Users/tomje/OneDrive - Cardiff University/Documents/PHD/'
-    )
-    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('AE/PYTHON/Acoustic-Emission')
-elif PLATFORM == 'nt':
-    ONEDRIVE_PATH = Path(
-        r'C:\Users\tomje\OneDrive - Cardiff University\Documents\PHD\AE'
-    )
-    ONEDRIVE_PATH = ONEDRIVE_PATH.joinpath('PYTHON/Acoustic-Emission')
+
+HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = config.config_paths()
 
 
 def _move_files(src: str, dst: str, ext: str = '*') -> None:
@@ -98,7 +90,7 @@ class TestInfo:
             dataloc: Location of the exp folder, for "TESTING INFO.txt" file.
         """
         self.dataloc = dataloc
-        dataloc = ONEDRIVE_PATH.joinpath(dataloc)
+        dataloc = CODE_DIR.joinpath(dataloc)
         infofile = os.path.join(dataloc, 'TESTING INFO.txt')
         try:
             data = pd.read_table(infofile,
@@ -185,7 +177,7 @@ class DCB:
 
     def gritsizeset(self):
         grainsizes = pd.read_csv(
-            ONEDRIVE_PATH.joinpath('resources/reference/grainsizes.csv')
+            CODE_DIR.joinpath('resources/reference/grainsizes.csv')
         )
         self.grainsize = float(
             grainsizes.iloc[
@@ -237,7 +229,7 @@ class Experiment:
         """
         Save Experiment obj to the data location folder as a '.pickle' file.
         """
-        save_path = ONEDRIVE_PATH.joinpath(self.test_info.dataloc)
+        save_path = CODE_DIR.joinpath(self.test_info.dataloc)
         save_path = save_path.joinpath(f'Test {self.test_info.testno}.pickle')
         # assert os.path.isfile(save_path)
         with open(fr'{save_path}', 'wb') as f:
@@ -248,7 +240,7 @@ class Experiment:
         Update the Experiment class with new files.
         """
         dataloc = self.dataloc
-        dataloc = ONEDRIVE_PATH.joinpath(dataloc)
+        dataloc = CODE_DIR.joinpath(dataloc)
         # check if there are new tdms files in teh data folder
         if glob.glob(os.path.join(dataloc, "*.tdms")):
             print('-' * 60)
@@ -263,7 +255,7 @@ class Experiment:
                 _sort_rename(ae_files, ae_path)
                 ae_files = glob.glob(os.path.join(ae_path, "*.tdms"))
                 ae_files = [
-                    os.path.relpath(f, ONEDRIVE_PATH) for f in ae_files
+                    os.path.relpath(f, CODE_DIR) for f in ae_files
                 ]
                 self.ae.update(tuple(ae_files))
 
@@ -274,7 +266,7 @@ class Experiment:
                 _sort_rename(nc4_files, nc4_path)
                 nc4_files = glob.glob(os.path.join(nc4_path, "*.tdms"))
                 nc4_files = [
-                    os.path.relpath(f, ONEDRIVE_PATH) for f in nc4_files
+                    os.path.relpath(f, CODE_DIR) for f in nc4_files
                 ]
                 self.nc4.update(tuple(nc4_files))
 
@@ -327,7 +319,7 @@ class Experiment:
         freq = 1000
 
         dataloc = self.dataloc
-        path = ONEDRIVE_PATH.joinpath(dataloc, 'Figures')
+        path = CODE_DIR.joinpath(dataloc, 'Figures')
         png_name = (
             f'{path}/Test {self.test_info.testno} - FFT_NC4 Correlation.png'
         )
@@ -437,7 +429,7 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
     if file is None:
         try:
             # root = tk.Tk()
-            initdir = ONEDRIVE_PATH.parents[1].joinpath('Testing')
+            initdir = CODE_DIR.parents[1].joinpath('Testing')
             file_path = askopenfilename(defaultextension='pickle',
                                         initialdir=initdir,
                                         title='Select exp file to load',
@@ -451,10 +443,10 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
             print('No existing exp file selected!')
             raise NotADirectoryError('No existing exp file selected to load!')
     else:
-        path_test_obj = ONEDRIVE_PATH.joinpath(
+        path_test_obj = CODE_DIR.joinpath(
             'resources/reference/Test obj locations.txt'
         )
-        path_ae = ONEDRIVE_PATH.parents[1]
+        path_ae = CODE_DIR.parents[1]
         f_locs = pd.read_csv(path_test_obj,
                              sep=',',
                              index_col=0
@@ -536,7 +528,7 @@ def create_obj(
     if folder is None:
         try:
             # root = tk.Tk()
-            initdir = ONEDRIVE_PATH.parents[1].joinpath('Testing')
+            initdir = CODE_DIR.parents[1].joinpath('Testing')
             folder_path = askdirectory(initialdir=initdir,
                                        title='Select test folder:'
                                        )
@@ -585,9 +577,9 @@ def create_obj(
     date = getdate(ae_files, nc4_files)
 
     # make file_paths relative
-    folder_path = os.path.relpath(folder_path, ONEDRIVE_PATH)
-    ae_files = tuple(os.path.relpath(f, ONEDRIVE_PATH) for f in ae_files)
-    nc4_files = tuple(os.path.relpath(f, ONEDRIVE_PATH) for f in nc4_files)
+    folder_path = os.path.relpath(folder_path, CODE_DIR)
+    ae_files = tuple(os.path.relpath(f, CODE_DIR) for f in ae_files)
+    nc4_files = tuple(os.path.relpath(f, CODE_DIR) for f in nc4_files)
 
     obj = Experiment(folder_path, date, ae_files, nc4_files)
     if process:
