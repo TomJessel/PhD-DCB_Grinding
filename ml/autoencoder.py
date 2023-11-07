@@ -41,18 +41,6 @@ import resources
 
 HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = resources.config_paths()
 
-# platform = os.name
-# if platform == 'nt':
-#     onedrive = Path(r'C:\Users\tomje\OneDrive - Cardiff University')
-#     onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
-#     DATA_DIR = onedrive.joinpath('Testing', 'RMS')
-#     TB_DIR = onedrive.joinpath('Tensorboard')
-# elif platform == 'posix':
-#     onedrive = Path(r'/mnt/c/Users/tomje/OneDrive - Cardiff University')
-#     onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
-#     DATA_DIR = onedrive.joinpath('Testing', 'RMS')
-#     TB_DIR = onedrive.joinpath('Tensorboard')
-
 
 def load_model(filepath):
     from ml import autoencoder

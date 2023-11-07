@@ -9,7 +9,7 @@ import resources
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pathlib import PurePosixPath as Path
+# from pathlib import PurePosixPath as Path
 
 
 def remove_dc(sig):
@@ -24,15 +24,7 @@ class join_rms_obj:
 
 if __name__ == '__main__':
 
-    platform = os.name
-    if platform == 'nt':
-        onedrive = Path(r'C:\Users\tomje\OneDrive - Cardiff University')
-        onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
-        TB_DIR = onedrive.joinpath('Tensorboard')
-    elif platform == 'posix':
-        onedrive = Path(r'/mnt/c/Users/tomje/OneDrive - Cardiff University')
-        onedrive = onedrive.joinpath('Documents', 'PHD', 'AE')
-        TB_DIR = onedrive.joinpath('Tensorboard')
+    _, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = resources.config_paths()
     print(f'TB logdir: {TB_DIR}')
 
     exps = ['Test 5', 'Test 7', 'Test 8', 'Test 9']
