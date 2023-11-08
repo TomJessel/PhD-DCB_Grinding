@@ -6,8 +6,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
+import keras
 from keras.models import Model
-from keras.layers import Layer, Dense, Input
+from keras.layers import Layer, Dense, Input, Lambda
 from keras import backend as K
 
 import resources
@@ -33,6 +34,8 @@ if gpus:
         print(e)
 else:
     print('No GPUs Available')
+
+# tf.config.set_visible_devices([], 'GPU')
 
 
 class Sampling(Layer):
@@ -135,9 +138,70 @@ class _VariationalAutoEncoder(Model):
         return fig, ax
 
 
+# class VariationalAutoEncoder(Model):
+#     def __init__(self, input_dim=300, latent_dim=16, n_size=[64, 64]):
+#         super().__init__()
+#         self.input_dim = input_dim
+#         self.latent_dim = latent_dim
+#         self.n_size = n_size
+#         self.encoder = self.get_encoder(input_dim, latent_dim, n_size)
+#         self.decoder = self.get_decoder(input_dim, latent_dim, n_size)
+
+#     def get_encoder(self, input_dim, latent_dim, n_size):
+#         inputs = Input(shape=(input_dim,), name='encoder_input')
+#         e = inputs
+
+#         for dim in n_size:
+#             e = Dense(dim, activation='relu')(e)
+
+#         z_mean = Dense(latent_dim, name='z_mean')(e)
+#         z_log_sigma = Dense(latent_dim, name='z_log_sigma')(e)
+
+#         def sampling(args):
+#             z_mean, z_log_sigma = args
+#             epsilon = K.random_normal(shape=(K.shape(z_mean)[0], latent_dim),
+#                                       mean=0., stddev=0.1)
+#             return z_mean + K.exp(z_log_sigma) * epsilon
+
+#         z = Lambda(sampling)([z_mean, z_log_sigma])
+
+#         # encoder mapping inputs to rthe latent space
+#         encoder = Model(inputs, [z_mean, z_log_sigma, z], name='encoder')
+#         return encoder
+
+#     def get_decoder(self, input_dim, latent_dim, n_size):
+#         latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
+#         d = latent_inputs
+
+#         for dim in n_size[::-1]:
+#             d = Dense(dim, activation='relu')(d)
+
+#         outputs = Dense(input_dim, activation='sigmoid')(d)
+
+#         decoder = Model(latent_inputs, outputs, name='decoder')
+#         return decoder
+
+#     def call(self, inputs):
+#         out_encoder = self.encoder(inputs)
+#         z_mean, z_log_sigma, z = out_encoder
+#         out_decoder = self.decoder(z)
+
+#         reconstruction_loss = tf.keras.metrics.mean_squared_error(
+#             inputs,
+#             out_decoder,
+#         )
+#         reconstruction_loss *= self.input_dim
+#         kl_loss = 1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma)
+#         kl_loss = K.sum(kl_loss, axis=-1)
+#         kl_loss *= -0.5
+#         vae_loss = K.mean(reconstruction_loss + kl_loss)
+#         self.add_loss(vae_loss)
+#         return out_decoder
+
+
 if __name__ == '__main__':
 
-    exps = ['Test 9']
+    exps = ['Test 8']
     rms = {}
     for test in exps:
         rms[test] = resources.ae.RMS(test)
@@ -153,19 +217,29 @@ if __name__ == '__main__':
         rms[test]._data = rms[test].data.apply(remove_dc, axis=0)
 
     dataset = rms[exps[0]].data.values.T
-    x_train = dataset[:100, :]
-    x_test = dataset[100:, :]
+    x_train = dataset[:140, :]
+    x_test = dataset[140:, :]
     print(f'x_train shape: {x_train.shape}')
     print(f'x_test shape: {x_test.shape}')
 
     vae = _VariationalAutoEncoder(300)
-    vae.compile(optimizer=tf.optimizers.Adam())
-    vae.fit(x_train, x_train,
-            epochs=500,
-            batch_size=32,
-            metrics=['mse', 'mae', 'r2'],
-            )
+    vae.compile(optimizer=keras.optimizers.Adam(),
+                metrics=[keras.metrics.RootMeanSquaredError(),
+                         keras.metrics.MeanAbsoluteError(),
+                         ],
+                )
+    history = vae.fit(x_train, x_train,
+                      validation_data=(x_test, x_test),
+                      epochs=200,
+                      batch_size=32,
+                      )
     vae.build_graph().summary()
 
     fig, ax = vae.plot_latent_space(dataset)
+
+    fig, ax = plt.subplots()
+    ax.plot(history.history['loss'], label='Training Loss')
+    ax.plot(history.history['val_loss'], label='Validation Loss')
     plt.show()
+
+# TODO: add in pre-processing steps
