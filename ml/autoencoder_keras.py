@@ -3,10 +3,11 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import numpy as np
+import matplotlib.pyplot as plt
 
 import tensorflow as tf
 from keras.models import Model
-from keras.layers import Layer, Dense
+from keras.layers import Layer, Dense, Input
 from keras import backend as K
 
 import resources
@@ -23,7 +24,7 @@ if gpus:
         # Limit memory usage to 5GB of the first GPU (if available)
         tf.config.set_logical_device_configuration(
             gpus[0],
-            [tf.config.LogicalDeviceConfiguration(memory_limit=5120)]
+            [tf.config.LogicalDeviceConfiguration(memory_limit=4096)]
         )
         logical_gpus = tf.config.list_logical_devices('GPU')
         print(len(gpus), 'Physical GPUs,', len(logical_gpus), 'Logical GPUs')
@@ -51,15 +52,19 @@ class Encoder(Layer):
                  **kwargs
                  ):
         super().__init__(name=name, **kwargs)
-        self.dense_proj = Dense(inter_dim,
-                                activation='relu',
-                                )
+        self.dense_1 = Dense(inter_dim,
+                             activation='relu',
+                             )
+        self.dense_2 = Dense(inter_dim,
+                             activation='relu',
+                             )
         self.dense_mean = Dense(latent_dim)
         self.dense_log_var = Dense(latent_dim)
         self.sampling = Sampling()
 
     def call(self, inputs):
-        x = self.dense_proj(inputs)
+        x = self.dense_1(inputs)
+        x = self.dense_2(x)
         z_mean = self.dense_mean(x)
         z_log_var = self.dense_log_var(x)
         z = self.sampling((z_mean, z_log_var))
@@ -74,11 +79,13 @@ class Decoder(Layer):
                  **kwargs
                  ):
         super().__init__(name=name, **kwargs)
-        self.dense_proj = Dense(inter_dim, activation='relu')
+        self.dense_1 = Dense(inter_dim, activation='relu')
+        self.dense_2 = Dense(inter_dim, activation='relu')
         self.dense_out = Dense(original_dim, activation='sigmoid')
 
     def call(self, inputs):
-        x = self.dense_proj(inputs)
+        x = self.dense_1(inputs)
+        x = self.dense_2(x)
         return self.dense_out(x)
 
 
@@ -111,10 +118,26 @@ class _VariationalAutoEncoder(Model):
         self.add_loss(vae_loss)
         return reconstructed
 
+    def build_graph(self):
+        x = Input(shape=(self.original_dim,))
+        return Model(inputs=[x], outputs=self.call(x))
+    
+    def plot_latent_space(self, data):
+        z_mean, _, _ = self.encoder(data)
+        
+        fig, ax = plt.subplots()
+        s = ax.scatter(z_mean[:, 0], z_mean[:, 1],
+                       c=range(len(z_mean[:, 0])),
+                       cmap=plt.get_cmap('jet'),
+                       )
+        cbar = plt.colorbar(s)
+        cbar.set_label('Cut No.')
+        return fig, ax
+
 
 if __name__ == '__main__':
 
-    exps = ['Test 7']
+    exps = ['Test 9']
     rms = {}
     for test in exps:
         rms[test] = resources.ae.RMS(test)
@@ -129,10 +152,20 @@ if __name__ == '__main__':
         rms[test]._data = rms[test].data.iloc[50:350, :].reset_index(drop=True)
         rms[test]._data = rms[test].data.apply(remove_dc, axis=0)
 
-    x_train = rms['Test 7'].data.values.T
-    print(x_train.shape)
+    dataset = rms[exps[0]].data.values.T
+    x_train = dataset[:100, :]
+    x_test = dataset[100:, :]
+    print(f'x_train shape: {x_train.shape}')
+    print(f'x_test shape: {x_test.shape}')
 
     vae = _VariationalAutoEncoder(300)
-    # vae.compile(optimizer=tf.keras.optimizers.legacy.Adam(learning_rate=0.001),)
-    vae.compile(optimizer=tf.optimizers.RMSprop())
-    vae.fit(x_train, x_train, epochs=100, batch_size=32)
+    vae.compile(optimizer=tf.optimizers.Adam())
+    vae.fit(x_train, x_train,
+            epochs=500,
+            batch_size=32,
+            metrics=['mse', 'mae', 'r2'],
+            )
+    vae.build_graph().summary()
+
+    fig, ax = vae.plot_latent_space(dataset)
+    plt.show()
