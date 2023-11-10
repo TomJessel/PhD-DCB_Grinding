@@ -16,7 +16,6 @@ from sklearn.preprocessing import MinMaxScaler
 
 import resources
 
-
 # Get Project Paths
 HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = resources.config_paths()
 
@@ -64,7 +63,7 @@ class VariationalAutoEncoder(Model):
 
         for dim in n_size:
             e = Dense(dim, activation='relu')(e)
-            e = BatchNormalization()(e)
+            # e = BatchNormalization()(e)
             e = Dropout(self.dropout)(e)
 
         z_mean = Dense(latent_dim, name='z_mean')(e)
@@ -88,7 +87,7 @@ class VariationalAutoEncoder(Model):
 
         for dim in n_size[::-1]:
             d = Dense(dim, activation='relu')(d)
-            d = BatchNormalization()(d)
+            # d = BatchNormalization()(d)
             d = Dropout(self.dropout)(d)
 
         outputs = Dense(input_dim, activation='sigmoid')(d)
@@ -114,7 +113,7 @@ class VariationalAutoEncoder(Model):
     
     @staticmethod
     def total_loss(reconstruction_loss, kl_loss, r_loss_factor):
-        return reconstruction_loss + kl_loss
+        return (r_loss_factor * reconstruction_loss) + kl_loss
 
     def call(self, inputs):
         z_mean, z_log_sigma, z = self.encoder(inputs)
@@ -167,7 +166,7 @@ def pre_process(data: np.array, ind: (tuple, tuple)):
 
 if __name__ == '__main__':
 
-    exps = ['Test 9']
+    exps = ['Test 8']
     rms = {}
     for test in exps:
         rms[test] = resources.ae.RMS(test)
@@ -184,28 +183,27 @@ if __name__ == '__main__':
 
     dataset = rms[exps[0]].data.values.T
 
+    TRAIN_STOP_IND = 50
+
     x_train, x_test, x_val, dataset_sc = pre_process(
         dataset,
-        (range(0, 100),
-         range(100, dataset.shape[0])
+        (range(0, TRAIN_STOP_IND),
+         range(TRAIN_STOP_IND, dataset.shape[0])
          )
     )
 
     vae = VariationalAutoEncoder(x_train.shape[1],
-                                 n_size=[64, 64],
+                                 n_size=[16],
                                  latent_dim=2,
                                  r_loss_factor=1000,
                                  )
     vae.build_graph().summary()
 
-    vae.compile(optimizer=keras.optimizers.Adam(),
-                # metrics=[keras.metrics.RootMeanSquaredError(),
-                #          keras.metrics.MeanAbsoluteError(),
-                #          ],
-                )
+    vae.compile(optimizer=keras.optimizers.Adam(),)
+
     history = vae.fit(x_train, x_train,
                       validation_data=(x_test, x_test),
-                      epochs=200,
+                      epochs=500,
                       batch_size=32,
                       )
 
@@ -215,22 +213,30 @@ if __name__ == '__main__':
     ax.plot(history.history['loss'], label='Training Loss')
     ax.plot(history.history['val_loss'], label='Validation Loss')
 
-    pred = vae.predict(dataset_sc)
+    pred = vae.predict(dataset_sc, verbose=0)
 
     recon_scores = vae.reconstruction_loss(dataset_sc, pred)
     kl_scores = vae.kl_loss(*vae.encoder(dataset_sc)[:2])
     total_scores = vae.total_loss(recon_scores, kl_scores, vae.r_loss_factor)
-    total_scores = total_scores.numpy()
 
-    fig, ax = plt.subplots()
-    ax.scatter(range(len(recon_scores)), recon_scores)
+    exp = resources.load(exps[0])
+    runout = exp.features['Runout'].drop([0, 1, 2])
 
-    fig, ax = plt.subplots()
-    ax.scatter(range(len(kl_scores)), kl_scores)
-
-    fig, ax = plt.subplots()
-    ax.scatter(range(len(total_scores)), total_scores)
-
-    #todo: plot scatter with runout/formerror
+    # Scatter plot of reconstruction loss with runout overlayed
+    fig, ax = plt.subplots(constrained_layout=True)
+    ax.scatter(range(len(recon_scores)),
+               recon_scores,
+               s=5,
+               )
+    ax.axvline(TRAIN_STOP_IND,
+               color='k',
+               linestyle='--',
+               alpha=0.5,
+               )
+    ax2 = ax.twinx()
+    ax2.plot(runout, 'C1', label='Runout')
+    ax.set_ylabel('Reconstruction Loss')
+    ax2.set_ylabel('Runout')
+    ax.set_xlabel('Cut No.')
 
     plt.show()
