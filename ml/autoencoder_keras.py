@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras
 from keras.models import Model
-from keras.layers import Dense, Input, Lambda, Dropout, BatchNormalization
+from keras.layers import Dense, Input, Lambda, Dropout
 from keras import backend as K
 
 from sklearn.model_selection import train_test_split
