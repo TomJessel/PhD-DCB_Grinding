@@ -25,11 +25,11 @@ from sklearn.preprocessing import MinMaxScaler
 from tqdm.auto import tqdm
 
 import tensorflow as tf  # noqa: E402
-import tensorflow_addons as tfa  # noqa: E402
+# import tensorflow_addons as tfa  # noqa: E402
 import tensorboard.plugins.hparams.api as hp
 from tensorboard.backend.event_processing import event_accumulator
 
-tf.config.set_visible_devices([], 'GPU')
+# tf.config.set_visible_devices([], 'GPU')
 from absl import logging
 logging.set_verbosity(logging.ERROR)
 
@@ -669,8 +669,8 @@ class MLP_Model(Base_Model):
         if callbacks is None:
             callbacks = []
         # Add in TQDM progress bar for fitting
-        callbacks.append(tfa.callbacks.TQDMProgressBar(
-            show_epoch_progress=False))
+        # callbacks.append(tfa.callbacks.TQDMProgressBar(
+        #     show_epoch_progress=False))
 
         if self._tb:
             # Add in tensorboard logging
@@ -1128,8 +1128,8 @@ class MLP_Win_Model(Base_Model):
         if callbacks is None:
             callbacks = []
         # Add in TQDM progress bar for fitting
-        callbacks.append(tfa.callbacks.TQDMProgressBar(
-            show_epoch_progress=False))
+        # callbacks.append(tfa.callbacks.TQDMProgressBar(
+            # show_epoch_progress=False))
 
         if self._tb:
             # Add in tensorboard logging
@@ -1496,8 +1496,8 @@ class LSTM_Model(Base_Model):
         if callbacks is None:
             callbacks = []
         # Add in TQDM progress bar for fitting
-        callbacks.append(tfa.callbacks.TQDMProgressBar(
-            show_epoch_progress=False))
+        # callbacks.append(tfa.callbacks.TQDMProgressBar(
+            # show_epoch_progress=False))
 
         if self._tb:
             # Add in tensorboard logging

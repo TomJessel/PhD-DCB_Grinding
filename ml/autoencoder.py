@@ -1725,7 +1725,7 @@ if __name__ == '__main__':
         try:
             fig, ax = autoe.plot_latent_space()
         except AttributeError:
-            pass      
+            pass
         plt.show(block=True)
 
         # %% SAVE MODEL
