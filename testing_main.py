@@ -57,5 +57,5 @@ def main(exp_name: str = None) -> resources.experiment.Experiment:
 
 
 if __name__ == "__main__":
-    exp = main('Test 8')
+    exp = main()
     plt.show()
