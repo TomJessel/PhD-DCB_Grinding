@@ -150,7 +150,6 @@ class AutoEncoder():
         self._tb = tb
         self._tb_logdir = TB_DIR.joinpath('AUTOE', tb_logdir)
         self._thres = None
-        self._run_name = None
 
         # attributes to be set later for predictions and scores on whole data
         self.pred = None

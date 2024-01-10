@@ -19,25 +19,59 @@ import resources
 # Get Project Paths
 HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = resources.config_paths()
 
-# Setup Tensorflow
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
-    print('Num GPUs Available: ', len(gpus))
-    try:
-        # Limit memory usage to 5GB of the first GPU (if available)
-        tf.config.set_logical_device_configuration(
-            gpus[0],
-            [tf.config.LogicalDeviceConfiguration(memory_limit=4096)]
-        )
-        logical_gpus = tf.config.list_logical_devices('GPU')
-        print(len(gpus), 'Physical GPUs,', len(logical_gpus), 'Logical GPUs')
-    except RuntimeError as e:
-        # Virtual devices must be set before GPUs have been initialized
-        print(e)
-else:
-    print('No GPUs Available')
 
-# tf.config.set_visible_devices([], 'GPU')
+class AutoEncoder(Model):
+    def __init__(self,
+                 input_dim=300,
+                 latent_dim=16,
+                 n_size=[64, 64],
+                 dropout=0.01,
+                 ):
+        super().__init__()
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
+        self.n_size = n_size
+        self.dropout = dropout
+        self.encoder = self.get_encoder(input_dim, latent_dim, n_size)
+        self.decoder = self.get_decoder(input_dim, latent_dim, n_size)
+
+    def get_encoder(self, input_dim, latent_dim, n_size):
+        inputs = Input(shape=(input_dim,), name='encoder_input')
+        e = inputs
+
+        for dim in n_size:
+            e = Dense(dim, activation='relu')(e)
+            e = Dropout(self.dropout)(e)
+
+        encoder_out = Dense(latent_dim,
+                            activation='relu',
+                            )(e)
+
+        encoder = Model(inputs, encoder_out, name='encoder')
+        return encoder
+
+    def get_decoder(self, input_dim, latent_dim, n_size):
+        latent_inputs = Input(shape=(latent_dim,))
+        d = latent_inputs
+
+        for dim in n_size[::-1]:
+            d = Dense(dim, activation='relu')(d)
+            d = Dropout(self.dropout)(d)
+
+        outputs = Dense(input_dim, activation='linear')(d)
+
+        decoder = Model(latent_inputs, outputs, name='decoder')
+        return decoder
+    
+    def call(self, inputs):
+        z = self.encoder(inputs)
+        out_decoder = self.decoder(z)
+        self.add_loss(tf.losses.mean_squared_error(inputs, out_decoder))
+        return out_decoder
+        
+    def build_graph(self):
+        x = Input(shape=(self.input_dim,))
+        return Model(inputs=[x], outputs=self.call(x))
 
 
 class VariationalAutoEncoder(Model):
@@ -165,7 +199,27 @@ def pre_process(data: np.array, ind: (tuple, tuple)):
 
 
 if __name__ == '__main__':
+    # Setup Tensorflow
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        print('Num GPUs Available: ', len(gpus))
+        try:
+            # Limit memory usage to 5GB of the first GPU (if available)
+            tf.config.set_logical_device_configuration(
+                gpus[0],
+                [tf.config.LogicalDeviceConfiguration(memory_limit=4096)]
+            )
+            logical_gpus = tf.config.list_logical_devices('GPU')
+            print(
+                f'{len(gpus)} Physical GPUs, {len(logical_gpus)} Logical GPUs'
+            )
+        except RuntimeError as e:
+            # Virtual devices must be set before GPUs have been initialized
+            print(e)
+    else:
+        print('No GPUs Available')
 
+    # tf.config.set_visible_devices([], 'GPU')
     exps = ['Test 8']
     rms = {}
     for test in exps:
