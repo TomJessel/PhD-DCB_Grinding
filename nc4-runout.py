@@ -290,4 +290,5 @@ if __name__ == "__main__":
               f"Runout: {atts['runout'] * 1000:.3f} um\n" \
               f"Form Error: {atts['form_error'] * 1000:.3f} um"
         plt.figtext(0.81, 0.5, txt, fontsize=10)
-        plt.show()
+        plt.savefig(f'{filepath}.png', dpi=300, bbox_inches='tight')
+        # plt.show()
