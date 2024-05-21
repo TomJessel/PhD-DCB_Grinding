@@ -13,3 +13,5 @@ ML.log
 *.pdf
 /models/
 *egg-info/
+*.png
+*.tfrecord
