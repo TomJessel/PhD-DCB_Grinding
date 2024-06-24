@@ -150,7 +150,6 @@ class AutoEncoder():
         self._tb = tb
         self._tb_logdir = TB_DIR.joinpath('AUTOE', tb_logdir)
         self._thres = None
-        self._run_name = None
 
         # attributes to be set later for predictions and scores on whole data
         self.pred = None
@@ -346,6 +345,7 @@ class AutoEncoder():
         n_size: list[int],
         activation: str,
         activity_regularizer,
+        dropout,
     ) -> Model:
         """
         Create a Keras autoencoder model with the given parameters.
@@ -368,7 +368,7 @@ class AutoEncoder():
             for dim in n_size:
                 e = Dense(dim, activation=activation)(e)
                 e = BatchNormalization()(e)
-                e = Dropout(0.1)(e)
+                e = Dropout(dropout)(e)
 
             encoder_out = Dense(n_bottleneck,
                                 activation='relu',
@@ -383,7 +383,7 @@ class AutoEncoder():
             for dim in n_size[::-1]:
                 d = Dense(dim, activation=activation)(d)
                 d = BatchNormalization()(d)
-                d = Dropout(0.1)(d)
+                d = Dropout(dropout)(d)
 
             decoder_out = Dense(n_inputs, activation='relu')(d)
             decoder = Model(decoder_in, decoder_out, name='Decoder')
@@ -414,6 +414,7 @@ class AutoEncoder():
                               KerasRegressor.r_squared
                               ],
         optimizer='adam',
+        dropout: float = 0.01,
         activity_regularizer=None,
         verbose: int = 1,
         callbacks: list[Any] = None,
@@ -490,6 +491,7 @@ class AutoEncoder():
             model__n_size=n_size,
             model__activation=activation,
             model__activity_regularizer=activity_regularizer,
+            model__dropout=dropout,
             epochs=epochs,
             batch_size=batch_size,
             loss=loss,
