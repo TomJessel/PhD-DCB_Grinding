@@ -18,9 +18,11 @@ from resources import load, ae
 
 
 if __name__ == '__main__':
-    exp = load('Test 9')
-    rms = ae.RMS('Test 9')
-
+    exp = load('Test 11')
+    # rms = ae.RMS('Test 9')
+    
+    fig, ax = exp.nc4.plot_surf()
+    fig = exp.nc4.plot_att()
     # fig, ax = plt.subplots(2, 1)
     # ax[0] = exp.ae.plotAE(150, ax=ax[0])
     # ax[1] = rms.plot_rms(150, ax=ax[1])
