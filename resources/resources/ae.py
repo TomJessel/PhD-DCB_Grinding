@@ -280,7 +280,7 @@ class AE:
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Voltage (V)')
         mplcursors.cursor(multiple=True)
-        fig.show()
+        # fig.show()
         return fig, ax
 
     def plotfft(self, fno: int, freqres: float = 1000) -> None:
@@ -602,7 +602,7 @@ class AE:
         """
         self._files = files
 
-    def plot_triggers(self, fno: int) -> None:
+    def plot_triggers(self, fno: int, ax: plt.axes = None) -> None:
         """
         Plot calculated trigger points of the file on the hibert enveloped\
             and lowpass filtered AE signal
@@ -618,6 +618,11 @@ class AE:
             print('Process AE data with triggers then retry')
             return
 
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = ax.get_figure()
+
         sig = self.readAE(fno)
         ts = 1 / self._fs
         n = len(sig)
@@ -628,19 +633,18 @@ class AE:
         en_sig = envelope_hilbert(sig)
         sig = butter_filter(data=en_sig, fs=self._fs, order=3, ftype='low')
 
-        fig, ax = plt.subplots()
         ax.plot(t, sig, linewidth=1)
-        ax.axhline(triggers['trig y-val'], color='r', linewidth=1, alpha=0.5)
+        ax.axhline(triggers['trig y-val'],
+                   color='r', linewidth=1, alpha=0.8, linestyle='--')
         ax.axvline(triggers['trig st'] * ts,
-                   color='r', linewidth=1.5, alpha=0.5, linestyle='--')
+                   color='r', linewidth=1, alpha=0.8, linestyle='--')
         ax.axvline(triggers['trig end'] * ts,
-                   color='r', linewidth=1.5, alpha=0.5, linestyle='--')
+                   color='r', linewidth=1, alpha=0.8, linestyle='--')
         ax.set_title(filename)
         ax.autoscale(enable=True, axis='x', tight=True)
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Voltage (V)')
-        fig.show()
-        return fig
+        return fig, ax
 
 
 class RMS:
