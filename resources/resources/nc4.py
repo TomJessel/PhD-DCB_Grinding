@@ -203,7 +203,9 @@ class NC4:
         fig = self.plot_att()
         return fig
 
-    def plot_att(self) -> None:
+    def plot_att(self,
+                 fno: tuple = None,
+                 ) -> None:
         """
         Plot NC4 features for each measurement.
         """
@@ -217,19 +219,25 @@ class NC4:
             os.makedirs(path)
 
         fig, ax_r = plt.subplots()
-        self.mean_radius.dropna().plot(color='C0',
-                                       label='Mean Radius'
-                                       )
-        self.peak_radius.dropna().plot(color='C1',
-                                       label='Peak Radius'
-                                       )
+
+        if fno is None:
+            mean_radius = self.mean_radius
+            peak_radius = self.peak_radius
+            runout = self.runout
+            form_error = self.form_error
+        else:
+            slice_n = slice(fno[0], fno[1])
+            mean_radius = self.mean_radius[slice_n]
+            peak_radius = self.peak_radius[slice_n]
+            runout = self.runout[slice_n]
+            form_error = self.form_error[slice_n]
+
+        ax_r.plot(mean_radius, color='C0', label='Mean Radius')
+        ax_r.plot(peak_radius, color='C1', label='Peak Radius')
+
         ax_e = ax_r.twinx()
-        self.runout.dropna().multiply(1000).plot(color='C2',
-                                                 label='Runout'
-                                                 )
-        self.form_error.dropna().multiply(1000).plot(color='C3',
-                                                     label='Form Error'
-                                                     )
+        ax_e.plot(runout * 1000, color='C2', label='Runout')
+        ax_e.plot(form_error * 1000, color='C3', label='Form Error')
 
         ax_r.set_title(f'Test No: {self._testinfo.testno} - NC4 Attributes')
         ax_r.autoscale(enable=True, axis='x', tight=True)
