@@ -476,7 +476,7 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
 
 
 def create_obj(
-        folder: str = None,
+        folder: Union[str, None] = None,
         process: bool = False
 ) -> Union[Experiment, None]:
     """
