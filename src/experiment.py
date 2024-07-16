@@ -414,7 +414,9 @@ class Experiment:
         return df
 
 
-def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
+def load(file: Union[str, None] = None,
+         process: bool = False,
+         ) -> Union[Experiment, None]:
     """
     Load in a saved exp pickle file, option to process data.
 
@@ -429,7 +431,7 @@ def load(file: str = None, process: bool = False) -> Union[Experiment, None]:
     if file is None:
         try:
             # root = tk.Tk()
-            initdir = CODE_DIR.parents[1].joinpath('Testing')
+            initdir = BASE_DIR.joinpath(r'AE/Testing')
             file_path = askopenfilename(defaultextension='pickle',
                                         initialdir=initdir,
                                         title='Select exp file to load',
@@ -528,7 +530,7 @@ def create_obj(
     if folder is None:
         try:
             # root = tk.Tk()
-            initdir = CODE_DIR.parents[1].joinpath('Testing')
+            initdir = BASE_DIR.joinpath(r'AE/Testing')
             folder_path = askdirectory(initialdir=initdir,
                                        title='Select test folder:'
                                        )
