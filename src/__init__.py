@@ -10,6 +10,7 @@
 05/10/2022 10:01   tomhj      1.0         None
 """
 
+# import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 # import .experiment
 # import src.acousticEmission.ae
 # import src.nc4.nc4

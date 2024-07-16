@@ -43,17 +43,17 @@ def config_paths():
     BASE_DIR = HOME_DIR.joinpath(r'OneDrive - Cardiff University',
                                  r'Documents',
                                  r'PHD',
-                                 r'AE',
                                  )
     # Code directory
-    CODE_DIR = BASE_DIR.joinpath(r'PYTHON',
+    CODE_DIR = BASE_DIR.joinpath(r'CODE',
                                  r'Acoustic-Emission',
                                  )
     # Tensorboard directory
     TB_DIR = BASE_DIR.joinpath(r'TensorBoard',
                                )
     # RMS data directory
-    RMS_DATA_DIR = BASE_DIR.joinpath(r'Testing',
+    RMS_DATA_DIR = BASE_DIR.joinpath(r'AE',
+                                     r'Testing',
                                      r'RMS',
                                      )
     return HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR
