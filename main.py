@@ -14,7 +14,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import warnings
 warnings.filterwarnings('ignore')
 import matplotlib.pyplot as plt
-from resources import load, ae
+from src import load
 
 
 if __name__ == '__main__':
