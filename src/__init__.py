@@ -12,7 +12,7 @@
 
 # import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 # import .experiment
-# import src.acousticEmission.ae
+# import src.ae.ae
 # import src.nc4.nc4
 # import src.nc4.surf_meas
 # import src.ml_mlp  # noqa

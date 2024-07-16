@@ -30,7 +30,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from .acousticEmission import ae
+from .ae import ae
 from .nc4 import nc4
 from . import config
 
