@@ -46,7 +46,7 @@ def config_paths():
                                  )
     # Code directory
     CODE_DIR = BASE_DIR.joinpath(r'CODE',
-                                 r'Acoustic-Emission',
+                                 r'PhD-DCB_Grinding',
                                  )
     # Tensorboard directory
     TB_DIR = BASE_DIR.joinpath(r'TensorBoard',
