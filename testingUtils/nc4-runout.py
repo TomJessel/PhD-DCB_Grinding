@@ -1,6 +1,8 @@
+import sys, os # noqa
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 import argparse
 import math
-
 import numpy as np
 import matplotlib.pyplot as plt
 from nptdms import TdmsFile
@@ -11,7 +13,7 @@ import circle_fit
 from src import config_paths
 
 HOME_DIR, BASE_DIR, _, _, _ = config_paths()
-TESTING_DIR = BASE_DIR / 'Testing'
+TESTING_DIR = BASE_DIR / 'AE/Testing'
 
 
 def readNC4(filepath) -> list[float]:
@@ -268,6 +270,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     filepath = TESTING_DIR / args.filepath
+    # if filepath is a folder convert last tdms file
+    if filepath.is_dir():
+        filepath = list(filepath.glob('*.tdms'))[-1]
+
+    assert filepath.exists(), 'Filepath does not exist'
+
     _fs = args.fs
     _dcb_diameter = args.dia
     _theta = 2 * np.pi * np.arange(0, 1, 1 / _fs)
