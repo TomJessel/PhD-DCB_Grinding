@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import pandas as pd
 from pathlib import Path
 from scipy.interpolate import interp1d
 from nptdms import TdmsFile
