@@ -19,7 +19,7 @@ import fnmatch
 import glob
 import os
 import re
-from pathlib import PurePosixPath as Path
+from pathlib import Path
 from tkinter.filedialog import askdirectory, askopenfilename
 import pickle
 from typing import Union
@@ -32,6 +32,7 @@ import pandas as pd
 
 from .ae import ae
 from .nc4 import nc4
+from .probe import probe
 from . import config
 
 
@@ -190,7 +191,7 @@ class Experiment:
                  dataloc: str,
                  date: datetime.date,
                  ae_files: tuple[str],
-                 nc4_files: tuple[str]
+                 nc4_files: tuple[str],
                  ) -> None:
         """
         Experiment Class, including AE & NC4 class, test_info and features.
@@ -214,7 +215,15 @@ class Experiment:
                            self.test_info.dcb,
                            self.test_info.acquisition[1]
                            )
+        self._probe = None
+        self.__probe_bool = True
         self.features = pd.DataFrame
+
+    @property
+    def probe(self):
+        if self._probe is None and self.__probe_bool:
+            self.probe_process()
+        return self._probe
 
     def __repr__(self):
         no_nc4 = len(self.nc4._files)
@@ -374,7 +383,9 @@ class Experiment:
                 'Peak radius',
                 'Radius diff',
                 'Runout',
-                'Form error'
+                'Form error',
+                'Avg probe',
+                'Probe diff',
                 ]
 
         rms = np.concatenate(([np.NaN], self.ae.rms))
@@ -394,6 +405,9 @@ class Experiment:
         run_out = np.array(self.nc4.runout)
         form_err = np.array(self.nc4.form_error)
 
+        avgProbe = np.array(self.probe.probeData['AVGPROBE'])
+        probeDiff = np.array(self.probe.probeData['PROBEDIFF'])
+
         m = np.stack((rms,
                       kurt,
                       amp,
@@ -405,13 +419,30 @@ class Experiment:
                       peak_rad,
                       rad_diff,
                       run_out,
-                      form_err
+                      form_err,
+                      avgProbe,
+                      probeDiff,
                       ), axis=0)
         df = pd.DataFrame(m.T, columns=cols)
         print(f'Feature DF of Test {self.test_info.testno}:')
         print(df.head())
         self.features = df
         return df
+
+    def probe_process(self):
+        probe_path = Path(self.dataloc).name[:8].replace('_', '') + \
+            '-WEARTEST.csv'
+        probe_path = Path(self.dataloc) / probe_path
+
+        if not probe_path.exists():
+            print(f'Probe file not found: {probe_path}')
+            print('If test should have probe data, please add file and rerun')
+            self.__probe_bool = False
+            return
+        self._probe = probe.PROBE(probe_path,
+                                  doc=self.test_info.grindprop.doc_rad,
+                                  tol=0.02,
+                                  )
 
 
 def load(file: Union[str, None] = None,
