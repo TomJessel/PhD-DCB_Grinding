@@ -448,7 +448,7 @@ def load(file: Union[str, None] = None,
         path_test_obj = CODE_DIR.joinpath(
             'src/reference/Test obj locations.txt'
         )
-        path_ae = CODE_DIR.parents[1]
+        path_ae = BASE_DIR.joinpath('AE/Testing')
         f_locs = pd.read_csv(path_test_obj,
                              sep=',',
                              index_col=0

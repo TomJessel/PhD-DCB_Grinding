@@ -1,13 +1,13 @@
 Test no,Obj location
 
-test1,Testing/28_2_22_grit1000/Test 1.pickle
-test2,Testing/TEST2Combined/Test 2.pickle
-test5,Testing/22_08_03_grit1000/Test 5.pickle
-test7,Testing/22_11_07_weartest_1000/Test 7.pickle
-test8,Testing/22_11_09_weartest_1000/Test 8.pickle
-test9,Testing/22_11_30_weartest_1000/Test 9.pickle
-test10,Testing/23_05_15_OWL_Probe_test/Test 10.pickle
-test11,Testing/24_05_28_weartest_D1.3#1000/Test 11.pickle
-test14,Testing/24_06_10_weartest_D1.3_#1000/Test 14.pickle
-test15,Testing/24_06_19_weartest_D1.3_#1000/Test 15.pickle
-test16,Testing/24_07_03_weartest_D1.3_#1000/Test 16.pickle
+test1,28_2_22_grit1000/Test 1.pickle
+test2,TEST2Combined/Test 2.pickle
+test5,22_08_03_grit1000/Test 5.pickle
+test7,22_11_07_weartest_1000/Test 7.pickle
+test8,22_11_09_weartest_1000/Test 8.pickle
+test9,22_11_30_weartest_1000/Test 9.pickle
+test10,23_05_15_OWL_Probe_test/Test 10.pickle
+test11,24_05_28_weartest_D1.3#1000/Test 11.pickle
+test14,24_06_10_weartest_D1.3_#1000/Test 14.pickle
+test15,24_06_19_weartest_D1.3_#1000/Test 15.pickle
+test16,24_07_03_weartest_D1.3_#1000/Test 16.pickle
