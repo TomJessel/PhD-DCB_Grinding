@@ -377,22 +377,22 @@ class Experiment:
                 'Form error'
                 ]
 
-        rms = self.ae.rms
-        kurt = self.ae.kurt
-        amp = self.ae.amplitude
-        skew = self.ae.skewness
+        rms = np.concatenate(([np.NaN], self.ae.rms))
+        kurt = np.concatenate(([np.NaN], self.ae.kurt))
+        amp = np.concatenate(([np.NaN], self.ae.amplitude))
+        skew = np.concatenate(([np.NaN], self.ae.skewness))
 
         f = np.array(self.ae.fft[1000])
         f = f.T
-        f_35 = f[35]
-        f_10 = f[10]
-        f_134 = f[134]
+        f_35 = np.concatenate(([np.NaN], f[35]))
+        f_10 = np.concatenate(([np.NaN], f[10]))
+        f_134 = np.concatenate(([np.NaN], f[134]))
 
-        mean_rad = np.array(self.nc4.mean_radius[1:])
-        peak_rad = np.array(self.nc4.peak_radius[1:])
-        rad_diff = np.diff(self.nc4.mean_radius)
-        run_out = np.array(self.nc4.runout[1:])
-        form_err = np.array(self.nc4.form_error[1:])
+        mean_rad = np.array(self.nc4.mean_radius)
+        peak_rad = np.array(self.nc4.peak_radius)
+        rad_diff = np.concatenate(([np.NaN], np.diff(self.nc4.mean_radius)))
+        run_out = np.array(self.nc4.runout)
+        form_err = np.array(self.nc4.form_error)
 
         m = np.stack((rms,
                       kurt,
