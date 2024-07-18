@@ -244,6 +244,10 @@ def disp_atts(att: dict):
 
 
 if __name__ == "__main__":
+
+    # Common usage:
+    # python testingUtils/nc4-runout.py -p "24_07_17_ToolSetupRunout"
+
     parser = argparse.ArgumentParser(
         description='Convert raw NC4 data to radius.'
     )
