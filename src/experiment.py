@@ -384,8 +384,6 @@ class Experiment:
                 'Radius diff',
                 'Runout',
                 'Form error',
-                'Avg probe',
-                'Probe diff',
                 ]
 
         rms = np.concatenate(([np.NaN], self.ae.rms))
@@ -405,9 +403,6 @@ class Experiment:
         run_out = np.array(self.nc4.runout)
         form_err = np.array(self.nc4.form_error)
 
-        avgProbe = np.array(self.probe.probeData['AVGPROBE'])
-        probeDiff = np.array(self.probe.probeData['PROBEDIFF'])
-
         m = np.stack((rms,
                       kurt,
                       amp,
@@ -420,9 +415,15 @@ class Experiment:
                       rad_diff,
                       run_out,
                       form_err,
-                      avgProbe,
-                      probeDiff,
                       ), axis=0)
+
+        # if this test has probe data, add it to the feature matrix
+        if self.__probe_bool:
+            cols.append(['AVGPROBE', 'PROBEDIFF'])
+            avgProbe = np.array(self.probe.probeData['AVGPROBE'])
+            probeDiff = np.array(self.probe.probeData['PROBEDIFF'])
+            m = np.vstack((m, avgProbe, probeDiff))
+
         df = pd.DataFrame(m.T, columns=cols)
         print(f'Feature DF of Test {self.test_info.testno}:')
         print(df.head())
