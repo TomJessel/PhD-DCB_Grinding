@@ -5,6 +5,7 @@ from pathlib import Path
 from scipy.interpolate import interp1d
 from nptdms import TdmsFile
 from tqdm import tqdm
+from datetime import datetime
 
 from src import config
 
@@ -54,9 +55,16 @@ class NC4SpiralScan:
         self._scFeedrate = scFeedrate
 
         self.__calBounds = None
+        self._scanMat = None
 
         # Setup for conversion from signal to radius
         self._sig2rad = self.SCurveCalibration(self._sCurvePath)
+
+    @property
+    def scanMat(self):
+        if self._scanMat is None:
+            self._scanMat = self.processSpiralScan(self._scanPath)
+        return self._scanMat
 
     @staticmethod
     def readTDMS(path):
@@ -119,7 +127,7 @@ class NC4SpiralScan:
         dataMat = dataMat.reshape(-1, samplesPerRev)
         return dataMat
 
-    def spiralScan(self, path):
+    def processSpiralScan(self, path):
         scanData = self.readTDMS(path)
         scanData = _smooth(scanData, win=51)
 
@@ -138,7 +146,7 @@ class NC4SpiralScan:
         if path is None:
             path = self._scanPath
 
-        scanMat = self.spiralScan(path)
+        scanMat = self.scanMat
 
         z = np.arange(0, len(scanMat)) * self._zSpiralFeedrate / 60
         theta = np.linspace(0, 360, scanMat.shape[1])
@@ -154,16 +162,16 @@ class NC4SpiralScan:
                                layout='constrained',
                                figsize=(10, 6),
                                )
-        fig.suptitle(f'BJD Spiral Scan - {path.stem}')
+        fig.suptitle(f'{path.stem}')
         im = ax[1].imshow(scanMat[:, :],
                           aspect='auto',
-                          cmap='viridis',
+                          cmap='jet',
                           origin='lower',
                           interpolation='none',
                           extent=[theta[0], theta[-1],
                                   z[0], z[-1]
                                   ],
-                          vmin=0.62,
+                          vmin=0.61,
                           vmax=0.68,
                           )
         plt.colorbar(im, ax=ax[1], label='Radius (mm)')
@@ -179,11 +187,65 @@ class NC4SpiralScan:
         ax[0].grid()
         ax[0].legend(ncol=3, loc='upper center', bbox_to_anchor=(0.5, -0.1))
         if saveFig:
-            fig.savefig(f'{path.parent}/{path.stem}-BJDSpiralScan.png',
-                        dpi=500,
+            fig.savefig(f'{path.parent}/{path.stem}.png',
+                        dpi=100,
                         bbox_inches='tight',
                         )
         return fig, ax
+
+
+def renameSpiralScans(exp, spiralScanDir, spiralScanFiles):
+    # find closest NC4 file for each spiral scan, via timestamps
+    timeStamp_Sprial = []
+    timeStamp_NC4 = []
+    for f in spiralScanFiles:
+        timeStamp_Sprial.append(datetime.strptime(f.name[:19],
+                                                  "%Y_%m_%d_%H_%M_%S",
+                                                  ))
+    for f in exp.nc4._files:
+        timeStamp_NC4.append(datetime.strptime(Path(f).name[9:28],
+                                               "%Y_%m_%d_%H_%M_%S",
+                                               ))
+
+    for i, (ts_spiral, f) in enumerate(zip(timeStamp_Sprial, spiralScanFiles)):
+        # find the nearest NC4 file
+        idx = np.argmin([abs(ts_spiral - t0) for t0 in timeStamp_NC4])
+        fileName = f'Cut_{Path(exp.nc4._files[idx]).name[5:8]}_{f[i].name}'
+        spiralScanFiles[i].rename(spiralScanDir.joinpath(fileName))
+
+
+def processExpSprialScans(exp,
+                          SCPath,
+                          nomDia=1.3,
+                          feedrate=2,
+                          rpm=60,
+                          fs=50_000,
+                          yOffset=0.03,
+                          calFeedrate=60,
+                          ):
+    spiralScanDir = Path(exp.dataloc).joinpath('Spiral Scans')
+    assert spiralScanDir.exists(), "Spiral Scan directory not found."
+    spiralScanFiles = list(spiralScanDir.glob("*.tdms"))
+    
+    # if files not already renamed
+    if not all([f.name.startswith('Cut') for f in spiralScanFiles]):
+        renameSpiralScans(exp, spiralScanDir, spiralScanFiles)
+    
+    # process the renamed files
+    nc = []
+    for f in tqdm(spiralScanFiles):
+        sc = NC4SpiralScan(scanPath=f,
+                           sCurvePath=SCPath,
+                           toolNomDia=nomDia,
+                           zSpiralFeedrate=feedrate,
+                           spindleSpeed=rpm,
+                           fs=fs,
+                           yOffset=yOffset,
+                           scFeedrate=calFeedrate,
+                           )
+        sc.scanMat
+        nc.append(sc)
+    return nc
 
 
 if __name__ == "__main__":
