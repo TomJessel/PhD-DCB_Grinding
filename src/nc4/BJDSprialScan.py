@@ -56,6 +56,7 @@ class NC4SpiralScan:
 
         self.__calBounds = None
         self._scanMat = None
+        self._scan = None
 
         # Setup for conversion from signal to radius
         self._sig2rad = self.SCurveCalibration(self._sCurvePath)
@@ -65,6 +66,12 @@ class NC4SpiralScan:
         if self._scanMat is None:
             self._scanMat = self.processSpiralScan(self._scanPath)
         return self._scanMat
+    
+    @property
+    def scan(self):
+        if self._scan is None:
+            self.processSpiralScan(self._scanPath)
+        return self._scan
 
     @staticmethod
     def readTDMS(path):
@@ -138,6 +145,7 @@ class NC4SpiralScan:
         scanRad = self._sig2rad(scanData)
         # account for positioning offset
         scanRad = scanRad + (self._toolNomDia / 2) + self._yOffset
+        self._scan = scanRad
 
         scanMat = self._scanToMat(scanRad)
         return scanMat
