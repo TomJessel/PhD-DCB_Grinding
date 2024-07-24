@@ -6,6 +6,7 @@ from scipy.interpolate import interp1d
 from nptdms import TdmsFile
 from tqdm import tqdm
 from datetime import datetime
+import re
 
 from src import config
 
@@ -207,7 +208,8 @@ def renameSpiralScans(exp, spiralScanDir, spiralScanFiles):
     timeStamp_Sprial = []
     timeStamp_NC4 = []
     for f in spiralScanFiles:
-        timeStamp_Sprial.append(datetime.strptime(f.name[:19],
+        ind = re.search(r'^.*202', f.name).end()
+        timeStamp_Sprial.append(datetime.strptime(f.name[ind - 3:ind + 16],
                                                   "%Y_%m_%d_%H_%M_%S",
                                                   ))
     for f in exp.nc4._files:
@@ -218,7 +220,9 @@ def renameSpiralScans(exp, spiralScanDir, spiralScanFiles):
     for i, (ts_spiral, f) in enumerate(zip(timeStamp_Sprial, spiralScanFiles)):
         # find the nearest NC4 file
         idx = np.argmin([abs(ts_spiral - t0) for t0 in timeStamp_NC4])
-        fileName = f'Cut_{Path(exp.nc4._files[idx]).name[5:8]}_{f.name}'
+        fileName = (
+            f'Cut_{Path(exp.nc4._files[idx]).name[5:8]}_{f.name[ind-3:]}'
+        )
         spiralScanFiles[i].rename(spiralScanDir.joinpath(fileName))
 
 
