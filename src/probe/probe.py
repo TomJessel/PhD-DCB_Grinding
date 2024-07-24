@@ -65,8 +65,7 @@ class PROBE:
             ax = plt_ax
             fig = ax.get_figure()
 
-        y_measured = self.probeData['AVGPROBE'].values - \
-            self.probeData['AVGPROBE'].iloc[0]
+        y_measured = self.probeData['AVGPROBE'].values
 
         ax.plot(y_measured, label='Cumulative DOC')
 
