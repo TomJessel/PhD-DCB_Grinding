@@ -218,7 +218,7 @@ def renameSpiralScans(exp, spiralScanDir, spiralScanFiles):
     for i, (ts_spiral, f) in enumerate(zip(timeStamp_Sprial, spiralScanFiles)):
         # find the nearest NC4 file
         idx = np.argmin([abs(ts_spiral - t0) for t0 in timeStamp_NC4])
-        fileName = f'Cut_{Path(exp.nc4._files[idx]).name[5:8]}_{f[i].name}'
+        fileName = f'Cut_{Path(exp.nc4._files[idx]).name[5:8]}_{f.name}'
         spiralScanFiles[i].rename(spiralScanDir.joinpath(fileName))
 
 
@@ -232,12 +232,14 @@ def processExpSprialScans(exp,
                           calFeedrate=60,
                           ):
     spiralScanDir = Path(exp.dataloc).joinpath('Spiral Scans')
-    assert spiralScanDir.exists(), "Spiral Scan directory not found."
+    assert spiralScanDir.exists(), \
+        f"Spiral Scan directory not found: {spiralScanDir}"
     spiralScanFiles = list(spiralScanDir.glob("*.tdms"))
     
     # if files not already renamed
     if not all([f.name.startswith('Cut') for f in spiralScanFiles]):
         renameSpiralScans(exp, spiralScanDir, spiralScanFiles)
+        spiralScanFiles = list(spiralScanDir.glob("*.tdms"))
     
     # process the renamed files
     nc = []
