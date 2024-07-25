@@ -207,6 +207,7 @@ def renameSpiralScans(exp, spiralScanDir, spiralScanFiles):
     # find closest NC4 file for each spiral scan, via timestamps
     timeStamp_Sprial = []
     timeStamp_NC4 = []
+    # todo join these two for loops into one. do nc4 first then one loop for spiral
     for f in spiralScanFiles:
         ind = re.search(r'^.*202', f.name).end()
         timeStamp_Sprial.append(datetime.strptime(f.name[ind - 3:ind + 16],
@@ -219,6 +220,7 @@ def renameSpiralScans(exp, spiralScanDir, spiralScanFiles):
 
     for i, (ts_spiral, f) in enumerate(zip(timeStamp_Sprial, spiralScanFiles)):
         # find the nearest NC4 file
+        ind = re.search(r'^.*202', f.name).end()
         idx = np.argmin([abs(ts_spiral - t0) for t0 in timeStamp_NC4])
         fileName = (
             f'Cut_{Path(exp.nc4._files[idx]).name[5:8]}_{f.name[ind-3:]}'
