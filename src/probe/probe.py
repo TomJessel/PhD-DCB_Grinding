@@ -58,6 +58,9 @@ class PROBE:
         df['AVGPROBE'] = df['AVGPROBE'] - df['AVGPROBE'].iloc[0]
         return df
     
+    def refreshProbeData(self):
+        self.probeData = self.readProbeCSV(self.filepath)
+    
     def plot_probe_DOC(self, plt_ax=None):
         if plt_ax is None:
             fig, ax = plt.subplots()
