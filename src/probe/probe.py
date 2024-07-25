@@ -31,6 +31,7 @@ class PROBE:
         self.doc = doc
         self.tol = tol
 
+        # todo add cumulative error to probe Data
         self.probeData = self.readProbeCSV(self.filepath)
 
     @property

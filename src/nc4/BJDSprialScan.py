@@ -248,6 +248,7 @@ def processExpSprialScans(exp,
         spiralScanFiles = list(spiralScanDir.glob("*.tdms"))
     
     # process the renamed files
+    # todo make this mp
     nc = []
     for f in tqdm(spiralScanFiles):
         sc = NC4SpiralScan(scanPath=f,
