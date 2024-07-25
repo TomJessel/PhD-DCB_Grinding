@@ -419,7 +419,7 @@ class Experiment:
 
         # if this test has probe data, add it to the feature matrix
         if self.__probe_bool:
-            cols.append(['AVGPROBE', 'PROBEDIFF'])
+            cols.extend(['Avg probe', 'Probe diff'])
             avgProbe = np.array(self.probe.probeData['AVGPROBE'])
             probeDiff = np.array(self.probe.probeData['PROBEDIFF'])
             m = np.vstack((m, avgProbe, probeDiff))
