@@ -7,6 +7,7 @@ from nptdms import TdmsFile
 from tqdm import tqdm
 from datetime import datetime
 import re
+import multiprocessing as mp
 
 from src import config
 
@@ -207,25 +208,28 @@ def renameSpiralScans(exp, spiralScanDir, spiralScanFiles):
     # find closest NC4 file for each spiral scan, via timestamps
     timeStamp_Sprial = []
     timeStamp_NC4 = []
-    # todo join these two for loops into one. do nc4 first then one loop for spiral
-    for f in spiralScanFiles:
-        ind = re.search(r'^.*202', f.name).end()
-        timeStamp_Sprial.append(datetime.strptime(f.name[ind - 3:ind + 16],
-                                                  "%Y_%m_%d_%H_%M_%S",
-                                                  ))
     for f in exp.nc4._files:
         timeStamp_NC4.append(datetime.strptime(Path(f).name[9:28],
                                                "%Y_%m_%d_%H_%M_%S",
                                                ))
 
-    for i, (ts_spiral, f) in enumerate(zip(timeStamp_Sprial, spiralScanFiles)):
+    for i, f in enumerate(spiralScanFiles):
         # find the nearest NC4 file
         ind = re.search(r'^.*202', f.name).end()
-        idx = np.argmin([abs(ts_spiral - t0) for t0 in timeStamp_NC4])
+        timeStamp_Sprial = datetime.strptime(f.name[ind - 3:ind + 16],
+                                             "%Y_%m_%d_%H_%M_%S",
+                                             )
+        idx = np.argmin([abs(timeStamp_Sprial - t0) for t0 in timeStamp_NC4])
         fileName = (
             f'Cut_{Path(exp.nc4._files[idx]).name[5:8]}_{f.name[ind-3:]}'
         )
         spiralScanFiles[i].rename(spiralScanDir.joinpath(fileName))
+
+
+def _mpNC4Scan(args):
+    nc = NC4SpiralScan(*args)
+    nc.scanMat
+    return nc
 
 
 def processExpSprialScans(exp,
@@ -248,20 +252,23 @@ def processExpSprialScans(exp,
         spiralScanFiles = list(spiralScanDir.glob("*.tdms"))
     
     # process the renamed files
-    # todo make this mp
-    nc = []
-    for f in tqdm(spiralScanFiles):
-        sc = NC4SpiralScan(scanPath=f,
-                           sCurvePath=SCPath,
-                           toolNomDia=nomDia,
-                           zSpiralFeedrate=feedrate,
-                           spindleSpeed=rpm,
-                           fs=fs,
-                           yOffset=yOffset,
-                           scFeedrate=calFeedrate,
-                           )
-        sc.scanMat
-        nc.append(sc)
+    inputArgs = [SCPath,
+                 fs,
+                 rpm,
+                 feedrate,
+                 nomDia,
+                 yOffset,
+                 calFeedrate,
+                 ]
+    inputmp = [(f, *inputArgs) for f in spiralScanFiles]
+    
+    with mp.Pool() as p:
+        nc = list(tqdm(p.imap(_mpNC4Scan,
+                              inputmp,
+                              ),
+                       total=len(spiralScanFiles),
+                       desc="Processing Spiral Scans",
+                       ))
     return nc
 
 
