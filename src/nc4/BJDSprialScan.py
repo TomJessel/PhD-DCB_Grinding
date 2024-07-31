@@ -8,8 +8,9 @@ from tqdm import tqdm
 from datetime import datetime
 import re
 import multiprocessing as mp
+from matplotlib.widgets import Slider
 
-from src import config
+from src import config, load
 
 HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = config.config_paths()
 
@@ -272,6 +273,66 @@ def processExpSprialScans(exp,
     return nc
 
 
+class spiralPlotter:
+    def __init__(self, expScans, testNo):
+        self.fig, self.ax = plt.subplots()
+        self.expScans = expScans
+        self.z = np.arange(0, len(expScans[0].scanMat)) * \
+            (expScans[0]._zSpiralFeedrate / 60)
+        self.theta = np.linspace(0, 360, expScans[0].scanMat.shape[1])
+        self.testNo = testNo
+
+    def plot(self):
+        self.im = self.ax.imshow(self.expScans[0].scanMat,
+                                 aspect='auto',
+                                 cmap='jet',
+                                 interpolation='none',
+                                 origin='lower',
+                                 vmin=0.61,
+                                 vmax=0.68,
+                                 extent=[self.theta[0], self.theta[-1],
+                                         self.z[0], self.z[-1]
+                                         ],
+                                 )
+        self.ax.set_xlabel('Angle (deg)')
+        self.ax.set_ylabel('Z (mm)')
+        self.ax.set_title(f'Test {self.testNo} - Cut 0')
+
+        self.fig.subplots_adjust(bottom=0.2)
+        self.slider = self.addSlider()
+        # plt.show()
+
+    def addSlider(self):
+        ax = self.fig.add_axes([0.1, 0.02, 0.8, 0.03])
+        slider = Slider(ax,
+                        'File',
+                        0,
+                        (len(self.expScans) - 1),
+                        valinit=0,
+                        valstep=1,
+                        valfmt='%d',
+                        )
+
+        def update(val):
+            ix = int(self.slider.val)
+            # ix = int(self.slider.val / 5)
+            self.im.set_data(self.expScans[ix].scanMat)
+            self.ax.set_title(f'Test {self.testNo} - Cut {ix * 5}')
+            self.fig.canvas.draw_idle()
+
+        def arrowUpdateIm(event):
+            ix = int(self.slider.val)
+            if event.key == 'up':
+                ix += 1
+            elif event.key == 'down':
+                ix -= 1
+            self.slider.set_val(ix)
+
+        slider.on_changed(update)
+        self.fig.canvas.mpl_connect('key_press_event', arrowUpdateIm)
+        return slider
+ 
+
 if __name__ == "__main__":
 
     NOM_DIA = 1.3
@@ -286,29 +347,45 @@ if __name__ == "__main__":
     )
     assert SCPath.exists(), "SCurve calibration file not found."
 
-    # AE testing Folder
-    TEST_FOLDER = BASE_DIR.joinpath(r'AE/Testing')
+    exp = load('Test 17')
 
-    assert TEST_FOLDER.exists(), "Testing folder not found."
+    sprialScans = processExpSprialScans(exp,
+                                        SCPath,
+                                        nomDia=NOM_DIA,
+                                        feedrate=FEEDRATE,
+                                        rpm=RPM,
+                                        fs=FS,
+                                        yOffset=YOFFSET,
+                                        calFeedrate=CALFEEDRATE,
+                                        )
 
-    dataFiles = list(
-        TEST_FOLDER.joinpath(
-            r'24_07_03_weartest_D1.3_#1000/Spiral Scans'
-        ).glob('*.tdms')
-    )
+    fig, ax = sprialScans[0].plotSpiralScan(saveFig=False,
+                                            Zsection=1.0,
+                                            )
 
-    for f in tqdm(dataFiles[:]):
-        nc = NC4SpiralScan(
-            scanPath=f,
-            sCurvePath=SCPath,
-            fs=FS,
-            spindleSpeed=RPM,
-            zSpiralFeedrate=FEEDRATE,
-            toolNomDia=NOM_DIA,
-            yOffset=YOFFSET,
-        )
-        fig, ax = nc.plotSpiralScan(saveFig=True,
-                                    Zsection=1.0,
-                                    )
-        plt.close(fig)
+    # # AE testing Folder
+    # TEST_FOLDER = BASE_DIR.joinpath(r'AE/Testing')
+
+    # assert TEST_FOLDER.exists(), "Testing folder not found."
+
+    # dataFiles = list(
+    #     TEST_FOLDER.joinpath(
+    #         r'24_07_03_weartest_D1.3_#1000/Spiral Scans'
+    #     ).glob('*.tdms')
+    # )
+
+    # for f in tqdm(dataFiles[:]):
+    #     nc = NC4SpiralScan(
+    #         scanPath=f,
+    #         sCurvePath=SCPath,
+    #         fs=FS,
+    #         spindleSpeed=RPM,
+    #         zSpiralFeedrate=FEEDRATE,
+    #         toolNomDia=NOM_DIA,
+    #         yOffset=YOFFSET,
+    #     )
+    #     fig, ax = nc.plotSpiralScan(saveFig=True,
+    #                                 Zsection=1.0,
+    #                                 )
+    #     plt.close(fig)
     # plt.show()
