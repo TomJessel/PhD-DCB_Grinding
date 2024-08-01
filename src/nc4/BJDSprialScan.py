@@ -263,7 +263,7 @@ def processExpSprialScans(exp,
                  ]
     inputmp = [(f, *inputArgs) for f in spiralScanFiles]
     
-    with mp.Pool() as p:
+    with mp.Pool(processes=4) as p:
         nc = list(tqdm(p.imap(_mpNC4Scan,
                               inputmp,
                               ),
@@ -304,6 +304,7 @@ class spiralPlotter:
 
     def addSlider(self):
         ax = self.fig.add_axes([0.1, 0.02, 0.8, 0.03])
+        # todo limit slider from exceeding the number of scans
         slider = Slider(ax,
                         'File',
                         0,
@@ -315,16 +316,15 @@ class spiralPlotter:
 
         def update(val):
             ix = int(self.slider.val)
-            # ix = int(self.slider.val / 5)
             self.im.set_data(self.expScans[ix].scanMat)
             self.ax.set_title(f'Test {self.testNo} - Cut {ix * 5}')
             self.fig.canvas.draw_idle()
 
         def arrowUpdateIm(event):
             ix = int(self.slider.val)
-            if event.key == 'up':
+            if event.key == 'right':
                 ix += 1
-            elif event.key == 'down':
+            elif event.key == 'left':
                 ix -= 1
             self.slider.set_val(ix)
 
