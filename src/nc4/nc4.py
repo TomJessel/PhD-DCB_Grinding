@@ -258,6 +258,7 @@ class NC4:
         except IOError:
             with open(pic_name, 'wb') as f:
                 pickle.dump(fig, f)
+        # todo make interactive mplcursor optional
         mplcursors.cursor(hover=2)
         return fig
     
@@ -328,6 +329,7 @@ class NC4:
             except IOError:
                 with open(pic_name, 'wb') as f:
                     pickle.dump(fig, f)
+        # todo make interactive mplcursor optional
         mplcursors.cursor(multiple=True)
         if plt_ax is None:
             return fig, ax
@@ -439,6 +441,13 @@ class NC4:
                     (sno * seclensamples):((sno + 1) * seclensamples)
                 ]
             else:
+                # check if padding required
+                if ((sno + 1) * seclensamples + gapsamples) > len(voltage):
+                    pad_n = (
+                        ((sno + 1) * seclensamples + gapsamples) - len(voltage)
+                    )
+                    voltage = np.pad(voltage, (0, pad_n), 'constant')
+                    
                 vsec[sno][:] = voltage[
                     ((sno * seclensamples) + gapsamples):
                     (((sno + 1) * seclensamples) + gapsamples)
