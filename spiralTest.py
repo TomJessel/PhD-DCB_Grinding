@@ -18,7 +18,7 @@ if __name__ == "__main__":
     )
     assert SCPath.exists(), "SCurve calibration file not found."
 
-    exp = load('Test 18')
+    exp = load('Test 19')
 
     sprialScans = processExpSprialScans(exp,
                                         SCPath,
@@ -30,6 +30,6 @@ if __name__ == "__main__":
                                         calFeedrate=CALFEEDRATE,
                                         )
     
-    scPlotter = spiralPlotter(sprialScans, 18).plot()
+    scPlotter = spiralPlotter(sprialScans, exp.test_info.testno).plot()
 
     plt.show()
