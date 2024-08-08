@@ -664,7 +664,7 @@ class RMS:
             )
             f_locs = pd.read_csv(ref_test_loc, sep=',', index_col=0)
             f_locs = f_locs.to_dict()['Obj location']
-            f_locs = {k: CODE_DIR.parents[1].joinpath(v)
+            f_locs = {k: BASE_DIR.joinpath(r'AE/Testing', v)
                       for k, v in f_locs.items()}
             try:
                 self._folder = f_locs[exp_obj.lower().replace(' ', '')].parent
