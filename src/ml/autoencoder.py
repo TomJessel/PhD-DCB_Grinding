@@ -535,8 +535,8 @@ class AutoEncoder():
 
     def score(
             self,
-            label: str = None,
-            x: np.ndarray = None,
+            label: Union[str, None] = None,
+            x: Union[np.ndarray, None] = None,
             tb: bool = True,
             print_score: bool = True,
     ) -> tuple[tuple[np.ndarray, np.ndarray], dict]:
