@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pathlib import Path
 import time
+from collections import deque
 import tqdm
 import tensorflow as tf
 from keras.models import Model
@@ -397,7 +398,71 @@ class MLP_Model(Base_Model):
 
 class LSTM_Model(Base_Model):
     #todo add LSTM model
-    pass
+    def __init__(self,
+                 testFrac: float = 0.33,
+                 **kwargs,
+                 ):
+        super().__init__(**kwargs)
+        
+        if self._inputData is None:
+            raise ValueError("Data is required for pre-processing.")
+
+        if 'seqLen' not in self.modelParams:
+            raise ValueError(
+                "Sequence length must be provided in model params."
+            )
+
+        self.pre_process_data(seqLen=self.modelParams['seqLen'],
+                              testFrac=testFrac,
+                              )
+
+        # self.get_model()
+
+    @staticmethod
+    def sequence_data(inputData: np.ndarray,
+                      targetData: np.ndarray,
+                      seqLen: int,
+                      ):
+        seqDataInput = []
+        seqDataOutput = []
+        prev_points = deque(maxlen=seqLen)
+
+        for inp, out in zip(inputData, targetData):
+            prev_points.append(inp)
+            if len(prev_points) == seqLen:
+                seqDataInput.append(np.array(prev_points))
+                seqDataOutput.append(out)
+        return np.array(seqDataInput), np.array(seqDataOutput)
+
+    def pre_process_data(self,
+                         seqLen: int,
+                         testFrac: float = 0.33,
+                         scaler: callable = MinMaxScaler,
+                         ):
+        idx = np.arange(self._inputData.shape[0])
+        train_idx, test_idx = train_test_split(idx,
+                                               test_size=testFrac,
+                                               random_state=self._randomState,
+                                               shuffle=self._shuffle,
+                                               )
+
+        self._trainIdx = train_idx
+        self._testIdx = test_idx
+
+        # Scale X input data only based on training data split
+        self._scaler = scaler()
+        self._scaler.fit(self._inputData[train_idx, :])
+        self._inputData = self._scaler.transform(self._inputData)
+
+        seqData = self.sequence_data(self._inputData,
+                                     self._targetData,
+                                     seqLen,
+                                     )
+        # todo need to remove overlapping parts between tests
+        return seqData
+
+    def get_model(self, ):
+        pass
 
 
 if __name__ == "__main__":
@@ -420,10 +485,6 @@ if __name__ == "__main__":
                     tb=False,
                     )
     mlp.summary()
-    mlp.compile(optimizer='adam',
-                loss='mse',
-                metrics=['mae'],
-                )
     history = mlp.fit(mlp.trainData[0],
                       mlp.trainData[1],
                       epochs=2,
