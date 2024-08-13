@@ -30,6 +30,7 @@ class Base_Model(Model):
                  tbLogDir: str | None = None,
                  randomState: int | None = None,
                  shuffle: bool = True,
+                 scaler: callable = None,
                  **kwargs,
                  ):
         super().__init__(**kwargs)
@@ -40,6 +41,11 @@ class Base_Model(Model):
         self._shuffle: bool = shuffle
         self._trainIdx: list[int] | None = None
         self._testIdx: list[int] | None = None
+
+        if scaler is None:
+            self._scaler = MinMaxScaler
+        else:
+            self._scaler = scaler
 
         # Initialse tensorboard directory
         self._tbLogDir: Path = Path(TB_DIR)
@@ -276,7 +282,9 @@ class MLP_Model(Base_Model):
 
         if self._inputData is None:
             raise ValueError("Data is required for pre-processing.")
-        self.pre_process_data(testFrac=testFrac)
+        self.pre_process_data(testFrac=testFrac,
+                              scaler=self._scaler,
+                              )
 
         self.get_model()
 
@@ -400,6 +408,7 @@ class LSTM_Model(Base_Model):
     #todo add LSTM model
     def __init__(self,
                  testFrac: float = 0.33,
+                 endPointsData: list[int] | None = None,
                  **kwargs,
                  ):
         super().__init__(**kwargs)
@@ -412,11 +421,57 @@ class LSTM_Model(Base_Model):
                 "Sequence length must be provided in model params."
             )
 
+        if endPointsData is None:
+            raise ValueError(
+                "End points of each dataset must be provided "
+                "for proper sequencing without overlap."
+            )
+        assert np.cumsum(endPointsData)[-1] == self._inputData.shape[0], (
+            "End points of each dataset must sum to "
+            "the total number of data points."
+        )
+
         self.pre_process_data(seqLen=self.modelParams['seqLen'],
                               testFrac=testFrac,
+                              endPointsData=endPointsData,
+                              scaler=self._scaler,
                               )
 
         # self.get_model()
+
+    @property
+    def seqData(self):
+        try:
+            return (self._seqInputData[self._seqIdx, :, :],
+                    self._seqTargetData[self._seqIdx, :],
+                    )
+        except AttributeError:
+            raise AttributeError(
+                "Sequence data not found. "
+                "Please run pre_process_data() method."
+            )
+
+    @property
+    def trainData(self):
+        try:
+            return (self._seqInputData[self._trainIdx, :, :],
+                    self._seqTargetData[self._trainIdx, :]
+                    )
+        except AttributeError:
+            raise AttributeError(
+                "Train data not found. Please run pre_process_data() method."
+            )
+
+    @property
+    def testData(self):
+        try:
+            return (self._seqInputData[self._testIdx, :, :],
+                    self._seqTargetData[self._testIdx, :]
+                    )
+        except AttributeError:
+            raise AttributeError(
+                "Test data not found. Please run pre_process_data() method."
+            )
 
     @staticmethod
     def sequence_data(inputData: np.ndarray,
@@ -436,18 +491,32 @@ class LSTM_Model(Base_Model):
 
     def pre_process_data(self,
                          seqLen: int,
+                         endPointsData: list[int],
                          testFrac: float = 0.33,
                          scaler: callable = MinMaxScaler,
                          ):
-        idx = np.arange(self._inputData.shape[0])
+        # index starts from (seqLen -1) to allow for deque to fill
+        idx = np.arange(self._inputData.shape[0] - (seqLen - 1))
+
+        # Remove overlapping of exps data to prevent weird learning
+        # If not removed it will include a sequence that increases in radius
+        # end idx of each test dataset to remove overlap
+        endPointsData = np.cumsum(endPointsData)
+        delIdx = []
+        for end in endPointsData[:-1]:
+            end = end - seqLen + 1
+            delIdx.extend(list(range(end, (end + (seqLen - 1)))))
+
+        try:
+            idx = np.delete(idx, delIdx)
+        except IndexError:
+            print('Overlapping sections between exps not removed!')
+
         train_idx, test_idx = train_test_split(idx,
                                                test_size=testFrac,
                                                random_state=self._randomState,
                                                shuffle=self._shuffle,
                                                )
-
-        self._trainIdx = train_idx
-        self._testIdx = test_idx
 
         # Scale X input data only based on training data split
         self._scaler = scaler()
@@ -458,10 +527,17 @@ class LSTM_Model(Base_Model):
                                      self._targetData,
                                      seqLen,
                                      )
-        # todo need to remove overlapping parts between tests
+
+        self._seqIdx = idx
+        self._trainIdx = train_idx
+        self._testIdx = test_idx
+
+        self._seqInputData = seqData[0]
+        self._seqTargetData = seqData[1]
         return seqData
 
     def get_model(self, ):
+        # todo add LSTM model creation
         pass
 
 
