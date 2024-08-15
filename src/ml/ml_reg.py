@@ -9,7 +9,7 @@ from collections import deque
 import tqdm
 import tensorflow as tf
 from keras.models import Model
-from keras.layers import Dense, Input, Dropout
+from keras.layers import Dense, Input, Dropout, LSTM
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 
@@ -79,7 +79,7 @@ class Base_Model(Model):
                 self._targetData = self._targetData.reshape(-1, 1)
 
     def summary(self, print_fn=None):
-        x = Input(shape=(self.trainData[0].shape[1],))
+        x = Input(shape=(self.trainData[0].shape[1:]))
         return Model(inputs=x, outputs=self.call(x)).summary(print_fn=print_fn)
 
     def score(self,
@@ -227,6 +227,7 @@ class Base_Model(Model):
                                                )
             )
 
+        print(f"Training model: {self.runName}")
         super().fit(x, y,
                     epochs=epochs,
                     batch_size=batch_size,
@@ -234,15 +235,14 @@ class Base_Model(Model):
                     verbose=verbose,
                     callbacks=callbacks,
                     )
+
         if self._tb:
             tb_writer = tf.summary.create_file_writer(str(self._tbLogDir))
             self._tb_model_desc(tb_writer)
 
     def _tb_model_desc(self, tb_writer):
         if isinstance(self.modelParams['nUnits'], int):
-            units = np.fill(self.modelParams['nLayers'],
-                            self.modelParams['nUnits'],
-                            )
+            units = self.modelParams['nLayers'] * [self.modelParams['nUnits']]
         else:
             units = self.modelParams['nUnits']
 
@@ -256,6 +256,7 @@ class Base_Model(Model):
                   'optimiser': self.compileParams['optimiser'],
 
                   }
+        # todo include seqlen to dict for output for LSTM models
 
         hp = ('### Model parameters:\n'
               '___\n'
@@ -294,9 +295,9 @@ class MLP_Model(Base_Model):
         if self.runName is None:
             t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
             if isinstance(self.modelParams['nUnits'], int):
-                units = np.fill(self.modelParams['nLayers'],
-                                self.modelParams['nUnits'],
-                                )
+                units = (self.modelParams['nLayers'] *
+                         [self.modelParams['nUnits']]
+                         )
             else:
                 units = self.modelParams['nUnits']
 
@@ -388,9 +389,9 @@ class MLP_Model(Base_Model):
             )
             self.mlpLayers.append(Dropout(rate=self.modelParams['dropout']))
 
-        self.mlpOutputs = []
-        for _ in range(self._nOutputs):
-            self.mlpOutputs.append(Dense(1, activation='linear'))
+        # self.mlpOutputs = []
+        # for _ in range(self._nOutputs):
+        #     self.mlpOutputs.append(Dense(1, activation='linear'))
 
         # Linear output layer for regression
         self.mlpLayers.append(Dense(self._nOutputs,
@@ -405,7 +406,7 @@ class MLP_Model(Base_Model):
 
 
 class LSTM_Model(Base_Model):
-    #todo add LSTM model
+    # todo check tb logging works for LSTM models
     def __init__(self,
                  testFrac: float = 0.33,
                  endPointsData: list[int] | None = None,
@@ -437,7 +438,39 @@ class LSTM_Model(Base_Model):
                               scaler=self._scaler,
                               )
 
-        # self.get_model()
+        self.get_model()
+
+        if self.compileParams:
+            self.compile()
+
+        if self.runName is None:
+            t = time.strftime("%Y%m%d-%H%M%S", time.localtime())
+            if isinstance(self.modelParams['nLSTMUnits'], int):
+                lstmUnits = (self.modelParams['nLSTMLayers'] *
+                             [self.modelParams['nLSTMUnits']]
+                             )
+            else:
+                lstmUnits = self.modelParams['nLSTMUnits']
+            
+            if isinstance(self.modelParams['nDenseUnits'], int):
+                denseUnits = (self.modelParams['nDenseLayers'] *
+                              [self.modelParams['nDenseUnits']]
+                              )
+            else:
+                denseUnits = self.modelParams['nDenseUnits']
+
+            units = np.concatenate((lstmUnits, denseUnits))
+
+            if 'dropout' in self.modelParams:
+                d = self.modelParams['dropout']
+            else:
+                d = 0.01
+
+            self.runName = (f'LSTM-{units}-D{d}-{t}')
+
+        self._tbLogDir = self._tbLogDir.joinpath('LSTM',
+                                                 self.runName,
+                                                 )
 
     @property
     def seqData(self):
@@ -537,8 +570,77 @@ class LSTM_Model(Base_Model):
         return seqData
 
     def get_model(self, ):
-        # todo add LSTM model creation
-        pass
+        if 'nLSTMLayers' not in self.modelParams:
+            self.modelParams['nLSTMLayers'] = 3
+        if 'nLSTMUnits' not in self.modelParams:
+            self.modelParams['nLSTMUnits'] = 32
+        if 'nDenseLayers' not in self.modelParams:
+            self.modelParams['nDenseLayers'] = 1
+        if 'nDenseUnits' not in self.modelParams:
+            self.modelParams['nDenseUnits'] = 32
+        if 'activation' not in self.modelParams:
+            self.modelParams['activation'] = 'relu'
+        if 'initMode' not in self.modelParams:
+            self.modelParams['initMode'] = 'glorot_uniform'
+        if 'dropout' not in self.modelParams:
+            self.modelParams['dropout'] = 0.01
+        if 'seqLen' not in self.modelParams:
+            self.modelParams['seqLen'] = 15
+
+        # Check no layers and units match
+        if isinstance(self.modelParams['nLSTMUnits'], list):
+            if (len(self.modelParams['nLSTMUnits']) !=
+                    self.modelParams['nLSTMLayers']):
+                raise ValueError(
+                    "Number of layers and units do not match."
+                )
+            nLSTMUnits = self.modelParams['nLSTMUnits']
+        elif isinstance(self.modelParams['nLSTMUnits'], int):
+            nLSTMUnits = ([self.modelParams['nLSTMUnits']] *
+                          self.modelParams['nLSTMLayers'])
+
+        if isinstance(self.modelParams['nDenseUnits'], list):
+            if (len(self.modelParams['nDenseUnits']) !=
+                    self.modelParams['nDenseLayers']):
+                raise ValueError(
+                    "Number of layers and units do not match."
+                )
+            nDenseUnits = self.modelParams['nDenseUnits']
+        elif isinstance(self.modelParams['nDenseUnits'], int):
+            nDenseUnits = ([self.modelParams['nDenseUnits']] *
+                           self.modelParams['nDenseLayers'])
+
+        self.lstmLayers = []
+
+        for i, nUnit in enumerate(nLSTMUnits):
+            self.lstmLayers.append(
+                LSTM(nUnit,
+                     kernel_initializer=self.modelParams['initMode'],
+                     return_sequences=(True if i < len(nLSTMUnits) - 1
+                                       else False),
+                     ),
+            )
+            self.lstmLayers.append(Dropout(rate=self.modelParams['dropout']))
+
+        for nUnit in nDenseUnits:
+            self.lstmLayers.append(
+                Dense(nUnit,
+                      activation=self.modelParams['activation'],
+                      kernel_initializer=self.modelParams['initMode'],
+                      use_bias=True,
+                      )
+            )
+            self.lstmLayers.append(Dropout(rate=self.modelParams['dropout']))
+        
+        self.lstmLayers.append(Dense(self._nOutputs,
+                                     activation='linear',
+                                     ))
+    
+    def call(self, inputs):
+        # Forward pass
+        for layer in self.lstmLayers:
+            inputs = layer(inputs)
+        return inputs
 
 
 if __name__ == "__main__":
