@@ -89,7 +89,7 @@ class PROBE:
                  )
 
         ax.set_ylim(0,)
-        ax2.set_ylim(0,)
+        # ax2.set_ylim(0,)
         ax.set_xlim(0,)
 
         ax.set_ylabel('Radial DOC (mm)')
