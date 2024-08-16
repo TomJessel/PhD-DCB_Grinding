@@ -8,6 +8,7 @@ import time
 from collections import deque
 import tqdm
 import tensorflow as tf
+import keras
 from keras.models import Model
 from keras.layers import Dense, Input, Dropout, LSTM
 from sklearn.preprocessing import MinMaxScaler
@@ -87,7 +88,7 @@ class Base_Model(Model):
               y: np.ndarray | None = None,
               printout: bool = True,
               ) -> dict:
-        
+
         if x is None and y is None:
             x, y = self.testData
         elif x is None or y is None:
@@ -101,7 +102,7 @@ class Base_Model(Model):
             if 'metrics' in self.compileParams:
                 metrics.extend(self.compileParams['metrics'])
 
-            metrics = [tf.keras.metrics.get(metric) for metric in metrics]
+            metrics = [keras.metrics.get(metric) for metric in metrics]
             sc = {metric.name: metric(y_true, y_pred).numpy()
                   for metric in metrics}
             return sc
@@ -139,7 +140,7 @@ class Base_Model(Model):
                     print(f"Output {i+1}:")
                     for key, val in score.items():
                         print(f"\t{key}: {val:.4f}")
-            
+
         if self._tb:
             # todo add seperate scores for each output to tb
             tb_writer = tf.summary.create_file_writer(str(self._tbLogDir))
@@ -150,7 +151,7 @@ class Base_Model(Model):
                          )
             for key, val in score_all.items():
                 md_scores += f"| {key} | {val:.4f} |\n"
-            
+
             if self._nOutputs > 1:
                 md_scores += ('\n#### Individual Outputs\n'
                               '| Output | Metric | Value |\n'
@@ -166,15 +167,16 @@ class Base_Model(Model):
         return score_all, score_outputs
 
     def plot_loss(self):
-        if self.history is not None:
+        if self._history is not None:
             fig, ax = plt.subplots()
-            ax.plot(self.history.history['loss'], label='train')
-            if 'val_loss' in self.history.history.keys():
-                ax.plot(self.history.history['val_loss'], label='validation')
+            ax.plot(self._history.history['loss'], label='train')
+            if 'val_loss' in self._history.history.keys():
+                ax.plot(self._history.history['val_loss'], label='validation')
             ax.legend()
             ax.set_xlabel('Epoch')
             ax.set_ylabel('Loss')
             return fig, ax
+        return None
 
     def compile(self,
                 optimiser: str = 'adam',
@@ -187,10 +189,13 @@ class Base_Model(Model):
         if 'loss' not in self.compileParams:
             self.compileParams['loss'] = loss
         if 'metrics' not in self.compileParams:
-            self.compileParams['metrics'] = ['root_mean_squared_error',
-                                             'mean_absolute_error',
-                                             'r2_score',
-                                             ]
+            if metrics is not None:
+                self.compileParams['metrics'] = metrics
+            else:
+                self.compileParams['metrics'] = ['root_mean_squared_error',
+                                                 'mean_absolute_error',
+                                                 'r2_score',
+                                                 ]
 
         super().compile(optimizer=self.compileParams['optimizer'],
                         loss=self.compileParams['loss'],
@@ -210,6 +215,8 @@ class Base_Model(Model):
         if x is None and y is None:
             x, y = self.trainData
 
+        print(f"Training model: {self.runName}")
+
         if callbacks is None:
             callbacks = [tqdm.keras.TqdmCallback(verbose=verbose,
                                                  tqdm_class=tqdm.tqdm,
@@ -222,41 +229,26 @@ class Base_Model(Model):
 
         if self._tb:
             callbacks.append(
-                tf.keras.callbacks.TensorBoard(log_dir=str(self._tbLogDir),
-                                               histogram_freq=1,
-                                               )
+                keras.callbacks.TensorBoard(log_dir=str(self._tbLogDir),
+                                            histogram_freq=1,
+                                            )
             )
 
-        print(f"Training model: {self.runName}")
-        super().fit(x, y,
-                    epochs=epochs,
-                    batch_size=batch_size,
-                    validation_split=validation_split,
-                    verbose=verbose,
-                    callbacks=callbacks,
-                    )
+        self._history = super().fit(x, y,
+                                    epochs=epochs,
+                                    batch_size=batch_size,
+                                    validation_split=validation_split,
+                                    verbose=verbose,
+                                    callbacks=callbacks,
+                                    **kwargs,
+                                    )
 
         if self._tb:
             tb_writer = tf.summary.create_file_writer(str(self._tbLogDir))
             self._tb_model_desc(tb_writer)
 
     def _tb_model_desc(self, tb_writer):
-        if isinstance(self.modelParams['nUnits'], int):
-            units = self.modelParams['nLayers'] * [self.modelParams['nUnits']]
-        else:
-            units = self.modelParams['nUnits']
-
-        params = {'epochs': self.fitParams['epochs'],
-                  'batch_size': self.fitParams['batch_size'],
-                  'units': units,
-                  'init_mode': self.modelParams['initMode'],
-                  'activation': self.modelParams['activation'],
-                  'dropout': self.modelParams['dropout'],
-                  'loss': self.compileParams['loss'],
-                  'optimiser': self.compileParams['optimiser'],
-
-                  }
-        # todo include seqlen to dict for output for LSTM models
+        params = self._tb_desc_dict()
 
         hp = ('### Model parameters:\n'
               '___\n'
@@ -306,7 +298,7 @@ class MLP_Model(Base_Model):
             else:
                 d = 0.01
 
-            self.runName = (f'MLP-{units}-D{d}-{t}')
+            self.runName = f'MLP-{units}-D{d}-{t}'
 
         self._tbLogDir = self._tbLogDir.joinpath('MLP',
                                                  self.runName,
@@ -404,9 +396,25 @@ class MLP_Model(Base_Model):
             inputs = layer(inputs)
         return inputs
 
+    def _tb_desc_dict(self):
+        if isinstance(self.modelParams['nUnits'], int):
+            units = self.modelParams['nLayers'] * [self.modelParams['nUnits']]
+        else:
+            units = self.modelParams['nUnits']
+
+        params = {'epochs': self.fitParams['epochs'],
+                  'batch_size': self.fitParams['batch_size'],
+                  'units': units,
+                  'init_mode': self.modelParams['initMode'],
+                  'activation': self.modelParams['activation'],
+                  'dropout': self.modelParams['dropout'],
+                  'loss': self.compileParams['loss'],
+                  'optimiser': self.compileParams['optimiser'],
+                  }
+        return params
+
 
 class LSTM_Model(Base_Model):
-    # todo check tb logging works for LSTM models
     def __init__(self,
                  testFrac: float = 0.33,
                  endPointsData: list[int] | None = None,
@@ -466,7 +474,7 @@ class LSTM_Model(Base_Model):
             else:
                 d = 0.01
 
-            self.runName = (f'LSTM-{units}-D{d}-{t}')
+            self.runName = f'LSTM-{units}-D{d}-{t}'
 
         self._tbLogDir = self._tbLogDir.joinpath('LSTM',
                                                  self.runName,
@@ -641,6 +649,33 @@ class LSTM_Model(Base_Model):
         for layer in self.lstmLayers:
             inputs = layer(inputs)
         return inputs
+
+    def _tb_desc_dict(self):
+        if isinstance(self.modelParams['nLSTMUnits'], int):
+            lstmUnits = (self.modelParams['nLSTMLayers'] *
+                         [self.modelParams['nLSTMUnits']]
+                         )
+        else:
+            lstmUnits = self.modelParams['nLSTMUnits']
+
+        if isinstance(self.modelParams['nDenseUnits'], int):
+            denseUnits = (self.modelParams['nDenseLayers'] *
+                          [self.modelParams['nDenseUnits']]
+                          )
+        else:
+            denseUnits = self.modelParams['nDenseUnits']
+
+        params = {'epochs': self.fitParams['epochs'],
+                  'batch_size': self.fitParams['batch_size'],
+                  'lstm_units': lstmUnits,
+                  'dense_units': denseUnits,
+                  'init_mode': self.modelParams['initMode'],
+                  'activation': self.modelParams['activation'],
+                  'dropout': self.modelParams['dropout'],
+                  'loss': self.compileParams['loss'],
+                  'optimiser': self.compileParams['optimiser'],
+                  }
+        return params
 
 
 if __name__ == "__main__":
