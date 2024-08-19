@@ -2,21 +2,24 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
+import multiprocessing as mp
+from functools import partial
 from pathlib import Path
 import time
 from collections import deque
 import tqdm
+from tqdm.keras import TqdmCallback
 import tensorflow as tf
 import keras
 from keras.models import Model
 from keras.layers import Dense, Input, Dropout, LSTM
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold, RepeatedKFold
 
 from src import config
 
 HOME_DIR, BASE_DIR, CODE_DIR, TB_DIR, RMS_DATA_DIR = config.config_paths()
+
 
 # Regression Models
 
@@ -27,6 +30,7 @@ class Base_Model(Model):
                  targetData: np.ndarray | None,
                  modelParams: dict | None,
                  compileParams: dict | None = None,
+                 fitParams: dict | None = None,
                  tb: bool = True,
                  tbLogDir: str | None = None,
                  randomState: int | None = None,
@@ -64,6 +68,20 @@ class Base_Model(Model):
         else:
             self.compileParams = None
 
+        if fitParams:
+            self.fitParams = fitParams
+        else:
+            self.fitParams = {}
+        
+        if 'epochs' not in self.fitParams:
+            self.fitParams['epochs'] = 100
+        if 'batch_size' not in self.fitParams:
+            self.fitParams['batch_size'] = 32
+        if 'validation_split' not in self.fitParams:
+            self.fitParams['validation_split'] = 0.1
+        if 'verbose' not in self.fitParams:
+            self.fitParams['verbose'] = 0
+        
         # Initialise input and target data
         self._inputData: np.ndarray | None = inputData
         self._targetData: np.ndarray | None = targetData
@@ -86,9 +104,10 @@ class Base_Model(Model):
     def score(self,
               x: np.ndarray | None = None,
               y: np.ndarray | None = None,
+              model: Model | None = None,
               printout: bool = True,
               ) -> dict:
-
+        
         if x is None and y is None:
             x, y = self.testData
         elif x is None or y is None:
@@ -107,7 +126,7 @@ class Base_Model(Model):
                   for metric in metrics}
             return sc
 
-        pred = self.predict(x)
+        pred = self.predict(x, verbose=0)
 
         score_all = _score(self, y, pred)
         score_outputs = []
@@ -142,7 +161,6 @@ class Base_Model(Model):
                         print(f"\t{key}: {val:.4f}")
 
         if self._tb:
-            # todo add seperate scores for each output to tb
             tb_writer = tf.summary.create_file_writer(str(self._tbLogDir))
             md_scores = ('### Scores - Test Data\n'
                          '#### Combined Outputs\n'
@@ -205,9 +223,9 @@ class Base_Model(Model):
     def fit(self,
             x: np.ndarray | None = None,
             y: np.ndarray | None = None,
-            epochs: int = 100,
-            batch_size: int = 32,
-            validation_split: float = 0.1,
+            epochs: int | None = None,
+            batch_size: int | None = None,
+            validation_split: float | None = None,
             verbose: int = 0,
             callbacks: list | None = None,
             **kwargs,
@@ -215,17 +233,20 @@ class Base_Model(Model):
         if x is None and y is None:
             x, y = self.trainData
 
-        print(f"Training model: {self.runName}")
-
         if callbacks is None:
-            callbacks = [tqdm.keras.TqdmCallback(verbose=verbose,
-                                                 tqdm_class=tqdm.tqdm,
-                                                 )]
+            help
+            callbacks = [TqdmCallback(verbose=verbose,
+                                      tqdm_class=tqdm.tqdm,
+                                      )]
 
-        self.fitParams = {'epochs': epochs,
-                          'batch_size': batch_size,
-                          'val_split': validation_split,
-                          }
+        if epochs is not None:
+            self.fitParams['epochs'] = epochs
+        if batch_size is not None:
+            self.fitParams['batch_size'] = batch_size
+        if validation_split is not None:
+            self.fitParams['validation_split'] = validation_split
+        if verbose != 0:
+            self.fitParams['verbose'] = verbose
 
         if self._tb:
             callbacks.append(
@@ -235,12 +256,8 @@ class Base_Model(Model):
             )
 
         self._history = super().fit(x, y,
-                                    epochs=epochs,
-                                    batch_size=batch_size,
-                                    validation_split=validation_split,
-                                    verbose=verbose,
                                     callbacks=callbacks,
-                                    **kwargs,
+                                    **self.fitParams,
                                     )
 
         if self._tb:
@@ -262,13 +279,146 @@ class Base_Model(Model):
         with tb_writer.as_default():
             tf.summary.text('Model Parameters:', hp, step=0)
 
+    def cv(self,
+           nSplits: int = 5,
+           nRepeats: int = 1,
+           randomState: int | None = None,
+           printOut: bool = True,
+           ):
+        # Use KFold or RepeatedKFold
+        if nRepeats == 1:
+            cv = KFold(n_splits=nSplits,
+                       shuffle=True,
+                       random_state=randomState,
+                       )
+        else:
+            cv = RepeatedKFold(n_splits=nSplits,
+                               n_repeats=nRepeats,
+                               random_state=randomState,
+                               )
+
+        # split training data into cv sets
+        cv_items = [(i, train, test) for i, (train, test)
+                    in enumerate(cv.split(self.trainData[0]))]
+
+        hold_tb = self._tb
+        hold_valSplit = self.fitParams['validation_split']
+        self._tb = False
+
+        outputs = []
+        for i, train_idx, test_idx in tqdm.tqdm(cv_items,
+                                                desc='CV',
+                                                total=len(cv_items),
+                                                ):
+            self.fit(x=self.trainData[0][train_idx],
+                     y=self.trainData[1][train_idx],
+                     validation_split=0,
+                     epochs=self.fitParams['epochs'],
+                     batch_size=self.fitParams['batch_size'],
+                     callbacks=[]
+                     )
+            outputs.append(self.score(x=self.trainData[0][test_idx],
+                                      y=self.trainData[1][test_idx],
+                                      printout=False,
+                                      )
+                           )
+            self._reinitialise()
+        self._tb = hold_tb
+        self.fitParams['validation_split'] = hold_valSplit
+
+        scores = [output[0] for output in outputs]
+        mean_scores = {key: np.mean([score[key] for score in scores])
+                       for key in scores[0].keys()}
+        std_scores = {key: np.std([score[key] for score in scores])
+                      for key in scores[0].keys()}
+        
+        _cv_scores = {'mean': mean_scores,
+                      'std': std_scores,
+                      'all': scores,
+                      }
+        
+        individualOutputScores = [output[1] for output in outputs]
+        for i in range(len(individualOutputScores[0])):
+            _cv_scores[f'output_{i+1}'] = {
+                'mean': {key: np.mean([score[i][key]
+                                       for score in individualOutputScores])
+                         for key in individualOutputScores[0][i].keys()},
+                'std': {key: np.std([score[i][key]
+                                    for score in individualOutputScores])
+                        for key in individualOutputScores[0][i].keys()},
+                'all': [score[i] for score in individualOutputScores],
+            }
+
+        if printOut:
+            print("\nCV Scores:")
+            print("Overall:")
+            for key, val in mean_scores.items():
+                print(f"\t{key}: {val:.4f} (\u00B1 {std_scores[key]:.4f})")
+            if len(individualOutputScores[0]) > 1:
+                print("\nIndividual Outputs:")
+                for i in range(len(individualOutputScores[0])):
+                    print(f"Output {i+1}:")
+                    for key, val in (_cv_scores[f'output_{i+1}']
+                                     ['mean'].items()):
+                        std = _cv_scores[f'output_{i+1}']['std'][key]
+                        print(f"\t{key}: {val:.4f} (\u00B1 {std:.4f})")
+        
+        if self._tb:
+            tb_writer = tf.summary.create_file_writer(str(self._tbLogDir))
+            md_scores = ('### Scores - CV\n'
+                         '#### Combined Outputs\n'
+                         '| Metric | Mean | Std |\n'
+                         '|--------|------|-----|\n'
+                         )
+            for key, val in mean_scores.items():
+                md_scores += f"| {key} | {val:.4f} | {std_scores[key]:.4f} |\n"
+            
+            if len(individualOutputScores[0]) > 1:
+                md_scores += ('\n#### Individual Outputs\n'
+                              '| Output | Metric | Mean | Std |\n'
+                              '|--------|--------|------|-----|\n'
+                              )
+                for i in range(len(individualOutputScores[0])):
+                    for key, val in (_cv_scores[f'output_{i+1}']
+                                     ['mean'].items()):
+                        std = _cv_scores[f'output_{i+1}']['std'][key]
+                        md_scores += (
+                            f"| {i+1} | {key} | {val:.4f} | {std:.4f} |\n"
+                        )
+
+            with tb_writer.as_default():
+                tf.summary.text('CV Scores', md_scores, step=1)
+
+                for key, val in mean_scores.items():
+                    tf.summary.scalar(f'CV Overall/CV {key}', val, step=1)
+                step = tf.convert_to_tensor(0, dtype=tf.int64)
+                for iter in scores:
+                    for key, val in iter.items():
+                        tf.summary.scalar(f'cv_iter/CV {key}', val, step=step)
+                    step += 1
+
+        return _cv_scores
+
+    def _reinitialise(self):
+        for lay in self.layers:
+            if isinstance(lay, tf.keras.Model):
+                self._reinitialise(lay)
+                continue
+            if hasattr(lay, "kernel_initializer"):
+                lay.kernel.assign(lay.kernel_initializer(tf.shape(lay.kernel)))
+            if hasattr(lay, "bias_initializer"):
+                lay.bias.assign(lay.bias_initializer(tf.shape(lay.bias)))
+            if hasattr(lay, "recurrent_initializer"):
+                lay.recurrent_kernel.assign(
+                    lay.recurrent_initializer(tf.shape(lay.recurrent_kernel))
+                )
+
 
 class MLP_Model(Base_Model):
-    #todo add CV to model
     #todo add docstrings to functions
 
     def __init__(self,
-                 testFrac: float = 0.33,
+                 testFrac: float = 0.2,
                  **kwargs,
                  ):
         super().__init__(**kwargs)
@@ -389,7 +539,7 @@ class MLP_Model(Base_Model):
         self.mlpLayers.append(Dense(self._nOutputs,
                                     activation='linear',
                                     ))
-
+        
     def call(self, inputs):
         # Forward pass
         for layer in self.mlpLayers:
@@ -693,7 +843,7 @@ if __name__ == "__main__":
                                                'r2_score',
                                                ],
                                    },
-                    inputData=exampleData,
+                    inputData=exampleData[:, 2:],
                     targetData=exampleData[:, :2],
                     tb=False,
                     )
