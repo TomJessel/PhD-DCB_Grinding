@@ -16,3 +16,5 @@ test18,24_07_31_weartest_D1.3_#1000/Test 18.pickle
 test19,24_08_05_weartest_D1.3_#1000/Test 19.pickle
 test20,24_08_13_weartest_D1.3_#1000/Test 20.pickle
 test21,24_08_14_weartest_D1.3_#1000/Test 21.pickle
+test22,24_09_03_weartest_D1.3_#1000/Test 22.pickle
+test23,24_09_11_weartest_D1.3_#1000/Test 23.pickle

@@ -18,7 +18,7 @@ if __name__ == "__main__":
     )
     assert SCPath.exists(), "SCurve calibration file not found."
 
-    exp = load('Test 19')
+    exp = load('Test 21')
 
     sprialScans = processExpSprialScans(exp,
                                         SCPath,
