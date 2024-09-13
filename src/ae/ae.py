@@ -540,7 +540,7 @@ class AE:
             data = self.readAE(i)
             data = pd.DataFrame(data)
             v = data.pow(2).rolling(win_size).mean().apply(np.sqrt, raw=True)
-            v = v[1_000_000:41_000_000].to_numpy()
+            # v = v[499_999:].to_numpy()
             return v
 
         def mp4_conv(gifname: str) -> None:
