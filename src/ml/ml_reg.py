@@ -285,6 +285,8 @@ class Base_Model(Model):
            randomState: int | None = None,
            printOut: bool = True,
            ):
+        
+        # todo fix for LSTM model as reinitialise is not working
         # Use KFold or RepeatedKFold
         if nRepeats == 1:
             cv = KFold(n_splits=nSplits,
