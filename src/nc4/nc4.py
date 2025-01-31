@@ -336,7 +336,12 @@ class NC4:
         else:
             return ax
 
-    def plot_surf(self, fno: tuple = None, plt_ax=None) -> None:
+    def plot_surf(self,
+                  fno: tuple = None,
+                  plt_ax=None,
+                  vmin=None,
+                  vmax=None,
+                  ) -> None:
         """
         Plot surface of DCB radius over measurements in time.
 
@@ -369,7 +374,9 @@ class NC4:
                              r,
                              cmap='jet',
                              rasterized=True,
-                             shading='nearest'
+                             shading='nearest',
+                             vmax=vmax,
+                             vmin=vmin,
                              )
         fig.colorbar(surf, label='Radius (mm)')
         ax.set_title(
