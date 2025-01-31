@@ -71,11 +71,16 @@ class PROBE:
 
         y_measured = self.probeData['AVGPROBE'].values
 
-        ax.plot(y_measured, label='Cumulative DOC')
+        ax.plot(y_measured, label='Measured surface')
 
         x = np.arange(0, len(self.probeData))
         y_ideal = x * self.doc
-        ax.plot(x, y_ideal, 'C0', linestyle='--', alpha=0.5)
+        ax.plot(x, y_ideal,
+                'C0',
+                linestyle='--',
+                alpha=0.5,
+                label='Ideal surface pos',
+                )
 
         y_tol = (y_ideal + self.tol, y_ideal - self.tol)
         ax.fill_between(x, y_tol[0], y_tol[1],
@@ -84,7 +89,7 @@ class PROBE:
 
         ax2 = ax.twinx()
         ax2.plot(y_ideal - y_measured,
-                 color='C1', label='Cumulative Error',
+                 color='C1', label='Error',
                  alpha=0.75,
                  )
 
@@ -92,12 +97,12 @@ class PROBE:
         # ax2.set_ylim(0,)
         ax.set_xlim(0,)
 
-        ax.set_ylabel('Radial DOC (mm)')
+        ax.set_ylabel('Measured relative surface position (mm)')
         ax2.set_ylabel('Error (mm)')
         ax.set_xlabel('Cut No.')
 
         fig.legend(loc='upper center',
-                   ncol=2,
+                   ncol=3,
                    bbox_to_anchor=(0.5, -0.005),
                    )
         return fig, ax
