@@ -11,6 +11,7 @@ import tqdm
 from tqdm.keras import TqdmCallback
 
 import keras
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold
 from sklearn.preprocessing import MinMaxScaler
@@ -189,13 +190,21 @@ def plot_confusion_matrix(cm, std=None, classes=None, title=None, plt_ax=None):
         fig, ax = plt.subplots()
     else:
         ax = plt_ax
-    ax.imshow(cm, cmap='Blues', alpha=0.8)
+
+    cm_div = np.around(cm.astype('float') / cm.sum(axis=1)[:, np.newaxis], 3)
+    if std is not None:
+        std_div = np.around(
+            std.astype('float') / cm.sum(axis=1)[:, np.newaxis], 3
+        )
+
+    ax.imshow(cm_div, cmap='Blues', alpha=0.9)
     for ix in range(cm.shape[0]):
         for jx in range(cm.shape[1]):
             if std is not None:
-                txt = f'{cm.iloc[ix, jx]:.2f} +/- {std.iloc[ix, jx]:.2f}'
+                txt = f'{cm_div[ix, jx]:.2f} +/- {std_div[ix, jx]:.2f}'
+                txt += f'\n{round(cm[ix, jx])} +/- {round(std[ix, jx])}'
             else:
-                txt = f'{cm.iloc[ix, jx]:.2f}'
+                txt = f'{cm_div[ix, jx]:.2f}\n({cm[ix, jx]})'
             ax.text(x=jx, y=ix,
                     s=txt,
                     ha='center',
@@ -292,14 +301,9 @@ def _cv_model(model,
                         )
     y_pred = model.predict(cvData[0], verbose=0)
     y_pred_class = np.argmax(y_pred, axis=1)
-    cm_true = pd.Series(np.argmax(cvData[1], axis=1))
-    cm_pred = pd.Series(y_pred_class)
-    cm = pd.crosstab(cm_true[va_idx],
-                     cm_pred[va_idx],
-                     rownames=['True'],
-                     colnames=['Predicted'],
-                     )
-    cm = cm.div(cm.sum(axis=1), axis='index')
+    cm = confusion_matrix(np.argmax(cvData[1], axis=1),
+                          y_pred_class,
+                          )
     return sc, cm
 
 
@@ -376,16 +380,21 @@ def cv_model(cvNSplits,
     cv_sc_mean = {key: np.mean(val, axis=0) for key, val in sc.items()}
     cv_sc_std = {key: np.std(val, axis=0) for key, val in sc.items()}
     # Average CV confusion matrix
-    cv_cm = pd.concat(cv_cm, axis=0)
-    cv_cm_mean = cv_cm.groupby(cv_cm.index).mean()
-    cv_cm_std = cv_cm.groupby(cv_cm.index).std()
+    cm_shape = np.shape(cv_cm[0])
+    cv_cm = np.concatenate([cm.reshape(-1, 1) for cm in cv_cm], axis=1)
+    cv_cm_mean = np.mean(cv_cm, axis=1).reshape(cm_shape)
+    cv_cm_std = np.std(cv_cm, axis=1).reshape(cm_shape)
+
+    cv_cm_mean_div = np.around(
+        cv_cm_mean.astype('float') / cv_cm_mean.sum(axis=1)[:, np.newaxis], 3
+    )
 
     if printout:
         print('\nCross-Validation Evaluation:')
         for key, val in cv_sc_mean.items():
             print(f'{key.capitalize()}: {val} +/- {cv_sc_std[key]}')
         print('Cross-Validation Confusion Matrix:')
-        print(cv_cm_mean)
+        print(cv_cm_mean_div)
         print()
         fig, ax = plot_confusion_matrix(cv_cm_mean,
                                         std=cv_cm_std,
@@ -475,15 +484,13 @@ def model_evaluate(model,
     y_pred_class = np.argmax(y_pred, axis=1)
 
     # confusion matrix of test train and whole dataset
-    cm_true = pd.Series(np.argmax(datasets[1], axis=1))
-    cm_pred = pd.Series(y_pred_class)
 
-    cm = pd.crosstab(cm_true[idx_test],
-                     cm_pred[idx_test],
-                     rownames=['True'],
-                     colnames=['Predicted'],
-                     )
-    cm = cm.div(cm.sum(axis=1), axis='index')
+    cm = confusion_matrix(np.argmax(datasets[1], axis=1),
+                          y_pred_class,
+                          )
+
+    cm_norm = np.around(cm.astype('float') / cm.sum(axis=1)[:, np.newaxis], 3)
+
     if printout:
         print('Test Set Evaluation:')
         for key, val in sc.items():
@@ -494,7 +501,7 @@ def model_evaluate(model,
             except TypeError:
                 print(f'{key.capitalize()}: {val}')
         print('Test Set Confusion Matrix:')
-        print(cm)
+        print(cm_norm)
         fig, ax = plot_confusion_matrix(cm,
                                         # classes=['WI', 'SS', 'WO'],
                                         classes=['SS', 'WO'],
@@ -543,15 +550,15 @@ if __name__ == "__main__":
     TB_LOG_DIR = TB_DIR / 'probeClassification/FailPoint/MLP'
 
     FITPARAMS = {
-        'epochs': 2000,
+        'epochs': 1000,
         'batch_size': 128,
         'verbose': 0,
     }
 
     MODELPARAMS = {
         'modelFunc': create_mlp_model,
-        'nLayers': 2,
-        'nUnits': [32, 32],
+        'nLayers': 3,
+        'nUnits': [16, 16, 16],
         'activation': 'relu',
         'dropout': 0.01,
         'initMode': 'glorot_uniform',
