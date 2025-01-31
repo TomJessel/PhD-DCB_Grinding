@@ -3,6 +3,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from pathlib import Path
 from scipy.interpolate import interp1d
+from scipy.signal import correlate
 from nptdms import TdmsFile
 from tqdm import tqdm
 from datetime import datetime
@@ -33,6 +34,26 @@ def _smooth(sig, win=11):
     start = np.cumsum(sig[:win - 1])[::2] / r
     stop = (np.cumsum(sig[:-win:-1])[::2] / r)[::-1]
     return np.concatenate((start, out, stop))
+
+
+def compute_shift(zipped) -> int:
+    """
+    Use fft correlation to compute the shift between two signals.
+
+    Args:
+        zipped: Zip tuple containing the signals to compare between each other.
+
+    Returns:
+        Int representing the number of samples of shift between the signals.
+    """
+    x = zipped[0]
+    y = zipped[1]
+    assert len(x) == len(y)
+    c = correlate(x, y, mode='same', method='auto')
+    assert len(c) == len(x)
+    zero_index = int(len(x) / 2) - 1
+    shift = zero_index - np.argmax(c)
+    return shift
 
 
 class NC4SpiralScan:
@@ -153,7 +174,13 @@ class NC4SpiralScan:
         scanMat = self._scanToMat(scanRad)
         return scanMat
 
-    def plotSpiralScan(self, path=None, Zsection=1.0, saveFig=False):
+    def plotSpiralScan(self,
+                       path=None,
+                       Zsection=1.0,
+                       vmin=0.61,
+                       vmax=0.68,
+                       saveFig=False,
+                       ):
         if path is None:
             path = self._scanPath
 
@@ -182,8 +209,8 @@ class NC4SpiralScan:
                           extent=[theta[0], theta[-1],
                                   z[0], z[-1]
                                   ],
-                          vmin=0.61,
-                          vmax=0.68,
+                          vmin=vmin,
+                          vmax=vmax,
                           )
         plt.colorbar(im, ax=ax[1], label='Radius (mm)')
         ax[1].set_xlabel('Angle (deg)')
@@ -347,21 +374,33 @@ if __name__ == "__main__":
     )
     assert SCPath.exists(), "SCurve calibration file not found."
 
-    exp = load('Test 17')
+    exp = load('Test 21')
+    files = list(Path(exp.dataloc).joinpath('Spiral Scans').glob('*.tdms'))
 
-    sprialScans = processExpSprialScans(exp,
-                                        SCPath,
-                                        nomDia=NOM_DIA,
-                                        feedrate=FEEDRATE,
-                                        rpm=RPM,
-                                        fs=FS,
-                                        yOffset=YOFFSET,
-                                        calFeedrate=CALFEEDRATE,
-                                        )
+    nc = NC4SpiralScan(files[5],
+                       sCurvePath=SCPath,
+                       fs=FS,
+                       spindleSpeed=RPM,
+                       zSpiralFeedrate=FEEDRATE,
+                       toolNomDia=NOM_DIA,
+                       yOffset=YOFFSET,
+                       scFeedrate=CALFEEDRATE,
+                       )
+    fig, ax = nc.plotSpiralScan(saveFig=False,)
 
-    fig, ax = sprialScans[0].plotSpiralScan(saveFig=False,
-                                            Zsection=1.0,
-                                            )
+    # sprialScans = processExpSprialScans(exp,
+    #                                     SCPath,
+    #                                     nomDia=NOM_DIA,
+    #                                     feedrate=FEEDRATE,
+    #                                     rpm=RPM,
+    #                                     fs=FS,
+    #                                     yOffset=YOFFSET,
+    #                                     calFeedrate=CALFEEDRATE,
+    #                                     )
+
+    # fig, ax = sprialScans[0].plotSpiralScan(saveFig=False,
+    #                                         Zsection=1.0,
+    #                                         )
 
     # # AE testing Folder
     # TEST_FOLDER = BASE_DIR.joinpath(r'AE/Testing')
@@ -388,4 +427,4 @@ if __name__ == "__main__":
     #                                 Zsection=1.0,
     #                                 )
     #     plt.close(fig)
-    # plt.show()
+    plt.show()
