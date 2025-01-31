@@ -18,3 +18,12 @@ test20,24_08_13_weartest_D1.3_#1000/Test 20.pickle
 test21,24_08_14_weartest_D1.3_#1000/Test 21.pickle
 test22,24_09_03_weartest_D1.3_#1000/Test 22.pickle
 test23,24_09_11_weartest_D1.3_#1000/Test 23.pickle
+test24,24_10_02_weartest_D1.3_#1000/Test 24.pickle
+test25,24_10_08_weartest_D1.3_#1000/Test 25.pickle
+test26,24_10_09_weartest_D1.3_#1000/Test 26.pickle
+test28,24_11_13_weartest_D1.3_#1000/Test 28.pickle
+test30,24_11_20_weartest_D1.3_#1000/Test 30.pickle
+test31,24_12_03_weartest_D1.3_#1000/Test 31.pickle
+test32,25_01_20_weartest_D1.3_#1000/Test 32.pickle
+test33,25_01_21_weartest_D1.3_#1000_PARAMVAR/Test 33.pickle
+test34,25_01_28_weartest_D1.3_#1000/Test 34.pickle
