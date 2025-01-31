@@ -232,6 +232,8 @@ def create_mlp_model(modelParams, nInputs: int, nOutputs: int):
         modelParams['dropout'] = 0.01
     if 'initMode' not in modelParams:
         modelParams['initMode'] = 'glorot_uniform'
+    if 'kernelReg' not in modelParams:
+        modelParams['kernelReg'] = None
     
     if isinstance(modelParams['nUnits'], list):
         if len(modelParams['nUnits']) != modelParams['nLayers']:
@@ -248,6 +250,7 @@ def create_mlp_model(modelParams, nInputs: int, nOutputs: int):
                                activation=modelParams['activation'],
                                kernel_initializer=modelParams['initMode'],
                                use_bias=True,
+                               kernel_regularizer=modelParams['kernelReg'],
                                )
         )
         mlp_.add(keras.layers.Dropout(rate=modelParams['dropout']))
@@ -540,18 +543,19 @@ if __name__ == "__main__":
     TB_LOG_DIR = TB_DIR / 'probeClassification/FailPoint/MLP'
 
     FITPARAMS = {
-        'epochs': 1000,
-        'batch_size': 32,
+        'epochs': 2000,
+        'batch_size': 128,
         'verbose': 0,
     }
 
     MODELPARAMS = {
         'modelFunc': create_mlp_model,
-        'nLayers': 3,
-        'nUnits': [32, 32, 32],
+        'nLayers': 2,
+        'nUnits': [32, 32],
         'activation': 'relu',
         'dropout': 0.01,
         'initMode': 'glorot_uniform',
+        'kernelReg': keras.regularizers.l2(0.001),
     }
 
     COMPILEPARAMS = {
@@ -671,7 +675,7 @@ if __name__ == "__main__":
                                            )
     print(f'Training Data: {len(idx_train)} - Testing Data: {len(idx_test)}\n')
 
-    #* Print Model Setup
+    #* Model Setup
     # Define model
     mlp = create_mlp_model(MODELPARAMS,
                            nInputs=input_df.shape[1],
