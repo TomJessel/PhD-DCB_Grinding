@@ -1,5 +1,6 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import io
 import tensorflow as tf
 import multiprocessing as mp
 import time
@@ -246,13 +247,24 @@ def create_mlp_model(modelParams, nInputs: int, nOutputs: int):
     elif isinstance(modelParams['nUnits'], int):
         nUnits = [modelParams['nUnits']] * modelParams['nLayers']
 
+    # check model regularisation parameters
+    if modelParams['kernelReg'] is None:
+        modelParams['kernelReg'] = {'l1': 0, 'l2': 0}
+    if 'l1' not in modelParams['kernelReg']:
+        modelParams['kernelReg']['l1'] = 0
+    if 'l2' not in modelParams['kernelReg']:
+        modelParams['kernelReg']['l2'] = 0
+
     for nUnit in nUnits:
+        reg = keras.regularizers.L1L2(l1=modelParams['kernelReg']['l1'],
+                                      l2=modelParams['kernelReg']['l2'],
+                                      )
         mlp_.add(
             keras.layers.Dense(nUnit,
                                activation=modelParams['activation'],
                                kernel_initializer=modelParams['initMode'],
                                use_bias=True,
-                               kernel_regularizer=modelParams['kernelReg'],
+                               kernel_regularizer=reg,
                                )
         )
         mlp_.add(keras.layers.Dropout(rate=modelParams['dropout']))
@@ -397,6 +409,11 @@ def cv_model(cvNSplits,
                                         )
     
     if TB:
+        if printout is False:
+            fig, ax = plot_confusion_matrix(cv_cm_mean,
+                                            std=cv_cm_std,
+                                            title='Cross-Validation',
+                                            )
         tb_writer = tf.summary.create_file_writer(str(tbLogDir))
         md_scores = (
             f'### Scores - CV {cvNSplits}S{cvNRepeats}R\n'
@@ -410,19 +427,23 @@ def cv_model(cvNSplits,
             f'### Confusion Matrix - CV {cvNSplits}S{cvNRepeats}R\n'
             f'| True\Predicted | WI | SS | WO |\n'
             f'|----------------|----|----|----|\n'
-            f'| WI | {cv_cm_mean.iloc[0, 0]:.4f} +- {cv_cm_std.iloc[0, 0]:.4f}'
-            f' | {cv_cm_mean.iloc[0, 1]:.4f} +- {cv_cm_std.iloc[0, 1]:.4f}'
-            f' | {cv_cm_mean.iloc[0, 2]:.4f} +- {cv_cm_std.iloc[0, 2]:.4f} |\n'
-            f'| SS | {cv_cm_mean.iloc[1, 0]:.4f} +- {cv_cm_std.iloc[1, 0]:.4f}'
-            f' | {cv_cm_mean.iloc[1, 1]:.4f} +- {cv_cm_std.iloc[1, 1]:.4f}'
-            f' | {cv_cm_mean.iloc[1, 2]:.4f} +- {cv_cm_std.iloc[1, 2]:.4f} |\n'
-            f'| WO | {cv_cm_mean.iloc[2, 0]:.4f} +- {cv_cm_std.iloc[2, 0]:.4f}'
-            f' | {cv_cm_mean.iloc[2, 1]:.4f} +- {cv_cm_std.iloc[2, 1]:.4f}'
-            f' | {cv_cm_mean.iloc[2, 2]:.4f} +- {cv_cm_std.iloc[2, 2]:.4f} |\n'
+            f'| WI | {cv_cm_mean[0, 0]:.4f} +- {cv_cm_std[0, 0]:.4f}'
+            f' | {cv_cm_mean[0, 1]:.4f} +- {cv_cm_std[0, 1]:.4f}'
+            f' | {cv_cm_mean[0, 2]:.4f} +- {cv_cm_std[0, 2]:.4f} |\n'
+            f'| SS | {cv_cm_mean[1, 0]:.4f} +- {cv_cm_std[1, 0]:.4f}'
+            f' | {cv_cm_mean[1, 1]:.4f} +- {cv_cm_std[1, 1]:.4f}'
+            f' | {cv_cm_mean[1, 2]:.4f} +- {cv_cm_std[1, 2]:.4f} |\n'
+            f'| WO | {cv_cm_mean[2, 0]:.4f} +- {cv_cm_std[2, 0]:.4f}'
+            f' | {cv_cm_mean[2, 1]:.4f} +- {cv_cm_std[2, 1]:.4f}'
+            f' | {cv_cm_mean[2, 2]:.4f} +- {cv_cm_std[2, 2]:.4f} |\n'
         )
         with tb_writer.as_default():
             tf.summary.text('Cross-Validation Scores:', md_scores, step=0)
             tf.summary.text('Cross-Validation Scores:', md_cm, step=1)
+            tf.summary.image('CV Confusion Matrix',
+                             plot_to_image(fig),
+                             step=0,
+                             )
     return (cv_sc_mean, cv_sc_std), (cv_cm_mean, cv_cm_std)
 
 
@@ -451,6 +472,7 @@ def _mlp_tb_desc_dict(modelParams, compileParams, fitParams):
               'batch_size': fitParams['batch_size'],
               'units': units,
               'init_mode': modelParams['initMode'],
+              'kernel_reg': str(modelParams['kernelReg']),
               'activation': modelParams['activation'],
               'dropout': modelParams['dropout'],
               'loss': compileParams['loss'],
@@ -502,6 +524,10 @@ def model_evaluate(model,
                                         )
     
     if tb:
+        if printout is False:
+            fig, ax = plot_confusion_matrix(cm,
+                                            title='Test Set',
+                                            )
         tb_writer = tf.summary.create_file_writer(str(tbLogDir))
         md_scores = (
             '### Scores - Test Dataset\n'
@@ -515,18 +541,42 @@ def model_evaluate(model,
             '### Confusion Matrix - Test Dataset\n'
             f'| True\Predicted | WI | SS | WO |\n'
             f'|----------------|----|----|----|\n'
-            f'| WI | {cm.iloc[0, 0]:.4f} | {cm.iloc[0, 1]:.4f} '
-            f'| {cm.iloc[0, 2]:.4f} |\n'
-            f'| SS | {cm.iloc[1, 0]:.4f} | {cm.iloc[1, 1]:.4f} '
-            f'| {cm.iloc[1, 2]:.4f} |\n'
-            f'| WO | {cm.iloc[2, 0]:.4f} | {cm.iloc[2, 1]:.4f} '
-            f'| {cm.iloc[2, 2]:.4f} |\n'
+            f'| WI | {cm[0, 0]:.4f} | {cm[0, 1]:.4f} '
+            f'| {cm[0, 2]:.4f} |\n'
+            f'| SS | {cm[1, 0]:.4f} | {cm[1, 1]:.4f} '
+            f'| {cm[1, 2]:.4f} |\n'
+            f'| WO | {cm[2, 0]:.4f} | {cm[2, 1]:.4f} '
+            f'| {cm[2, 2]:.4f} |\n'
         )
 
         with tb_writer.as_default():
             tf.summary.text('Test Dataset Scores:', md_scores, step=0)
             tf.summary.text('Test Dataset Scores:', md_cm, step=1)
+            tf.summary.image('Test Dataset Confusion Matrix',
+                             plot_to_image(fig),
+                             step=0,
+                             )
     return sc, cm
+
+
+def plot_to_image(figure):
+    """
+    Converts the matplotlib plot specified by 'figure' to a PNG image and
+    returns it. The supplied figure is closed and inaccessible after this call.
+    From Tensorflow documentation.
+    """
+    # Save the plot to a PNG in memory.
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    # Closing the figure prevents it from being displayed directly inside
+    # the notebook.
+    plt.close(figure)
+    buf.seek(0)
+    # Convert PNG buffer to TF image
+    image = tf.image.decode_png(buf.getvalue(), channels=4)
+    # Add the batch dimension
+    image = tf.expand_dims(image, 0)
+    return image
 
 
 if __name__ == "__main__":
@@ -539,11 +589,11 @@ if __name__ == "__main__":
 
     RANDOM_STATE = 42
 
-    TB = False
-    TB_LOG_DIR = TB_DIR / 'probeClassification/FailPoint/MLP'
+    TB = True
+    TB_LOG_DIR = TB_DIR / 'probeClassification/MultiClass'
 
     FITPARAMS = {
-        'epochs': 2000,
+        'epochs': 4000,
         'batch_size': 128,
         'verbose': 0,
     }
@@ -551,11 +601,13 @@ if __name__ == "__main__":
     MODELPARAMS = {
         'modelFunc': create_mlp_model,
         'nLayers': 3,
-        'nUnits': [16, 16, 16],
+        'nUnits': [32, 32, 32],
         'activation': 'relu',
         'dropout': 0.01,
         'initMode': 'glorot_uniform',
-        'kernelReg': keras.regularizers.l2(0.001),
+        'kernelReg': {'l1': 0,
+                      'l2': 0.01,
+                      },
     }
 
     COMPILEPARAMS = {
@@ -649,6 +701,7 @@ if __name__ == "__main__":
 
     #* Plot probe data scatter
     fig, ax = plot_scatter_cat(dfs, DOC, TOL)
+    fig.suptitle('True Labels')
     
     #* Dataset setup for ML
     # Joing all datasets
@@ -696,6 +749,8 @@ if __name__ == "__main__":
         for key in pop_keys:
             hp_params.pop(key, None)
         hp_params['nUnits'] = str(hp_params['nUnits'])
+        if 'kernelReg' in hp_params:
+            hp_params['kernelReg'] = str(hp_params['kernelReg'])
         with tb_writer.as_default():
             hp.hparams(hp_params,
                        trial_id=run_name,
@@ -748,5 +803,11 @@ if __name__ == "__main__":
                    tb=TB,
                    tbLogDir=TB_LOG_DIR,
                    )
+
+    pred_dfs = [df.copy() for df in dfs]
+    for pred_df in pred_dfs:
+        pred_df['Probe cat'] = np.argmax(mlp.predict(input_df, verbose=0))
+    fig, ax = plot_scatter_cat(pred_dfs, DOC, TOL)
+    fig.suptitle('Predicted Labels')
     
     plt.show()
