@@ -100,6 +100,14 @@ def drop_point_labels(df, drop_point):
     return df
 
 
+def manual_multiclass_label(df, label_index):
+    cat = np.ones(len(df), dtype=int)
+    cat[:label_index[0] + 1] = 0
+    cat[label_index[1]:] = 2
+    df['Probe cat'] = cat
+    return df
+
+
 def create_maindf(dfs):
     # join all datasets
     main_df = pd.concat(dfs, ignore_index=True)
@@ -129,59 +137,43 @@ def plot_scatter_cat(dfs, doc, tol):
         tol (float): Tolerance of DOC.
     
     """
-    fig, ax = plt.subplots(4, 4,
+    fig, ax = plt.subplots(3, 6,
                            figsize=(15, 8),
-                           sharey='row',
+                           sharey=True,
                            constrained_layout=True,
                            )
-    ax_pos = [[0, 0],
-              [0, 1],
-              [0, 2],
-              [0, 3],
-              [1, 0],
-              [1, 1],
-              [1, 2],
-              [1, 3],
-              [2, 0],
-              [2, 1],
-              [2, 2],
-              [2, 3],
-              [3, 0],
-              [3, 1],
-              [3, 2],
-              [3, 3]]
+    ax = ax.ravel()
 
-    for i, (df, ax_idx) in enumerate(zip(dfs, ax_pos)):
-        ax_row, ax_col = ax_idx
-
+    # no. classes in dataset
+    try:
+        n_classes = np.max([len(df['Probe cat'].unique()) for df in dfs])
+    except KeyError:
+        n_classes = 1
+    
+    for i, df in enumerate(dfs):
         x = np.arange(len(df))
         y = df['Probe diff']
 
-        ax[ax_row, ax_col].plot(x, y, 'k--', alpha=0.5)
-        ax[ax_row, ax_col].axhline(y=doc, color='g', ls='--', alpha=0.5)
-        ax[ax_row, ax_col].axhline(y=doc + tol, color='r', ls='--', alpha=0.5)
-        ax[ax_row, ax_col].axhline(y=doc - tol, color='r', ls='--', alpha=0.5)
+        ax[i].plot(x, y, 'k--', alpha=0.5)
+        ax[i].axhline(y=doc, color='g', ls='--', alpha=0.5)
+        # ax[i].axhline(y=doc + tol, color='r', ls='--', alpha=0.5)
+        # ax[i].axhline(y=doc - tol, color='r', ls='--', alpha=0.5)
 
-        if 'Probe cat' in df.columns:
+        if n_classes == 3:
             cat = df['Probe cat']
-            # c = ['g' if x == 0 else 'r' if x == 2 else 'C0' for x in cat]
+            c = ['g' if x == 0 else 'r' if x == 2 else 'C0' for x in cat]
+        elif n_classes == 2:
             c = ['C0' if x == 0 else 'r' for x in cat]
         else:
             c = ['C0'] * len(df)
-        ax[ax_row, ax_col].scatter(x, y, c=c, s=50, marker='x')
-        ax[ax_row, ax_col].set_title(f'Test {i + 1}')
-        
-        if ax_col == 0:
-            ax[ax_row, ax_col].set_ylabel('Probed DOC (mm)')
-        if ax_row == 3:
-            ax[ax_row, ax_col].set_xlabel('Cut No.')
 
-    # # remove unused axes
-    # for i in range(1, 3):
-    #     for j in range(3, 7):
-    #         if i == 0 and j == 0:
-    #             continue
-    #         ax[i, j].axis('off')
+        ax[i].scatter(x, y, c=c, s=50, marker='x')
+        ax[i].set_title(f'Test {i + 1}')
+        
+        if i in [0, 6, 12]:
+            ax[i].set_ylabel('Probed DOC (mm)')
+        if i >= 12:
+            ax[i].set_xlabel('Cut No.')
     return fig, ax
 
 
@@ -213,8 +205,9 @@ def plot_confusion_matrix(cm, std=None, classes=None, title=None, plt_ax=None):
     ax.set_xticks(np.arange(cm.shape[1]))
     ax.set_yticks(np.arange(cm.shape[1]))
     if classes is not None:
-        ax.set_xticklabels(classes)
-        ax.set_yticklabels(classes)
+        if len(classes) == len(cm.shape[0]):
+            ax.set_xticklabels(classes)
+            ax.set_yticklabels(classes)
 
     ax.set_xlabel('Predicted')
     ax.set_ylabel('True')
@@ -399,7 +392,7 @@ def cv_model(cvNSplits,
         fig, ax = plot_confusion_matrix(cv_cm_mean,
                                         std=cv_cm_std,
                                         # classes=['WI', 'SS', 'WO'],
-                                        classes=['SS', 'WO'],
+                                        # classes=['SS', 'WO'],
                                         title='Cross-Validation',
                                         )
     
@@ -504,7 +497,7 @@ def model_evaluate(model,
         print(cm_norm)
         fig, ax = plot_confusion_matrix(cm,
                                         # classes=['WI', 'SS', 'WO'],
-                                        classes=['SS', 'WO'],
+                                        # classes=['SS', 'WO'],
                                         title='Test Set',
                                         )
     
@@ -550,7 +543,7 @@ if __name__ == "__main__":
     TB_LOG_DIR = TB_DIR / 'probeClassification/FailPoint/MLP'
 
     FITPARAMS = {
-        'epochs': 1000,
+        'epochs': 2000,
         'batch_size': 128,
         'verbose': 0,
     }
@@ -628,30 +621,31 @@ if __name__ == "__main__":
                                            )
 
     # Determine categorical labels
-    drop_points = [
-        120,
-        100,
-        131,
-        123,
-        122,
-        119,
-        115,
-        100,
-        89,
-        78,
-        148,
-        57,
-        102,
-        55,
-        55,
-        60,
-        50,
-        59,
+    label_index = [
+        (6, 120),
+        (6, 100),
+        (6, 131),
+        (6, 123),
+        (6, 122),
+        (6, 119),
+        (4, 115),
+        (0, 100),
+        (2, 89),
+        (6, 78),
+        (2, 148),
+        (3, 57),
+        (5, 102),
+        (2, 55),
+        (5, 55),
+        (1, 60),
+        (2, 50),
+        (1, 59),
     ]
 
     for i, df in enumerate(dfs):
         # df = multiclass_categorise(df, DOC, TOL)
-        df = drop_point_labels(df, drop_points[i])
+        df = manual_multiclass_label(df, label_index[i])
+        # df = drop_point_labels(df, label_index[i][1])
 
     #* Plot probe data scatter
     fig, ax = plot_scatter_cat(dfs, DOC, TOL)
