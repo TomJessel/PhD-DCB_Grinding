@@ -601,12 +601,12 @@ if __name__ == "__main__":
     MODELPARAMS = {
         'modelFunc': create_mlp_model,
         'nLayers': 3,
-        'nUnits': [32, 32, 32],
+        'nUnits': [16, 16, 16],
         'activation': 'relu',
-        'dropout': 0.01,
+        'dropout': 0,
         'initMode': 'glorot_uniform',
         'kernelReg': {'l1': 0,
-                      'l2': 0.01,
+                      'l2': 0,
                       },
     }
 
@@ -803,10 +803,23 @@ if __name__ == "__main__":
                    tb=TB,
                    tbLogDir=TB_LOG_DIR,
                    )
-
+    
+    #* Predicted Label Scatter Plot
     pred_dfs = [df.copy() for df in dfs]
     for pred_df in pred_dfs:
-        pred_df['Probe cat'] = np.argmax(mlp.predict(input_df, verbose=0))
+        df_input = pred_df.iloc[:, :-1].copy()
+        df_input = df_input.drop(columns=['Runout',
+                                          'Form error',
+                                          'Peak radius',
+                                          'Mean radius',
+                                          'Radius diff',
+                                          'Avg probe',
+                                          'Probe diff',
+                                          ])
+        df_input = scaler.transform(df_input)
+        pred_df['Probe cat'] = np.argmax(mlp.predict(df_input, verbose=0),
+                                         axis=1,
+                                         )
     fig, ax = plot_scatter_cat(pred_dfs, DOC, TOL)
     fig.suptitle('Predicted Labels')
     
