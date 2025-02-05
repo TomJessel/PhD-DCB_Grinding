@@ -593,7 +593,7 @@ if __name__ == "__main__":
     TB_LOG_DIR = TB_DIR / 'probeClassification/MultiClass'
 
     FITPARAMS = {
-        'epochs': 4000,
+        'epochs': 1000,
         'batch_size': 128,
         'verbose': 0,
     }
@@ -603,7 +603,7 @@ if __name__ == "__main__":
         'nLayers': 3,
         'nUnits': [16, 16, 16],
         'activation': 'relu',
-        'dropout': 0,
+        'dropout': 0.01,
         'initMode': 'glorot_uniform',
         'kernelReg': {'l1': 0,
                       'l2': 0,
@@ -780,7 +780,12 @@ if __name__ == "__main__":
                 metrics=COMPILEPARAMS['metrics'],
                 )
     # Fit model
-    callbacks = [TqdmCallback(verbose=0)]
+    callbacks = [
+        TqdmCallback(verbose=0),
+        keras.callbacks.ModelCheckpoint(
+            TB_LOG_DIR / 'model.keras',
+        ),
+    ]
     if TB:
         callbacks.append(keras.callbacks.TensorBoard(log_dir=TB_LOG_DIR,))
 
