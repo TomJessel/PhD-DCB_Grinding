@@ -403,8 +403,6 @@ def cv_model(cvNSplits,
         print()
         fig, ax = plot_confusion_matrix(cv_cm_mean,
                                         std=cv_cm_std,
-                                        # classes=['WI', 'SS', 'WO'],
-                                        # classes=['SS', 'WO'],
                                         title='Cross-Validation',
                                         )
     
@@ -414,6 +412,9 @@ def cv_model(cvNSplits,
                                             std=cv_cm_std,
                                             title='Cross-Validation',
                                             )
+        fig.savefig(tbLogDir / 'Figures/Confusion Matrix - CV.png',
+                    dpi=300,
+                    )
         tb_writer = tf.summary.create_file_writer(str(tbLogDir))
         md_scores = (
             f'### Scores - CV {cvNSplits}S{cvNRepeats}R\n'
@@ -528,6 +529,9 @@ def model_evaluate(model,
             fig, ax = plot_confusion_matrix(cm,
                                             title='Test Set',
                                             )
+        fig.savefig(tbLogDir / 'Figures/Confusion Matrix - Test.png',
+                    dpi=300,
+                    )
         tb_writer = tf.summary.create_file_writer(str(tbLogDir))
         md_scores = (
             '### Scores - Test Dataset\n'
@@ -562,15 +566,12 @@ def model_evaluate(model,
 def plot_to_image(figure):
     """
     Converts the matplotlib plot specified by 'figure' to a PNG image and
-    returns it. The supplied figure is closed and inaccessible after this call.
+    returns it.
     From Tensorflow documentation.
     """
     # Save the plot to a PNG in memory.
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
-    # Closing the figure prevents it from being displayed directly inside
-    # the notebook.
-    plt.close(figure)
     buf.seek(0)
     # Convert PNG buffer to TF image
     image = tf.image.decode_png(buf.getvalue(), channels=4)
@@ -593,7 +594,7 @@ if __name__ == "__main__":
     TB_LOG_DIR = TB_DIR / 'probeClassification/MultiClass'
 
     FITPARAMS = {
-        'epochs': 1000,
+        'epochs': 500,
         'batch_size': 128,
         'verbose': 0,
     }
@@ -633,6 +634,9 @@ if __name__ == "__main__":
         d = 0.01
     run_name = f'MLP-{units}-D{d}-{t}'
     TB_LOG_DIR = TB_LOG_DIR / run_name
+    if TB:
+        TB_LOG_DIR.mkdir(parents=True, exist_ok=True)
+        TB_LOG_DIR.joinpath('Figures').mkdir(parents=True, exist_ok=True)
 
     #* Load Datasets
     expLabels = [
@@ -702,6 +706,10 @@ if __name__ == "__main__":
     #* Plot probe data scatter
     fig, ax = plot_scatter_cat(dfs, DOC, TOL)
     fig.suptitle('True Labels')
+    if TB:
+        fig.savefig(TB_LOG_DIR / 'Figures/Scatter - True.png',
+                    dpi=300,
+                    )
     
     #* Dataset setup for ML
     # Joing all datasets
@@ -786,6 +794,7 @@ if __name__ == "__main__":
             TB_LOG_DIR / 'model.keras',
         ),
     ]
+
     if TB:
         callbacks.append(keras.callbacks.TensorBoard(log_dir=TB_LOG_DIR,))
 
@@ -827,5 +836,9 @@ if __name__ == "__main__":
                                          )
     fig, ax = plot_scatter_cat(pred_dfs, DOC, TOL)
     fig.suptitle('Predicted Labels')
+    if TB:
+        fig.savefig(TB_LOG_DIR / 'Figures/Scatter - Predictions.png',
+                    dpi=300,
+                    )
     
     plt.show()
