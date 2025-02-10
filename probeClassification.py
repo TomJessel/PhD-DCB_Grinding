@@ -43,6 +43,56 @@ def _smooth(sig, win=11):
     return np.concatenate((start, out, stop))
 
 
+def classification_report(y_true, y_pred, avg=None):
+    """
+    Classification metrics for multiclass classification.
+
+    Args:
+        y_true (np.array): True labels, not one-hot encoded
+        y_pred (np.array): Predicted labels, not one-hot encoded
+        avg (str, optional): Average method for metrics [None, macro, weighted]
+            Defaults to None.
+    Returns:
+        dict: dict of (accuracy, balanced_accuracy, recall, precision, f1, mcc)
+    """
+    total = len(y_true)
+    cm = confusion_matrix(y_true, y_pred)
+    true_preds = np.diag(cm)
+    total_trues = cm.sum(axis=1)
+    total_preds = cm.sum(axis=0)
+
+    accuracy = np.round(true_preds.sum() / total, 3)
+    recall = np.round(true_preds / total_trues, 3)
+    balanced_accuracy = np.round(np.sum(recall) / len(recall), 3)
+    precision = np.round(true_preds / total_preds, 3)
+    f1 = np.round(2 * (precision * recall) / (precision + recall), 3)
+
+    mcc = (true_preds.sum() * total) - np.dot(total_trues, total_preds)
+    mcc = mcc / np.sqrt(np.square(total) - (np.dot(total_trues, total_trues)))
+    mcc = mcc / np.sqrt(np.square(total) - (np.dot(total_preds, total_preds)))
+    mcc = np.round(mcc, 3)
+
+    if avg == 'macro':
+        recall = np.mean(recall).round(3)
+        precision = np.mean(precision).round(3)
+        f1 = np.mean(f1).round(3)
+    if avg == 'weighted':
+        support = total_trues / total
+        recall = np.sum(recall * support).round(3)
+        precision = np.sum(precision * support).round(3)
+        f1 = np.sum(f1 * support).round(3)
+
+    scores_dict = {
+        'accuracy': accuracy,
+        'balanced_accuracy': balanced_accuracy,
+        'recall': recall,
+        'precision': precision,
+        'f1_score': f1,
+        'mcc': mcc,
+    }
+    return scores_dict
+
+
 def add_freq_features(exps, freqs):
     """
     Add frequency features to experiments.
@@ -298,12 +348,11 @@ def _cv_model(model,
                                ),
               verbose=0,
               )
-    sc = model.evaluate(cvData[0][va_idx],
-                        cvData[1][va_idx],
-                        return_dict=True,
-                        batch_size=32,
-                        verbose=0,
-                        )
+
+    y_true = np.argmax(cvData[1][va_idx], axis=1)
+    y_pred = np.argmax(model.predict(cvData[0][va_idx], verbose=0), axis=1)
+    sc = classification_report(y_true, y_pred, avg='macro')
+
     y_pred = model.predict(cvData[0], verbose=0)
     y_pred_class = np.argmax(y_pred, axis=1)
     cm = confusion_matrix(np.argmax(cvData[1], axis=1),
@@ -322,7 +371,6 @@ def cv_model(cvNSplits,
              modelParams,
              compileParams,
              fitParams,
-             printout=True,
              TB=False,
              tbLogDir=None,
              random_state=None,
@@ -373,14 +421,8 @@ def cv_model(cvNSplits,
     # Average CV scores
     sc = {}
     for key in cv_scores[0].keys():
-        if key == 'loss':
-            continue
-        if key == 'f1_score':
-            sc[key] = [cv[key].numpy() for cv in cv_scores]
-            sc[key] = np.array(sc[key])
-        else:
-            sc[key] = [cv[key] for cv in cv_scores]
-            sc[key] = np.array(sc[key])
+        sc[key] = [cv[key] for cv in cv_scores]
+        sc[key] = np.array(sc[key])
 
     cv_sc_mean = {key: np.mean(val, axis=0) for key, val in sc.items()}
     cv_sc_std = {key: np.std(val, axis=0) for key, val in sc.items()}
@@ -394,24 +436,20 @@ def cv_model(cvNSplits,
         cv_cm_mean.astype('float') / cv_cm_mean.sum(axis=1)[:, np.newaxis], 3
     )
 
-    if printout:
-        print('\nCross-Validation Evaluation:')
-        for key, val in cv_sc_mean.items():
-            print(f'{key.capitalize()}: {val} +/- {cv_sc_std[key]}')
-        print('Cross-Validation Confusion Matrix:')
-        print(cv_cm_mean_div)
-        print()
-        fig, ax = plot_confusion_matrix(cv_cm_mean,
-                                        std=cv_cm_std,
-                                        title='Cross-Validation',
-                                        )
+    print('\nCross-Validation Evaluation:')
+    for key, val in cv_sc_mean.items():
+        string = f'{key.capitalize()}: {val.round(3)}'
+        string += f' +/- {cv_sc_std[key].round(3)}'
+        print(string)
+    print('Cross-Validation Confusion Matrix:')
+    print(cv_cm_mean_div)
+    print()
+    fig, ax = plot_confusion_matrix(cv_cm_mean,
+                                    std=cv_cm_std,
+                                    title='Cross-Validation',
+                                    )
     
     if TB:
-        if printout is False:
-            fig, ax = plot_confusion_matrix(cv_cm_mean,
-                                            std=cv_cm_std,
-                                            title='Cross-Validation',
-                                            )
         fig.savefig(tbLogDir / 'Figures/Confusion Matrix - CV.png',
                     dpi=300,
                     )
@@ -485,7 +523,6 @@ def _mlp_tb_desc_dict(modelParams, compileParams, fitParams):
 def model_evaluate(model,
                    datasets,
                    idx_test,
-                   printout=True,
                    tb=False,
                    tbLogDir=None,
                    ):
@@ -507,28 +544,23 @@ def model_evaluate(model,
 
     cm_norm = np.around(cm.astype('float') / cm.sum(axis=1)[:, np.newaxis], 3)
 
-    if printout:
-        print('Test Set Evaluation:')
-        for key, val in sc.items():
-            if key == 'loss':
-                continue
-            try:
-                print(f'{key.capitalize()}: {val:.4f}')
-            except TypeError:
-                print(f'{key.capitalize()}: {val}')
-        print('Test Set Confusion Matrix:')
-        print(cm_norm)
-        fig, ax = plot_confusion_matrix(cm,
-                                        # classes=['WI', 'SS', 'WO'],
-                                        # classes=['SS', 'WO'],
-                                        title='Test Set',
-                                        )
+    print('Test Set Evaluation:')
+    scores_dict = classification_report(
+        np.argmax(datasets[1][idx_test], axis=1),
+        y_pred_class[idx_test],
+        avg=None,
+    )
+
+    for metric, metric_val in scores_dict.items():
+        print(f'{metric}: {metric_val}')
+
+    print('Test Set Confusion Matrix:')
+    print(cm_norm)
+    fig, ax = plot_confusion_matrix(cm,
+                                    title='Test Set',
+                                    )
     
     if tb:
-        if printout is False:
-            fig, ax = plot_confusion_matrix(cm,
-                                            title='Test Set',
-                                            )
         fig.savefig(tbLogDir / 'Figures/Confusion Matrix - Test.png',
                     dpi=300,
                     )
@@ -538,19 +570,19 @@ def model_evaluate(model,
             '| Metric | Score |\n'
             '|--------|-------|\n'
         )
-        for key, val in sc.items():
-            md_scores += f"| {key} | {val:.4f} |\n"
+        for key, val in scores_dict.items():
+            md_scores += f"| {key} | {val} |\n"
 
         md_cm = (
             '### Confusion Matrix - Test Dataset\n'
             f'| True\Predicted | WI | SS | WO |\n'
             f'|----------------|----|----|----|\n'
-            f'| WI | {cm[0, 0]:.4f} | {cm[0, 1]:.4f} '
-            f'| {cm[0, 2]:.4f} |\n'
-            f'| SS | {cm[1, 0]:.4f} | {cm[1, 1]:.4f} '
-            f'| {cm[1, 2]:.4f} |\n'
-            f'| WO | {cm[2, 0]:.4f} | {cm[2, 1]:.4f} '
-            f'| {cm[2, 2]:.4f} |\n'
+            f'| WI | {cm[0, 0]} | {cm[0, 1]} '
+            f'| {cm[0, 2]} |\n'
+            f'| SS | {cm[1, 0]} | {cm[1, 1]} '
+            f'| {cm[1, 2]} |\n'
+            f'| WO | {cm[2, 0]} | {cm[2, 1]} '
+            f'| {cm[2, 2]} |\n'
         )
 
         with tb_writer.as_default():
@@ -594,7 +626,7 @@ if __name__ == "__main__":
     TB_LOG_DIR = TB_DIR / 'probeClassification/MultiClass'
 
     FITPARAMS = {
-        'epochs': 500,
+        'epochs': 4000,
         'batch_size': 128,
         'verbose': 0,
     }
@@ -604,7 +636,7 @@ if __name__ == "__main__":
         'nLayers': 3,
         'nUnits': [16, 16, 16],
         'activation': 'relu',
-        'dropout': 0.01,
+        'dropout': 0.001,
         'initMode': 'glorot_uniform',
         'kernelReg': {'l1': 0,
                       'l2': 0,
@@ -614,7 +646,7 @@ if __name__ == "__main__":
     COMPILEPARAMS = {
         'loss': 'categorical_crossentropy',
         'optimizer': 'adam',
-        'metrics': ['accuracy', 'recall', 'precision', 'auc'],
+        'metrics': ['accuracy'],
     }
 
     CV_NSPLITS = 5
@@ -772,7 +804,6 @@ if __name__ == "__main__":
              modelParams=MODELPARAMS,
              compileParams=COMPILEPARAMS,
              fitParams=FITPARAMS,
-             printout=True,
              TB=TB,
              tbLogDir=TB_LOG_DIR,
              )
@@ -813,7 +844,6 @@ if __name__ == "__main__":
     model_evaluate(mlp,
                    (input_df, target_df),
                    idx_test,
-                   printout=True,
                    tb=TB,
                    tbLogDir=TB_LOG_DIR,
                    )
